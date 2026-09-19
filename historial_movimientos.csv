@@ -1,0 +1,42 @@
+Fecha_Hora,Serie,Modelo,Tipo_Movimiento,Detalles
+2026-09-18 13:28:30,22537656Y,V25,ENTRADA,Registrado en En almacén de Publicidad con estatus Nuevo
+2026-09-18 13:33:45,22537656Y,V25,CAMBIO/SALIDA,"Movido de En almacén de Publicidad a En taller, Estatus: Para Reparar. Motivo: "
+2026-09-18 14:43:27,92581072A,V12,ENTRADA,Registrado en En almacén de Comodatos con estatus Para Reparar
+2026-09-18 14:43:45,22537656Y,V25,ELIMINACIÓN,Equipo eliminado del inventario.
+2026-09-18 14:44:22,12590452,V27,ENTRADA,Registrado en En almacén de Comodatos con estatus Para Reparar
+2026-09-18 14:45:36,343782,VENDING,ENTRADA,Registrado en En almacén de Comodatos con estatus Reparado
+2026-09-18 14:45:58,02580649A,HIDRO,ENTRADA,Registrado en Uso Interno con estatus En Uso
+2026-09-18 14:46:14,22201200X,V25,ENTRADA,Registrado en En almacén de Comodatos con estatus Reparado
+2026-09-18 14:46:26,92320962Y,V25,ENTRADA,Registrado en En almacén de Comodatos con estatus Reparado
+2026-09-18 14:47:02,42490300Z,V9,ENTRADA,Registrado en En almacén de Comodatos con estatus Reparado
+2026-09-18 14:47:18,52630324B,V12,ENTRADA,Registrado en Uso Interno con estatus En Uso
+2026-09-18 14:47:33,K52240800014,VR04,ENTRADA,Registrado en Uso Interno con estatus En Uso
+2026-09-18 14:47:48,02540698B,HIDRO,ENTRADA,Registrado en Uso Interno con estatus En Uso
+2026-09-18 14:48:01,12280799B,HIDRO,ENTRADA,Registrado en Uso Interno con estatus En Uso
+2026-09-18 14:48:17,42230790A,HIDRO,ENTRADA,Registrado en Uso Interno con estatus En Uso
+2026-09-18 14:49:04,12590452,V27,CAMBIO/SALIDA,"Movido de En almacén de Comodatos a En taller, Estatus: Nuevo. Motivo: "
+2026-09-18 14:57:00,343782,VENDING,ACTUALIZACIÓN/SALIDA,Canal: Tradicional -> Vending | Ubicación: En almacén de Comodatos -> En almacén de Comodatos. Motivo: 
+2026-09-18 14:59:12,02580649A,HIDRO,ACTUALIZACIÓN/SALIDA,Canal: Tradicional -> AP20L | Ubicación: Uso Interno -> Uso Interno. Motivo: 
+2026-09-18 15:00:05,02540698B,HIDRO,ACTUALIZACIÓN/SALIDA,Canal: Tradicional -> AP20L | Ubicación: Uso Interno -> Uso Interno. Motivo: 
+2026-09-18 15:00:28,12280799B,HIDRO,ACTUALIZACIÓN/SALIDA,Canal: Tradicional -> AP20L | Ubicación: Uso Interno -> Uso Interno. Motivo: 
+2026-09-18 15:00:51,42230790A,HIDRO,ACTUALIZACIÓN/SALIDA,Canal: Tradicional -> AP20L | Ubicación: Uso Interno -> Uso Interno. Motivo: 
+2026-09-18 15:05:34,22201200X,V25,ACTUALIZACIÓN/SALIDA,Canal: Tradicional -> Tradicional | Ubicación: En almacén de Comodatos -> En proceso de Baja. Motivo: 
+2026-09-18 15:08:30,22201200X,V25,ACTUALIZACIÓN/SALIDA,Canal: Tradicional -> Tradicional | Ubicación: En proceso de Baja -> En almacén de Comodatos. Motivo: 
+2026-09-18 15:15:30,12590452,V27,ACTUALIZACIÓN/SALIDA,Canal: Tradicional -> Tradicional | Ubicación: En taller -> En taller. Motivo: 
+2026-09-18 15:29:08,92581072A,V12,ACTUALIZACIÓN/SALIDA,Canal: Tradicional -> Moderno | Ubicación: En almacén de Comodatos -> En almacén de Comodatos. Motivo: 
+2026-09-18 15:29:25,92581072A,V12,ACTUALIZACIÓN/SALIDA,Canal: Moderno -> Hoteles | Ubicación: En almacén de Comodatos -> En almacén de Comodatos. Motivo: 
+2026-09-18 15:33:52,92581072A,V12,ACTUALIZACIÓN/SALIDA,Canal: Hoteles -> Moderno | Ubicación: En almacén de Comodatos -> En almacén de Comodatos. Motivo: 
+2026-09-18 15:37:28,22201200X,V25,ACTUALIZACIÓN/SALIDA,Canal: Tradicional -> Tradicional | Ubicación: En almacén de Comodatos -> En almacén de Publicidad. Motivo: 
+2026-09-18 15:38:35,22201200X,V25,ACTUALIZACIÓN/SALIDA,Canal: Tradicional -> Tradicional | Ubicación: En almacén de Publicidad -> En proceso de Baja. Motivo: 
+2026-09-18 15:39:59,92581072A,V12,ACTUALIZACIÓN/SALIDA,Canal: Moderno -> Tradicional | Ubicación: En almacén de Comodatos -> En patios. Motivo: 
+2026-09-18 15:41:25,42490300Z,V9,ACTUALIZACIÓN/SALIDA,Canal: Tradicional -> Moderno | Ubicación: En almacén de Comodatos -> En almacén de Publicidad. Motivo: 
+2026-09-18 16:01:51,32456298Q,v17,ENTRADA,Canal: Moderno | Ubicación: En almacén de Comodatos | Estatus: Reparado | Fecha: 2026-07-30
+2026-09-18 16:02:55,32456298Q,v17,ACTUALIZACIÓN/SALIDA,Canal: Moderno -> Moderno | Ubicación: En almacén de Comodatos -> En almacén de Comodatos | Fecha Mov: 2026-08-13. Motivo: 
+2026-09-18 16:03:41,32456298Q,v17,ACTUALIZACIÓN/SALIDA,Canal: Moderno -> Moderno | Ubicación: En almacén de Comodatos -> En almacén de Comodatos | Fecha Mov: 2026-08-28. Motivo: 
+2026-09-18 16:07:29,32456298Q,v17,ACTUALIZACIÓN/SALIDA,Canal: Moderno -> Moderno | Ubicación: En almacén de Comodatos -> En almacén de Comodatos | Fecha Mov: 2026-08-13. Motivo: 
+2026-09-18 16:11:01,32456298Q,V17,ACTUALIZACIÓN/SALIDA,Modelo: v17 -> V17 | Canal: Moderno -> Moderno | Ubicación: En almacén de Comodatos -> En almacén de Comodatos | Fecha Mov: 2026-07-16. Motivo: 
+2026-09-18 16:13:14,32456298Q,V17,ACTUALIZACIÓN/SALIDA,Modelo: V17 -> V17 | Canal: Moderno -> Tradicional | Ubicación: En almacén de Comodatos -> En almacén de Comodatos | Fecha Mov: 2026-07-08. Motivo: 
+2026-09-18 16:14:00,92581072A,V12,ACTUALIZACIÓN/SALIDA,Modelo: V12 -> V12 | Canal: Tradicional -> Tradicional | Ubicación: En patios -> En patios | Fecha Mov: 2026-06-18. Motivo: 
+2026-09-18 16:15:26,12590452,V27,ACTUALIZACIÓN/SALIDA,Modelo: V27 -> V27 | Canal: Tradicional -> Tradicional | Ubicación: En taller -> En taller | Fecha Mov: 2026-08-20. Motivo: 
+2026-09-18 16:16:13,42490300Z,V9,ACTUALIZACIÓN/SALIDA,Modelo: V9 -> V9 | Canal: Moderno -> Moderno | Ubicación: En almacén de Publicidad -> En almacén de Publicidad | Fecha Mov: 2026-05-13. Motivo: 
+2026-09-18 16:16:54,42490300Z,V9,ACTUALIZACIÓN/SALIDA,Modelo: V9 -> V9 | Canal: Moderno -> Tradicional | Ubicación: En almacén de Publicidad -> En almacén de Publicidad | Fecha Mov: 2026-04-04. Motivo: 
