@@ -7,30 +7,56 @@ if sys.platform == 'win32':
 
 import streamlit as st
 import pandas as pd
+import matplotlib.pyplot as plt
 from datetime import datetime, date
 import os
 
 # Configuración de la página y diseño estético
 st.set_page_config(
     page_title="Control de Inventario - Bepensa / Coca-Cola",
-    page_icon="🥤",
+    page_icon="❄️",
     layout="wide"
 )
 
-# Estilos CSS personalizados con la paleta corporativa y colores de fondo
+# Estilos CSS personalizados (Sidebar naranja y tarjetas de KPI estilizadas)
 st.markdown("""
     <style>
     .main {
         background-color: #f8f9fa;
     }
-    .metric-card {
-        background-color: #ffffff;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-        border-left: 5px solid #E60012;
-        text-align: center;
+    
+    /* Personalización de la barra lateral (Sidebar) a color naranja */
+    [data-testid="stSidebar"] {
+        background-color: #FF7A00; /* Color naranja vibrante */
     }
+    
+    /* Cambiar el color de los textos y títulos dentro del Sidebar para que resalten */
+    [data-testid="stSidebar"] h1, 
+    [data-testid="stSidebar"] h2, 
+    [data-testid="stSidebar"] h3, 
+    [data-testid="stSidebar"] label, 
+    [data-testid="stSidebar"] span, 
+    [data-testid="stSidebar"] p {
+        color: #FFFFFF !important;
+    }
+    
+    /* Estilo para el selectbox y elementos interactivos del sidebar */
+    [data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] {
+        background-color: #ffffff;
+        color: #111827;
+        border-radius: 8px;
+    }
+    [data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] * {
+        color: #111827 !important;
+    }
+
+    /* Tarjetas KPI con estilos personalizados de colores */
+    .kpi-card-1 { background-color: #eff6ff; border-left: 5px solid #3b82f6; padding: 16px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .kpi-card-2 { background-color: #ffedd5; border-left: 5px solid #f97316; padding: 16px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .kpi-card-3 { background-color: #fee2e2; border-left: 5px solid #ef4444; padding: 16px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .kpi-card-4 { background-color: #dcfce7; border-left: 5px solid #22c55e; padding: 16px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+    .kpi-card-5 { background-color: #f3e8ff; border-left: 5px solid #a855f7; padding: 16px; border-radius: 10px; text-align: center; box-shadow: 0 2px 4px rgba(0,0,0,0.05); }
+
     div.stButton > button {
         background-color: #E60012;
         color: white;
@@ -97,10 +123,9 @@ def cargar_datos():
         if "Ultimo_Movimiento" not in df.columns:
             df["Ultimo_Movimiento"] = df.get("Fecha_Registro", datetime.now().strftime("%Y-%m-%d"))
         else:
-            # Limpiar por si quedó algún registro anterior con hora
             df["Ultimo_Movimiento"] = df["Ultimo_Movimiento"].astype(str).str.split().str[0]
         if "Canal" not in df.columns:
-            df["Canal"] = "Tradicional"  # Valor por defecto si el archivo anterior no lo tenía
+            df["Canal"] = "Tradicional"
         return df
     else:
         return pd.DataFrame(columns=["Serie", "Modelo", "Canal", "Ubicación", "Estatus", "Fecha_Registro", "Ultimo_Movimiento"])
@@ -126,7 +151,7 @@ def registrar_historial(serie, modelo, tipo_movimiento, detalles):
     df_h = pd.concat([df_h, nuevo_mov], ignore_index=True)
     df_h.to_csv(HISTORIAL_FILE, index=False)
 
-# Función para calcular los días sin movimiento (usando formato de fecha pura YYYY-MM-DD)
+# Función para calcular los días sin movimiento
 def calcular_dias_sin_movimiento(df):
     if df.empty:
         return df
@@ -137,7 +162,6 @@ def calcular_dias_sin_movimiento(df):
     dias_lista = []
     for fecha_str in df_calc['Ultimo_Movimiento']:
         try:
-            # Intentar parsear como fecha pura
             f_mov = datetime.strptime(str(fecha_str).split()[0], "%Y-%m-%d").date()
         except ValueError:
             f_mov = fecha_actual
@@ -152,22 +176,22 @@ def calcular_dias_sin_movimiento(df):
 def colorear_ubicaciones(val):
     val_lower = str(val).strip()
     if val_lower in ["En almacén de Comodatos", "En almacén de Publicidad"]:
-        return 'background-color: #d1fae5; color: #065f46; font-weight: bold;'  # Verde suave
+        return 'background-color: #d1fae5; color: #065f46; font-weight: bold;'
     elif val_lower == "En patios":
-        return 'background-color: #fef3c7; color: #92400e; font-weight: bold;'  # Amarillo suave
+        return 'background-color: #fef3c7; color: #92400e; font-weight: bold;'
     elif val_lower == "En proceso de Baja":
-        return 'background-color: #fee2e2; color: #991b1b; font-weight: bold;'  # Rojo suave
+        return 'background-color: #fee2e2; color: #991b1b; font-weight: bold;'
     elif val_lower == "En taller":
-        return 'background-color: #ffedd5; color: #9a3412; font-weight: bold;'  # Naranja suave
+        return 'background-color: #ffedd5; color: #9a3412; font-weight: bold;'
     elif val_lower == "Uso Interno":
-        return 'background-color: #dbeafe; color: #1e40af; font-weight: bold;'  # Azul suave
+        return 'background-color: #dbeafe; color: #1e40af; font-weight: bold;'
     return ''
 
 # Función para colorear los días sin movimiento si pasan de 40
 def colorear_dias(val):
     try:
         if float(val) > 40:
-            return 'background-color: #fee2e2; color: #991b1b; font-weight: bold;' # Rojo suave
+            return 'background-color: #fee2e2; color: #991b1b; font-weight: bold;'
     except (ValueError, TypeError):
         pass
     return ''
@@ -176,9 +200,8 @@ def colorear_dias(val):
 df_inv = cargar_datos()
 
 # --- BARRA LATERAL PERSONALIZADA ---
-st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3067/3067403.png", width=110)
-st.sidebar.title("🥤 Control Bepensa")
-st.sidebar.markdown("**Gestión de Refrigeradores**")
+st.sidebar.markdown("<h2 style='color: white; text-align: center;'>❄️ Bepensa</h2>", unsafe_allow_html=True)
+st.sidebar.markdown("<p style='text-align: center; color: white;'><b>Control de Refrigeradores</b></p>", unsafe_allow_html=True)
 st.sidebar.markdown("---")
 
 menu = st.sidebar.selectbox(
@@ -186,16 +209,28 @@ menu = st.sidebar.selectbox(
     [
         "📊 Inventario General", 
         "📈 Estadía", 
+        "📦 Equipos Disponibles", 
         "📥 Registrar Entrada", 
-        "🔄 Actualizar / Salida", 
+        "📤 Salida de Equipos", 
         "✏️ Editar / Eliminar", 
         "📜 Historial de Movimientos", 
         "💾 Exportar a Excel"
     ]
 )
 
-# Encabezado principal
-st.markdown("<h1 style='color: #E60012;'>🥤 Control de Inventarios de Refrigeradores - Bepensa</h1>", unsafe_allow_html=True)
+# Encabezado principal con diseño de columnas (Título a la izquierda, Logo Local a la derecha)
+col_titulo, col_logo = st.columns([4, 1])
+
+with col_titulo:
+    st.markdown("<h1 style='color: #E60012; margin-top: 0;'>❄️ Control de Inventarios de Refrigeradores</h1>", unsafe_allow_html=True)
+
+with col_logo:
+    # Carga de la imagen local ubicada en el mismo directorio
+    if os.path.exists("Logo_Bepensa.png"):
+        st.image("Logo_Bepensa.png", width=160)
+    else:
+        st.warning("⚠️ No se encontró 'Logo_Bepensa.png' en la carpeta.")
+
 st.markdown("---")
 
 # 1. INVENTARIO GENERAL Y BUSCADOR
@@ -204,22 +239,50 @@ if menu == "📊 Inventario General":
     
     df_con_dias = calcular_dias_sin_movimiento(df_inv)
     
-    # Tarjetas de resumen rápido (KPIs)
+    # Tarjetas de resumen rápido (KPIs con diseño de colores)
     col1, col2, col3, col4, col5 = st.columns(5)
+    
+    total_eq = len(df_inv)
+    en_taller = len(df_inv[df_inv['Ubicación'] == 'En taller']) if not df_inv.empty else 0
+    para_reparar = len(df_inv[(df_inv['Estatus'] == 'Para Reparar') & (df_inv['Ubicación'] != 'En taller')]) if not df_inv.empty else 0
+    nuevos = len(df_inv[df_inv['Estatus'] == 'Nuevo']) if not df_inv.empty else 0
+    reparados = len(df_inv[df_inv['Estatus'] == 'Reparado']) if not df_inv.empty else 0
+
     with col1:
-        st.metric(label="Total de Equipos", value=len(df_inv))
+        st.markdown(f"""
+            <div class="kpi-card-1">
+                <span style="font-size: 14px; color: #1e3a8a; font-weight: bold;">Total de Equipos</span><br>
+                <span style="font-size: 26px; font-weight: bold; color: #1e3a8a;">{total_eq}</span>
+            </div>
+        """, unsafe_allow_html=True)
     with col2:
-        en_taller = len(df_inv[df_inv['Ubicación'] == 'En taller']) if not df_inv.empty else 0
-        st.metric(label="En Taller", value=en_taller)
+        st.markdown(f"""
+            <div class="kpi-card-2">
+                <span style="font-size: 14px; color: #9a3412; font-weight: bold;">En Taller</span><br>
+                <span style="font-size: 26px; font-weight: bold; color: #9a3412;">{en_taller}</span>
+            </div>
+        """, unsafe_allow_html=True)
     with col3:
-        para_reparar = len(df_inv[(df_inv['Estatus'] == 'Para Reparar') & (df_inv['Ubicación'] != 'En taller')]) if not df_inv.empty else 0
-        st.metric(label="Para Reparar", value=para_reparar)
+        st.markdown(f"""
+            <div class="kpi-card-3">
+                <span style="font-size: 14px; color: #991b1b; font-weight: bold;">Para Reparar</span><br>
+                <span style="font-size: 26px; font-weight: bold; color: #991b1b;">{para_reparar}</span>
+            </div>
+        """, unsafe_allow_html=True)
     with col4:
-        nuevos = len(df_inv[df_inv['Estatus'] == 'Nuevo']) if not df_inv.empty else 0
-        st.metric(label="Nuevos", value=nuevos)
+        st.markdown(f"""
+            <div class="kpi-card-4">
+                <span style="font-size: 14px; color: #065f46; font-weight: bold;">Nuevos</span><br>
+                <span style="font-size: 26px; font-weight: bold; color: #065f46;">{nuevos}</span>
+            </div>
+        """, unsafe_allow_html=True)
     with col5:
-        reparados = len(df_inv[df_inv['Estatus'] == 'Reparado']) if not df_inv.empty else 0
-        st.metric(label="Reparados", value=reparados)
+        st.markdown(f"""
+            <div class="kpi-card-5">
+                <span style="font-size: 14px; color: #6b21a8; font-weight: bold;">Reparados</span><br>
+                <span style="font-size: 26px; font-weight: bold; color: #6b21a8;">{reparados}</span>
+            </div>
+        """, unsafe_allow_html=True)
         
     st.markdown("<br>", unsafe_allow_html=True)
     
@@ -261,38 +324,140 @@ if menu == "📊 Inventario General":
     else:
         st.dataframe(df_filtrado, use_container_width=True)
 
-# 2. ESTADÍA (GRÁFICA EXCLUSIVA)
+# 2. ESTADÍA (GRÁFICAS SEPARADAS PARA TRADICIONAL Y MODERNO)
 elif menu == "📈 Estadía":
-    st.subheader("📈 Promedio de Días en Estadía - Canal Tradicional")
-    st.markdown("Gráfica analítica que muestra el promedio de días sin movimiento de los equipos pertenecientes al **Canal Tradicional**, excluyendo aquellos en *Uso Interno* o *En proceso de Baja*, agrupados por su ubicación actual.")
+    st.subheader("📈 Promedio de Días en Estadía por Canal")
+    st.markdown("Análisis del promedio de días sin movimiento agrupados por ubicación, divididos por canal de operación. Las barras que superan los **40 días** se destacan en **Rojo ⚠️**.")
     st.markdown("---")
     
     df_con_dias = calcular_dias_sin_movimiento(df_inv)
     
     if not df_con_dias.empty:
-        # Filtrar solo Canal Tradicional, excluyendo Uso Interno y En proceso de Baja
+        df_con_dias['Días sin movimiento'] = pd.to_numeric(df_con_dias['Días sin movimiento'], errors='coerce')
+        
+        # --- SECCIÓN 1: CANAL TRADICIONAL ---
+        st.markdown("### 🏬 Canal Tradicional")
         df_trad = df_con_dias[
             (df_con_dias['Canal'] == 'Tradicional') & 
             (~df_con_dias['Ubicación'].isin(['Uso Interno', 'En proceso de Baja']))
         ].copy()
         
         if not df_trad.empty:
-            # Asegurar tipo numérico para la columna de días
-            df_trad['Días sin movimiento'] = pd.to_numeric(df_trad['Días sin movimiento'], errors='coerce')
+            df_prom_trad = df_trad.groupby('Ubicación')['Días sin movimiento'].mean().reset_index()
+            df_prom_trad.columns = ['Ubicación', 'Promedio de Días']
             
-            # Calcular el promedio por ubicación
-            df_promedio = df_trad.groupby('Ubicación')['Días sin movimiento'].mean().reset_index()
-            df_promedio.columns = ['Ubicación', 'Promedio de Días']
-            df_promedio = df_promedio.set_index('Ubicación')
+            fig_t, ax_t = plt.subplots(figsize=(10, 4.5))
+            colores_t = ['#E60012' if x > 40 else '#2563eb' for x in df_prom_trad['Promedio de Días']]
+            bars_t = ax_t.bar(df_prom_trad['Ubicación'], df_prom_trad['Promedio de Días'], color=colores_t, width=0.55, edgecolor='black', linewidth=0.8)
             
-            # Mostrar gráfica de barras interactiva en Streamlit
-            st.bar_chart(df_promedio)
-        else:
-            st.info("ℹ️ No hay equipos registrados que cumplan con los filtros de Canal Tradicional (sin Uso Interno ni En proceso de Baja).")
-    else:
-        st.info("ℹ️ No hay datos suficientes en el inventario para generar la gráfica.")
+            ax_t.axhline(40, color='#dc2626', linestyle='--', linewidth=1.5, label='Límite de Alerta (40 días)')
+            
+            for bar in bars_t:
+                yval = bar.get_height()
+                alerta_txt = f" ⚠️ ({yval:.1f}d)" if yval > 40 else f" ({yval:.1f}d)"
+                ax_t.text(bar.get_x() + bar.get_width()/2.0, yval + 1, alerta_txt, ha='center', va='bottom', fontsize=9, fontweight='bold', color='#111827')
 
-# 3. REGISTRAR ENTRADA
+            ax_t.set_ylabel('Promedio de Días', fontsize=10, fontweight='bold')
+            ax_t.set_xlabel('Ubicación', fontsize=10, fontweight='bold')
+            ax_t.set_title('Estadía Promedio - Canal Tradicional', fontsize=12, fontweight='bold', pad=12)
+            plt.xticks(rotation=15, ha='right')
+            ax_t.grid(axis='y', linestyle=':', alpha=0.6)
+            ax_t.legend(loc='upper right')
+            
+            st.pyplot(fig_t)
+            
+            # Tabla Tradicional
+            df_t_tabla = df_prom_trad.copy()
+            df_t_tabla['Estado de Alerta'] = df_t_tabla['Promedio de Días'].apply(lambda x: "🚨 Alerta: Supera los 40 días" if x > 40 else "✅ Normal")
+            df_t_tabla['Promedio de Días'] = df_t_tabla['Promedio de Días'].round(1)
+            st.dataframe(df_t_tabla, use_container_width=True)
+        else:
+            st.info("ℹ️ No hay equipos registrados para el Canal Tradicional (excluyendo Uso Interno y Baja).")
+            
+        st.markdown("<br><hr><br>", unsafe_allow_html=True)
+        
+        # --- SECCIÓN 2: CANAL MODERNO ---
+        st.markdown("### 🛒 Canal Moderno")
+        df_mod = df_con_dias[
+            (df_con_dias['Canal'] == 'Moderno') & 
+            (~df_con_dias['Ubicación'].isin(['Uso Interno', 'En proceso de Baja']))
+        ].copy()
+        
+        if not df_mod.empty:
+            df_prom_mod = df_mod.groupby('Ubicación')['Días sin movimiento'].mean().reset_index()
+            df_prom_mod.columns = ['Ubicación', 'Promedio de Días']
+            
+            fig_m, ax_m = plt.subplots(figsize=(10, 4.5))
+            colores_m = ['#E60012' if x > 40 else '#10b981' for x in df_prom_mod['Promedio de Días']]
+            bars_m = ax_m.bar(df_prom_mod['Ubicación'], df_prom_mod['Promedio de Días'], color=colores_m, width=0.55, edgecolor='black', linewidth=0.8)
+            
+            ax_m.axhline(40, color='#dc2626', linestyle='--', linewidth=1.5, label='Límite de Alerta (40 días)')
+            
+            for bar in bars_m:
+                yval = bar.get_height()
+                alerta_txt = f" ⚠️ ({yval:.1f}d)" if yval > 40 else f" ({yval:.1f}d)"
+                ax_m.text(bar.get_x() + bar.get_width()/2.0, yval + 1, alerta_txt, ha='center', va='bottom', fontsize=9, fontweight='bold', color='#111827')
+
+            ax_m.set_ylabel('Promedio de Días', fontsize=10, fontweight='bold')
+            ax_m.set_xlabel('Ubicación', fontsize=10, fontweight='bold')
+            ax_m.set_title('Estadía Promedio - Canal Moderno', fontsize=12, fontweight='bold', pad=12)
+            plt.xticks(rotation=15, ha='right')
+            ax_m.grid(axis='y', linestyle=':', alpha=0.6)
+            ax_m.legend(loc='upper right')
+            
+            st.pyplot(fig_m)
+            
+            # Tabla Moderno
+            df_m_tabla = df_prom_mod.copy()
+            df_m_tabla['Estado de Alerta'] = df_m_tabla['Promedio de Días'].apply(lambda x: "🚨 Alerta: Supera los 40 días" if x > 40 else "✅ Normal")
+            df_m_tabla['Promedio de Días'] = df_m_tabla['Promedio de Días'].round(1)
+            st.dataframe(df_m_tabla, use_container_width=True)
+        else:
+            st.info("ℹ️ No hay equipos registrados para el Canal Moderno (excluyendo Uso Interno y Baja).")
+            
+    else:
+        st.info("ℹ️ No hay datos suficientes en el inventario para generar las gráficas de estadía.")
+
+# 3. EQUIPOS DISPONIBLES
+elif menu == "📦 Equipos Disponibles":
+    st.subheader("📦 Reporte de Equipos Disponibles")
+    st.markdown("Equipos listos para distribución por canal.")
+    st.markdown("---")
+    
+    if not df_inv.empty:
+        condicion_disponibles = (
+            (df_inv['Ubicación'].isin(["En almacén de Comodatos", "En almacén de Publicidad"])) |
+            ((df_inv['Ubicación'] == "En patios") & (df_inv['Estatus'] == "Reparado"))
+        )
+        
+        df_disp = df_inv[condicion_disponibles].copy()
+        
+        # --- TABLA 1: CANAL TRADICIONAL ---
+        st.markdown("### 🏬 Canal Tradicional")
+        df_trad_disp = df_disp[df_disp['Canal'] == 'Tradicional']
+        
+        if not df_trad_disp.empty:
+            df_grouped_trad = df_trad_disp.groupby(['Modelo', 'Estatus']).size().reset_index(name='Cantidad Disponible')
+            st.dataframe(df_grouped_trad, use_container_width=True)
+        else:
+            st.info("ℹ️ No hay equipos disponibles bajo los criterios seleccionados para el Canal Tradicional.")
+            
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # --- TABLA 2: CANAL MODERNO ---
+        st.markdown("### 🛒 Canal Moderno")
+        df_mod_disp = df_disp[df_disp['Canal'] == 'Moderno']
+        
+        if not df_mod_disp.empty:
+            df_grouped_mod = df_mod_disp.groupby(['Modelo', 'Estatus']).size().reset_index(name='Cantidad Disponible')
+            st.dataframe(df_grouped_mod, use_container_width=True)
+        else:
+            st.info("ℹ️ No hay equipos disponibles bajo los criterios seleccionados para el Canal Moderno.")
+            
+    else:
+        st.info("ℹ️ El inventario se encuentra vacío actualmente.")
+
+# 4. REGISTRAR ENTRADA
 elif menu == "📥 Registrar Entrada":
     st.subheader("📥 Registrar Entrada de Nuevo Equipo")
     
@@ -327,67 +492,47 @@ elif menu == "📥 Registrar Entrada":
                 registrar_historial(serie, modelo, "ENTRADA", f"Canal: {canal} | Ubicación: {ubicacion} | Estatus: {estatus} | Fecha: {fecha_str}")
                 st.success(f"✅ ¡Equipo con serie {serie} registrado exitosamente!")
 
-# 4. ACTUALIZAR / CAMBIAR MODELO, CANAL, UBICACIÓN Y ESTATUS (SALIDAS)
-elif menu == "🔄 Actualizar / Salida":
-    st.subheader("🔄 Actualizar Modelo, Canal, Ubicación o Estatus (Salidas / Movimientos)")
+# 5. SALIDA DE EQUIPOS
+elif menu == "📤 Salida de Equipos":
+    st.subheader("📤 Salida de Equipos del Inventario")
     
-    serie_buscar = st.text_input("🔍 Escanee o escriba la serie del equipo a actualizar:").strip()
+    serie_buscar = st.text_input("🔍 Escanee o escriba la serie del equipo para dar salida:").strip()
     
     if serie_buscar:
         equipo = df_inv[df_inv['Serie'] == serie_buscar]
         if equipo.empty:
-            st.warning("⚠️ No se encontró ningún equipo con esa serie.")
+            st.warning("⚠️ No se encontró ningún equipo con esa serie en el inventario.")
         else:
-            modelo_actual_eq = str(equipo.values[0][1])
-            canal_actual_eq = str(equipo.values[0][2])
-            ubicacion_actual_eq = str(equipo.values[0][3])
-            estatus_actual_eq = str(equipo.values[0][4])
+            modelo_actual_eq = str(equipo.iloc[0]['Modelo'])
+            canal_actual_eq = str(equipo.iloc[0]['Canal'])
+            ubicacion_actual_eq = str(equipo.iloc[0]['Ubicación'])
+            estatus_actual_eq = str(equipo.iloc[0]['Estatus'])
             
-            st.info(f"📌 Equipo encontrado -> Modelo actual: **{modelo_actual_eq}** | Canal actual: **{canal_actual_eq}** | Ubicación actual: **{ubicacion_actual_eq}**")
+            st.info(f"📌 Equipo encontrado -> Modelo: **{modelo_actual_eq}** | Canal: **{canal_actual_eq}** | Ubicación: **{ubicacion_actual_eq}** | Estatus: **{estatus_actual_eq}**")
             
-            with st.form("form_actualizar"):
-                nuevo_modelo = st.text_input("🧊 Modelo del Refrigerador", value=modelo_actual_eq).strip()
+            with st.form("form_salida"):
+                fecha_salida = st.date_input("📅 Fecha de salida", value=date.today())
+                motivo_salida = st.text_input("📝 Motivo de la salida / Destino (Opcional):")
                 
-                idx_canal = CANALES.index(canal_actual_eq) if canal_actual_eq in CANALES else 0
-                nuevo_canal = st.selectbox("🏬 Nuevo Canal", CANALES, index=idx_canal)
+                btn_confirmar_salida = st.form_submit_button("Confirmar salida")
                 
-                idx_ub = UBICACIONES.index(ubicacion_actual_eq) if ubicacion_actual_eq in UBICACIONES else 0
-                nueva_ubicacion = st.selectbox("📍 Nueva Ubicación", UBICACIONES, index=idx_ub)
-                
-                idx_est = ESTATUS.index(estatus_actual_eq) if estatus_actual_eq in ESTATUS else 0
-                nuevo_estatus = st.selectbox("⚡ Nuevo Estatus", ESTATUS, index=idx_est)
-                
-                fecha_movimiento = st.date_input("📅 Fecha en que ocurrió este movimiento", value=date.today())
-                
-                motivo = st.text_input("📝 Motivo del movimiento / Actualización (Opcional):")
-                
-                btn_actualizar = st.form_submit_button("Guardar Cambios y Actualizar")
-                
-                if btn_actualizar:
-                    if not nuevo_modelo:
-                        st.error("⚠️ El campo de modelo no puede estar vacío.")
-                    else:
-                        idx = df_inv[df_inv['Serie'] == serie_buscar].index[0]
-                        modelo_anterior = df_inv.loc[idx, 'Modelo']
-                        ubicacion_anterior = df_inv.loc[idx, 'Ubicación']
-                        canal_anterior = df_inv.loc[idx, 'Canal']
-                        
-                        fecha_str = fecha_movimiento.strftime("%Y-%m-%d")
-                        
-                        df_inv.loc[idx, 'Modelo'] = nuevo_modelo
-                        df_inv.loc[idx, 'Canal'] = nuevo_canal
-                        df_inv.loc[idx, 'Ubicación'] = nueva_ubicacion
-                        df_inv.loc[idx, 'Estatus'] = nuevo_estatus
-                        
-                        # Actualizar Ultimo_Movimiento con la fecha proporcionada
-                        df_inv.loc[idx, 'Ultimo_Movimiento'] = fecha_str
-                            
-                        guardar_datos(df_inv)
-                        
-                        registrar_historial(serie_buscar, nuevo_modelo, "ACTUALIZACIÓN/SALIDA", f"Modelo: {modelo_anterior} -> {nuevo_modelo} | Canal: {canal_anterior} -> {nuevo_canal} | Ubicación: {ubicacion_anterior} -> {nueva_ubicacion} | Fecha Mov: {fecha_str}. Motivo: {motivo}")
-                        st.success("✅ ¡Información del equipo actualizada correctamente!")
+                if btn_confirmar_salida:
+                    idx = df_inv[df_inv['Serie'] == serie_buscar].index[0]
+                    fecha_str = fecha_salida.strftime("%Y-%m-%d")
+                    
+                    registrar_historial(
+                        serie_buscar, 
+                        modelo_actual_eq, 
+                        "SALIDA", 
+                        f"Canal: {canal_actual_eq} | Ubicación anterior: {ubicacion_actual_eq} | Estatus anterior: {estatus_actual_eq} | Fecha Salida: {fecha_str}. Motivo: {motivo_salida}"
+                    )
+                    
+                    df_inv = df_inv.drop(idx).reset_index(drop=True)
+                    guardar_datos(df_inv)
+                    
+                    st.success(f"✅ ¡Salida confirmada! El equipo con serie {serie_buscar} ha sido eliminado del inventario general.")
 
-# 5. EDITAR / ELIMINAR EQUIPO
+# 6. EDITAR / ELIMINAR EQUIPO
 elif menu == "✏️ Editar / Eliminar":
     st.subheader("✏️ Gestión, Corrección y Depuración de Equipos")
     
@@ -437,7 +582,7 @@ elif menu == "✏️ Editar / Eliminar":
                     registrar_historial(serie_edit, modelo_eliminado, "ELIMINACIÓN", "Equipo eliminado del inventario.")
                     st.success("🗑️ ¡Equipo eliminado permanentemente del sistema!")
 
-# 6. HISTORIAL DE MOVIMIENTOS
+# 7. HISTORIAL DE MOVIMIENTOS
 elif menu == "📜 Historial de Movimientos":
     st.subheader("📜 Bitácora de Entradas, Salidas y Cambios de Ubicación")
     df_h = cargar_historial()
@@ -446,14 +591,13 @@ elif menu == "📜 Historial de Movimientos":
     else:
         st.dataframe(df_h.sort_values(by="Fecha_Hora", ascending=False), use_container_width=True)
 
-# 7. EXPORTAR A EXCEL
+# 8. EXPORTAR A EXCEL
 elif menu == "💾 Exportar a Excel":
     st.subheader("💾 Exportar Base de Datos a Formato Excel")
     st.markdown("Genera un archivo completo con el inventario actual (incluyendo el canal, los días sin movimiento) y la bitácora de movimientos en pestañas separadas.")
     
     if st.button("📥 Generar Archivo Excel"):
         output_file = "Reporte_Inventario_Refrigeradores_Bepensa.xlsx"
-        
         df_export = calcular_dias_sin_movimiento(df_inv)
         
         with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
