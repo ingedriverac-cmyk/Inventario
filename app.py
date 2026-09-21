@@ -10,6 +10,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 from datetime import datetime, date
 import os
+import requests
+import json
 
 # Configuración de la página y diseño estético
 st.set_page_config(
@@ -85,11 +87,12 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Archivos CSV para persistencia de datos
+# Archivos CSV locales y URL de Google Apps Script integrada
 INVENTARIO_FILE = "inventario_refrigeradores.csv"
 HISTORIAL_FILE = "historial_movimientos.csv"
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx3L0fULObVfoAtgHEE0rPcpqJouOzG9kosFR33xF1JYkrIcMiEtjrZNoAYnlZEqfYyfw/exec"
 
-# Opciones fijas de Canales (incluyendo AP20L)
+# Opciones fijas de Canales
 CANALES = [
     "Moderno",
     "Tradicional",
@@ -116,19 +119,32 @@ ESTATUS = [
     "En Uso"
 ]
 
-# Funciones para cargar y guardar datos
+# Funciones de carga y guardado sincronizadas con Google Sheets
 def cargar_datos():
-    if os.path.exists(INVENTARIO_FILE):
-        df = pd.read_csv(INVENTARIO_FILE, dtype=str)
-        if "Ultimo_Movimiento" not in df.columns:
-            df["Ultimo_Movimiento"] = df.get("Fecha_Registro", datetime.now().strftime("%Y-%m-%d"))
+    try:
+        response = requests.get(WEB_APP_URL, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            if data:
+                df = pd.DataFrame(data, dtype=str)
+            else:
+                df = pd.DataFrame(columns=["Serie", "Modelo", "Canal", "Ubicación", "Estatus", "Fecha_Registro", "Ultimo_Movimiento"])
         else:
-            df["Ultimo_Movimiento"] = df["Ultimo_Movimiento"].astype(str).str.split().str[0]
-        if "Canal" not in df.columns:
-            df["Canal"] = "Tradicional"
-        return df
+            df = pd.DataFrame(columns=["Serie", "Modelo", "Canal", "Ubicación", "Estatus", "Fecha_Registro", "Ultimo_Movimiento"])
+    except Exception:
+        # Fallback a archivo local si no hay conexión
+        if os.path.exists(INVENTARIO_FILE):
+            df = pd.read_csv(INVENTARIO_FILE, dtype=str)
+        else:
+            df = pd.DataFrame(columns=["Serie", "Modelo", "Canal", "Ubicación", "Estatus", "Fecha_Registro", "Ultimo_Movimiento"])
+        
+    if "Ultimo_Movimiento" not in df.columns:
+        df["Ultimo_Movimiento"] = df.get("Fecha_Registro", datetime.now().strftime("%Y-%m-%d"))
     else:
-        return pd.DataFrame(columns=["Serie", "Modelo", "Canal", "Ubicación", "Estatus", "Fecha_Registro", "Ultimo_Movimiento"])
+        df["Ultimo_Movimiento"] = df["Ultimo_Movimiento"].astype(str).str.split().str[0]
+    if "Canal" not in df.columns:
+        df["Canal"] = "Tradicional"
+    return df
 
 def cargar_historial():
     if os.path.exists(HISTORIAL_FILE):
@@ -138,6 +154,11 @@ def cargar_historial():
 
 def guardar_datos(df):
     df.to_csv(INVENTARIO_FILE, index=False)
+    try:
+        records = df.to_dict(orient="records")
+        requests.post(WEB_APP_URL, json=records, timeout=10)
+    except Exception as e:
+        st.error(f"⚠️ Error al sincronizar con Google Sheets: {e}")
 
 def registrar_historial(serie, modelo, tipo_movimiento, detalles):
     df_h = cargar_historial()
@@ -172,7 +193,7 @@ def calcular_dias_sin_movimiento(df):
     df_calc['Días sin movimiento'] = dias_lista
     return df_calc
 
-# Función para colorear la columna de Ubicación según tus reglas
+# Funciones de estilo de celdas
 def colorear_ubicaciones(val):
     val_lower = str(val).strip()
     if val_lower in ["En almacén de Comodatos", "En almacén de Publicidad"]:
@@ -187,7 +208,6 @@ def colorear_ubicaciones(val):
         return 'background-color: #dbeafe; color: #1e40af; font-weight: bold;'
     return ''
 
-# Función para colorear los días sin movimiento si pasan de 40
 def colorear_dias(val):
     try:
         if float(val) > 40:
@@ -225,7 +245,6 @@ with col_titulo:
     st.markdown("<h1 style='color: #E60012; margin-top: 0;'>❄️ Control de Inventarios de Refrigeradores</h1>", unsafe_allow_html=True)
 
 with col_logo:
-    # Carga de la imagen local ubicada en el mismo directorio
     if os.path.exists("Logo_Bepensa.png"):
         st.image("Logo_Bepensa.png", width=160)
     else:
@@ -239,7 +258,6 @@ if menu == "📊 Inventario General":
     
     df_con_dias = calcular_dias_sin_movimiento(df_inv)
     
-    # Tarjetas de resumen rápido (KPIs con diseño de colores)
     col1, col2, col3, col4, col5 = st.columns(5)
     
     total_eq = len(df_inv)
@@ -286,7 +304,6 @@ if menu == "📊 Inventario General":
         
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Buscador rápido por serie o modelo
     busqueda = st.text_input("🔍 Buscar por número de serie o modelo:").strip()
     
     if busqueda:
@@ -297,7 +314,6 @@ if menu == "📊 Inventario General":
     else:
         df_filtrado = df_con_dias
         
-    # Mostrar tarjetas de conteo por canal filtrado
     col_c1, col_c2 = st.columns(2)
     with col_c1:
         cant_trad_hot = len(df_filtrado[
@@ -311,11 +327,9 @@ if menu == "📊 Inventario General":
         
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # Reordenar columnas para la visualización en la app
     columnas_visibles = ["Serie", "Modelo", "Canal", "Ubicación", "Estatus", "Días sin movimiento", "Ultimo_Movimiento"]
     df_filtrado = df_filtrado[[col for col in columnas_visibles if col in df_filtrado.columns]]
     
-    # Aplicar estilos de color a la tabla en las columnas correspondientes
     if not df_filtrado.empty:
         df_estilizado = df_filtrado.style.map(colorear_ubicaciones, subset=['Ubicación'])
         if 'Días sin movimiento' in df_filtrado.columns:
@@ -366,7 +380,6 @@ elif menu == "📈 Estadía":
             
             st.pyplot(fig_t)
             
-            # Tabla Tradicional
             df_t_tabla = df_prom_trad.copy()
             df_t_tabla['Estado de Alerta'] = df_t_tabla['Promedio de Días'].apply(lambda x: "🚨 Alerta: Supera los 40 días" if x > 40 else "✅ Normal")
             df_t_tabla['Promedio de Días'] = df_t_tabla['Promedio de Días'].round(1)
@@ -407,7 +420,6 @@ elif menu == "📈 Estadía":
             
             st.pyplot(fig_m)
             
-            # Tabla Moderno
             df_m_tabla = df_prom_mod.copy()
             df_m_tabla['Estado de Alerta'] = df_m_tabla['Promedio de Días'].apply(lambda x: "🚨 Alerta: Supera los 40 días" if x > 40 else "✅ Normal")
             df_m_tabla['Promedio de Días'] = df_m_tabla['Promedio de Días'].round(1)
