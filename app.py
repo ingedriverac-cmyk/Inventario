@@ -88,10 +88,10 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Archivos CSV locales y URL de Google Apps Script integrada
+# Archivos CSV locales y nueva URL de Google Apps Script integrada
 INVENTARIO_FILE = "inventario_refrigeradores.csv"
 HISTORIAL_FILE = "historial_movimientos.csv"
-WEB_APP_URL = "https://script.google.com/macros/s/AKfycbx3L0fULObVfoAtgHEE0rPcpqJouOzG9kosFR33xF1JYkrIcMiEtjrZNoAYnlZEqfYyfw/exec"
+WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz0uHPmSFwpgWRhmDApRKHyQyP1FK10d8vy3TlG5UNi5RpqhgpnZbBDEL8q93s9MfVf7Q/exec"
 
 # Opciones fijas de Canales
 CANALES = [
