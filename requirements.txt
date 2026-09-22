@@ -7,5 +7,3 @@ opencv-python-headless
 pyzbar
 numpy
 pillow
-gspread
-google-auth
