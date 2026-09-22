@@ -12,6 +12,7 @@ from datetime import datetime, date
 import os
 import requests
 import json
+import re
 
 # Configuración de la página y diseño estético
 st.set_page_config(
@@ -119,6 +120,9 @@ ESTATUS = [
     "En Uso"
 ]
 
+# Esquema oficial simplificado (Sin Fecha_Registro)
+ESQUEMA_COLUMNAS = ["Serie", "Modelo", "Canal", "Ubicación", "Estatus", "Ultimo_Movimiento"]
+
 # Funciones de carga y guardado sincronizadas con Google Sheets
 def cargar_datos():
     try:
@@ -128,22 +132,36 @@ def cargar_datos():
             if data:
                 df = pd.DataFrame(data, dtype=str)
             else:
-                df = pd.DataFrame(columns=["Serie", "Modelo", "Canal", "Ubicación", "Estatus", "Fecha_Registro", "Ultimo_Movimiento"])
+                df = pd.DataFrame(columns=ESQUEMA_COLUMNAS)
         else:
-            df = pd.DataFrame(columns=["Serie", "Modelo", "Canal", "Ubicación", "Estatus", "Fecha_Registro", "Ultimo_Movimiento"])
+            df = pd.DataFrame(columns=ESQUEMA_COLUMNAS)
     except Exception:
-        # Fallback a archivo local si no hay conexión
         if os.path.exists(INVENTARIO_FILE):
             df = pd.read_csv(INVENTARIO_FILE, dtype=str)
         else:
-            df = pd.DataFrame(columns=["Serie", "Modelo", "Canal", "Ubicación", "Estatus", "Fecha_Registro", "Ultimo_Movimiento"])
+            df = pd.DataFrame(columns=ESQUEMA_COLUMNAS)
         
-    if "Ultimo_Movimiento" not in df.columns:
-        df["Ultimo_Movimiento"] = df.get("Fecha_Registro", datetime.now().strftime("%Y-%m-%d"))
-    else:
-        df["Ultimo_Movimiento"] = df["Ultimo_Movimiento"].astype(str).str.split().str[0]
-    if "Canal" not in df.columns:
-        df["Canal"] = "Tradicional"
+    # Asegurar que existan todas las columnas del esquema simplificado
+    for col in ESQUEMA_COLUMNAS:
+        if col not in df.columns:
+            df[col] = ""
+
+    # Limpieza absoluta de formatos de fecha extraños a YYYY-MM-DD
+    def limpiar_fecha_estricta(val):
+        val_s = str(val).strip()
+        if not val_s or val_s.lower() == 'nan' or val_s.lower() == 'nat':
+            return datetime.now().strftime("%Y-%m-%d")
+        if re.match(r'^\d{4}-\d{2}-\d{2}$', val_s):
+            return val_s
+        dt_parsed = pd.to_datetime(val_s, errors='coerce')
+        if not pd.isna(dt_parsed):
+            return dt_parsed.strftime("%Y-%m-%d")
+        return val_s[:10]
+
+    df["Ultimo_Movimiento"] = df["Ultimo_Movimiento"].apply(limpiar_fecha_estricta)
+    
+    # Filtrar solo las columnas requeridas (eliminando Fecha_Registro si viniera de respaldo antiguo)
+    df = df[[c for c in ESQUEMA_COLUMNAS if c in df.columns]]
     return df
 
 def cargar_historial():
@@ -172,7 +190,7 @@ def registrar_historial(serie, modelo, tipo_movimiento, detalles):
     df_h = pd.concat([df_h, nuevo_mov], ignore_index=True)
     df_h.to_csv(HISTORIAL_FILE, index=False)
 
-# Función mejorada para calcular los días sin movimiento (limpia formatos de fecha complejos o en inglés)
+# Función precisa para calcular los días sin movimiento
 def calcular_dias_sin_movimiento(df):
     if df.empty:
         return df
@@ -184,19 +202,11 @@ def calcular_dias_sin_movimiento(df):
     for fecha_str in df_calc['Ultimo_Movimiento']:
         try:
             val_limpia = str(fecha_str).strip()
-            if len(val_limpia) >= 10 and '-' in val_limpia[:10]:
-                f_mov = datetime.strptime(val_limpia[:10], "%Y-%m-%d").date()
-            else:
-                f_mov = pd.to_datetime(val_limpia, errors='coerce')
-                if pd.isna(f_mov):
-                    f_mov = fecha_actual
-                else:
-                    f_mov = f_mov.date()
+            f_mov = datetime.strptime(val_limpia, "%Y-%m-%d").date()
+            dias = (fecha_actual - f_mov).days
+            dias_lista.append(max(0, dias))
         except Exception:
-            f_mov = fecha_actual
-                
-        dias = (fecha_actual - f_mov).days
-        dias_lista.append(max(0, dias))
+            dias_lista.append(0)
         
     df_calc['Días sin movimiento'] = dias_lista
     return df_calc
@@ -477,7 +487,7 @@ elif menu == "📦 Equipos Disponibles":
     else:
         st.info("ℹ️ El inventario se encuentra vacío actualmente.")
 
-# 4. REGISTRAR ENTRADA
+# 4. REGISTRAR ENTRADA (Asigna la fecha al ÚLTIMO MOVIMIENTO)
 elif menu == "📥 Registrar Entrada":
     st.subheader("📥 Registrar Entrada de Nuevo Equipo")
     
@@ -487,7 +497,7 @@ elif menu == "📥 Registrar Entrada":
         canal = st.selectbox("🏬 Canal:", CANALES)
         ubicacion = st.selectbox("📍 Ubicación inicial", UBICACIONES)
         estatus = st.selectbox("⚡ Estatus inicial", ESTATUS)
-        fecha_entrada = st.date_input("📅 Fecha real de entrada al inventario", value=date.today())
+        fecha_entrada = st.date_input("📅 Fecha de entrada / Último movimiento", value=date.today())
         
         submit = st.form_submit_button("Registrar Entrada en Sistema")
         
@@ -504,7 +514,6 @@ elif menu == "📥 Registrar Entrada":
                     "Canal": canal,
                     "Ubicación": ubicacion,
                     "Estatus": estatus,
-                    "Fecha_Registro": fecha_str,
                     "Ultimo_Movimiento": fecha_str
                 }])
                 df_inv = pd.concat([df_inv, nueva_fila], ignore_index=True)
@@ -552,7 +561,7 @@ elif menu == "📤 Salida de Equipos":
                     
                     st.success(f"✅ ¡Salida confirmada! El equipo con serie {serie_buscar} ha sido eliminado del inventario general.")
 
-# 6. EDITAR / ELIMINAR EQUIPO
+# 6. EDITAR / ELIMINAR EQUIPO (Actualiza Ultimo_Movimiento si cambia la ubicación)
 elif menu == "✏️ Editar / Eliminar":
     st.subheader("✏️ Gestión, Corrección y Depuración de Equipos")
     
@@ -575,6 +584,14 @@ elif menu == "✏️ Editar / Eliminar":
                 mod_ubicacion = st.selectbox("📍 Ubicación", UBICACIONES, index=UBICACIONES.index(df_inv.loc[idx, 'Ubicación']) if df_inv.loc[idx, 'Ubicación'] in UBICACIONES else 0)
                 mod_estatus = st.selectbox("⚡ Estatus", ESTATUS, index=ESTATUS.index(df_inv.loc[idx, 'Estatus']) if df_inv.loc[idx, 'Estatus'] in ESTATUS else 0)
                 
+                fecha_actual_reg = str(df_inv.loc[idx, 'Ultimo_Movimiento'])[:10]
+                try:
+                    dt_default = datetime.strptime(fecha_actual_reg, "%Y-%m-%d").date()
+                except ValueError:
+                    dt_default = date.today()
+                
+                mod_fecha = st.date_input("📅 Fecha de Último Movimiento", value=dt_default)
+                
                 col1, col2 = st.columns(2)
                 with col1:
                     btn_guardar = st.form_submit_button("💾 Guardar Cambios")
@@ -582,17 +599,14 @@ elif menu == "✏️ Editar / Eliminar":
                     btn_eliminar = st.form_submit_button("🗑️ Eliminar Equipo")
                 
                 if btn_guardar:
-                    ubicacion_anterior = df_inv.loc[idx, 'Ubicación']
                     df_inv.loc[idx, 'Modelo'] = mod_modelo
                     df_inv.loc[idx, 'Canal'] = mod_canal
                     df_inv.loc[idx, 'Ubicación'] = mod_ubicacion
                     df_inv.loc[idx, 'Estatus'] = mod_estatus
-                    
-                    if ubicacion_anterior != mod_ubicacion:
-                        df_inv.loc[idx, 'Ultimo_Movimiento'] = datetime.now().strftime("%Y-%m-%d")
+                    df_inv.loc[idx, 'Ultimo_Movimiento'] = mod_fecha.strftime("%Y-%m-%d")
                         
                     guardar_datos(df_inv)
-                    registrar_historial(serie_edit, mod_modelo, "EDICIÓN", f"Datos modificados. Canal: {mod_canal}")
+                    registrar_historial(serie_edit, mod_modelo, "EDICIÓN", f"Datos modificados. Canal: {mod_canal} | Fecha Movimiento: {mod_fecha.strftime('%Y-%m-%d')}")
                     st.success("✅ ¡Datos actualizados con éxito!")
                 
                 if btn_eliminar:
