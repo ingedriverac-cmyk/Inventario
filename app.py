@@ -146,29 +146,24 @@ def cargar_datos():
         if col not in df.columns:
             df[col] = ""
 
-    # Limpieza absoluta y conversión estricta a formato YYYY-MM-DD eliminando días de la semana y horas
+    # Limpieza absoluta y conversión estricta a formato YYYY-MM-DD
     def limpiar_fecha_estricta(val):
         val_s = str(val).strip()
         if not val_s or val_s.lower() == 'nan' or val_s.lower() == 'nat':
             return datetime.now().strftime("%Y-%m-%d")
         
-        # Intentar parsear cualquier formato extraño (incluyendo 'Sun Apr 26 2026' o similares)
         dt_parsed = pd.to_datetime(val_s, errors='coerce')
         if not pd.isna(dt_parsed):
             return dt_parsed.strftime("%Y-%m-%d")
             
-        # Si ya viene como YYYY-MM-DD
         if re.match(r'^\d{4}-\d{2}-\d{2}$', val_s):
             return val_s
             
         return val_s[:10]
 
     df["Ultimo_Movimiento"] = df["Ultimo_Movimiento"].apply(limpiar_fecha_estricta)
-    
-    # Forzar que la columna sea estrictamente texto para que Streamlit no la reinterprete
     df["Ultimo_Movimiento"] = df["Ultimo_Movimiento"].astype(str)
     
-    # Filtrar solo las columnas requeridas
     df = df[[c for c in ESQUEMA_COLUMNAS if c in df.columns]]
     return df
 
@@ -357,8 +352,13 @@ if menu == "📊 Inventario General":
     df_filtrado = df_filtrado[[col for col in columnas_visibles if col in df_filtrado.columns]]
     
     if not df_filtrado.empty:
-        df_estilizado = df_filtrado.style.map(colorear_ubicaciones, subset=['Ubicación'])
-        if 'Días sin movimiento' in df_filtrado.columns:
+        # Forzar formato limpio de fecha estrictamente a YYYY-MM-DD antes de mostrar en tabla
+        df_mostrar = df_filtrado.copy()
+        if 'Ultimo_Movimiento' in df_mostrar.columns:
+            df_mostrar['Ultimo_Movimiento'] = pd.to_datetime(df_mostrar['Ultimo_Movimiento'], errors='coerce').dt.strftime('%Y-%m-%d').fillna(df_mostrar['Ultimo_Movimiento'])
+
+        df_estilizado = df_mostrar.style.map(colorear_ubicaciones, subset=['Ubicación'])
+        if 'Días sin movimiento' in df_mostrar.columns:
             df_estilizado = df_estilizado.map(colorear_dias, subset=['Días sin movimiento'])
         st.dataframe(df_estilizado, use_container_width=True)
     else:
