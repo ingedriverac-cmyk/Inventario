@@ -3,7 +3,5 @@ pandas
 matplotlib
 requests
 openpyxl
-opencv-python-headless
-pyzbar
 numpy
 pillow

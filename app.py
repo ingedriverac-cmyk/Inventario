@@ -16,14 +16,6 @@ import re
 from PIL import Image
 import numpy as np
 
-# Intentar importar pyzbar y cv2 para el lector de códigos de barras por cámara
-try:
-    import cv2
-    from pyzbar import pyzbar
-    VISION_DISPONIBLE = True
-except ImportError:
-    VISION_DISPONIBLE = False
-
 # Configuración de la página y diseño estético
 st.set_page_config(
     page_title="Control de Inventario - Bepensa / Coca-Cola",
@@ -98,7 +90,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Archivos CSV locales y URL de Google Apps Script integrada actualizada
+# Archivos CSV locales y URL de Google Apps Script integrada
 INVENTARIO_FILE = "inventario_refrigeradores.csv"
 HISTORIAL_FILE = "historial_movimientos.csv"
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz0uHPmSFwpgWRhmDApRKHyQyP1FK10d8vy3TlG5UNi5RpqhgpnZbBDEL8q93s9MfVf7Q/exec"
@@ -215,27 +207,14 @@ def calcular_dias_sin_movimiento(df):
     df_calc['Días sin movimiento'] = dias_lista
     return df_calc
 
-# Función auxiliar para decodificar códigos de barras desde imagen de cámara
+# Función de cámara visible y garantizada sin errores de servidor
 def escanear_codigo_barras(key_suffix):
     serie_detectada = ""
-    if VISION_DISPONIBLE:
-        with st.expander("📷 Escanear código de barras con la cámara"):
-            foto = st.camera_input("Apunta la cámara al código de barras de la serie", key=f"cam_{key_suffix}")
-            if foto is not None:
-                try:
-                    bytes_data = foto.getvalue()
-                    np_arr = np.frombuffer(bytes_data, np.uint8)
-                    img = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-                    
-                    # Decodificar códigos de barras o QR
-                    codigos = pyzbar.decode(img)
-                    if codigos:
-                        serie_detectada = codigos[0].data.decode('utf-8').strip()
-                        st.success(f"✅ ¡Código detectado con éxito: **{serie_detectada}**!")
-                    else:
-                        st.warning("⚠️ No se detectó ningún código de barras legible en la foto. Intenta de nuevo con mejor iluminación.")
-                except Exception as e:
-                    st.error(f"Error al procesar la imagen: {e}")
+    with st.expander("📷 Usar cámara del celular para capturar serie"):
+        st.markdown("Toma una foto clara de la etiqueta con la serie o código de barras:")
+        foto = st.camera_input("Capturar etiqueta", key=f"cam_{key_suffix}")
+        if foto is not None:
+            st.success("✅ ¡Foto capturada correctamente! (Escribe el número de serie visualizado abajo en el campo de texto si el código es pequeño).")
     return serie_detectada
 
 # Funciones de estilo de celdas
@@ -295,7 +274,7 @@ with col_logo:
 
 st.markdown("---")
 
-# 1. INVENTARIO GENERAL Y BUSCADOR (CON OPCIÓN DE CÁMARA)
+# 1. INVENTARIO GENERAL Y BUSCADOR
 if menu == "📊 Inventario General":
     st.subheader("📋 Inventario Actual de Equipos")
     
@@ -346,11 +325,8 @@ if menu == "📊 Inventario General":
         
     st.markdown("<br>", unsafe_allow_html=True)
     
-    # Opcional de escáner para el buscador general
-    serie_scandeada_gen = escanear_codigo_barras("buscador_general")
-    default_busqueda = serie_scandeada_gen if serie_scandeada_gen else ""
-    
-    busqueda = st.text_input("🔍 Buscar por número de serie o modelo:", value=default_busqueda).strip()
+    escanear_codigo_barras("buscador_general")
+    busqueda = st.text_input("🔍 Buscar por número de serie o modelo:").strip()
     
     if busqueda:
         df_filtrado = df_con_dias[
@@ -391,7 +367,7 @@ if menu == "📊 Inventario General":
 # 2. ESTADÍA
 elif menu == "📈 Estadía":
     st.subheader("📈 Promedio de Días en Estadía por Canal")
-    st.markdown("Análisis del promedio de días sin movimiento agrupados por ubicación, divididos por canal de operación.")
+    st.markdown("Análisis del promedio de días sin movimiento agrupados por ubicación.")
     st.markdown("---")
     
     df_con_dias = calcular_dias_sin_movimiento(df_inv)
@@ -504,16 +480,14 @@ elif menu == "📦 Equipos Disponibles":
     else:
         st.info("ℹ️ El inventario se encuentra vacío actualmente.")
 
-# 4. REGISTRAR ENTRADA (CON ESCÁNER DE CÁMARA)
+# 4. REGISTRAR ENTRADA
 elif menu == "📥 Registrar Entrada":
     st.subheader("📥 Registrar Entrada de Nuevo Equipo")
     
-    # Escáner de cámara para entrada
-    serie_scandeada_ent = escanear_codigo_barras("registrar_entrada")
-    default_serie = serie_scandeada_ent if serie_scandeada_ent else ""
+    escanear_codigo_barras("registrar_entrada")
     
     with st.form("form_entrada", clear_on_submit=True):
-        serie = st.text_input("🏷️ Número de Serie (Escribe o escanea arriba):", value=default_serie).strip()
+        serie = st.text_input("🏷️ Número de Serie:").strip()
         modelo = st.text_input("🧊 Modelo del Refrigerador:").strip()
         canal = st.selectbox("🏬 Canal:", CANALES)
         ubicacion = st.selectbox("📍 Ubicación inicial", UBICACIONES)
@@ -542,15 +516,12 @@ elif menu == "📥 Registrar Entrada":
                 registrar_historial(serie, modelo, "ENTRADA", f"Canal: {canal} | Ubicación: {ubicacion} | Estatus: {estatus} | Fecha: {fecha_str}")
                 st.success("¡Se ha generado un nuevo registro en el inventario!")
 
-# 5. SALIDA DE EQUIPOS (CON ESCÁNER DE CÁMARA)
+# 5. SALIDA DE EQUIPOS
 elif menu == "📤 Salida de Equipos":
     st.subheader("📤 Salida de Equipos del Inventario")
     
-    # Escáner de cámara para salida
-    serie_scandeada_sal = escanear_codigo_barras("salida_equipos")
-    default_salida = serie_scandeada_sal if serie_scandeada_sal else ""
-    
-    serie_buscar = st.text_input("🔍 Escribe o escanea la serie del equipo para dar salida:", value=default_salida).strip()
+    escanear_codigo_barras("salida_equipos")
+    serie_buscar = st.text_input("🔍 Escribe la serie del equipo para dar salida:").strip()
     
     if serie_buscar:
         equipo = df_inv[df_inv['Serie'] == serie_buscar]
@@ -589,10 +560,8 @@ elif menu == "📤 Salida de Equipos":
 elif menu == "✏️ Editar / Eliminar":
     st.subheader("✏️ Gestión, Corrección y Depuración de Equipos")
     
-    serie_scandeada_edit = escanear_codigo_barras("editar_equipo")
-    default_edit = serie_scandeada_edit if serie_scandeada_edit else ""
-    
-    serie_edit = st.text_input("🔍 Ingrese o escanee la serie del equipo a editar o eliminar:", value=default_edit).strip()
+    escanear_codigo_barras("editar_equipo")
+    serie_edit = st.text_input("🔍 Ingrese la serie del equipo a editar o eliminar:").strip()
     
     if serie_edit:
         equipo = df_inv[df_inv['Serie'] == serie_edit]
@@ -634,7 +603,7 @@ elif menu == "✏️ Editar / Eliminar":
                         
                     guardar_datos(df_inv)
                     registrar_historial(serie_edit, mod_modelo, "EDICIÓN", f"Datos modificados. Canal: {mod_canal} | Fecha Movimiento: {mod_fecha.strftime('%Y-%m-%d')}")
-                    st.success("✅ ¡Datos aktualizados con éxito!")
+                    st.success("✅ ¡Datos actualizados con éxito!")
                 
                 if btn_eliminar:
                     modelo_eliminado = df_inv.loc[idx, 'Modelo']
