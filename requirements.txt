@@ -1,7 +1,11 @@
 streamlit
 pandas
-openpyxl
 matplotlib
+requests
+openpyxl
+opencv-python-headless
+pyzbar
+numpy
+pillow
 gspread
 google-auth
-requests
