@@ -13,8 +13,6 @@ import os
 import requests
 import json
 import re
-from PIL import Image
-import numpy as np
 
 # Configuración de la página y diseño estético
 st.set_page_config(
@@ -90,7 +88,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Archivos CSV locales y URL de Google Apps Script integrada
+# Archivos CSV locales y nueva URL de Google Apps Script integrada
 INVENTARIO_FILE = "inventario_refrigeradores.csv"
 HISTORIAL_FILE = "historial_movimientos.csv"
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz0uHPmSFwpgWRhmDApRKHyQyP1FK10d8vy3TlG5UNi5RpqhgpnZbBDEL8q93s9MfVf7Q/exec"
@@ -143,19 +141,24 @@ def cargar_datos():
         else:
             df = pd.DataFrame(columns=ESQUEMA_COLUMNAS)
         
+    # Asegurar que existan todas las columnas del esquema simplificado
     for col in ESQUEMA_COLUMNAS:
         if col not in df.columns:
             df[col] = ""
 
+    # Limpieza absoluta y conversión estricta a formato YYYY-MM-DD
     def limpiar_fecha_estricta(val):
         val_s = str(val).strip()
         if not val_s or val_s.lower() == 'nan' or val_s.lower() == 'nat':
             return datetime.now().strftime("%Y-%m-%d")
+        
         dt_parsed = pd.to_datetime(val_s, errors='coerce')
         if not pd.isna(dt_parsed):
             return dt_parsed.strftime("%Y-%m-%d")
+            
         if re.match(r'^\d{4}-\d{2}-\d{2}$', val_s):
             return val_s
+            
         return val_s[:10]
 
     df["Ultimo_Movimiento"] = df["Ultimo_Movimiento"].apply(limpiar_fecha_estricta)
@@ -190,11 +193,14 @@ def registrar_historial(serie, modelo, tipo_movimiento, detalles):
     df_h = pd.concat([df_h, nuevo_mov], ignore_index=True)
     df_h.to_csv(HISTORIAL_FILE, index=False)
 
+# Función precisa para calcular los días sin movimiento
 def calcular_dias_sin_movimiento(df):
     if df.empty:
         return df
+    
     df_calc = df.copy()
     fecha_actual = datetime.now().date()
+    
     dias_lista = []
     for fecha_str in df_calc['Ultimo_Movimiento']:
         try:
@@ -204,18 +210,9 @@ def calcular_dias_sin_movimiento(df):
             dias_lista.append(max(0, dias))
         except Exception:
             dias_lista.append(0)
+        
     df_calc['Días sin movimiento'] = dias_lista
     return df_calc
-
-# Función de cámara visible y garantizada sin errores de servidor
-def escanear_codigo_barras(key_suffix):
-    serie_detectada = ""
-    with st.expander("📷 Usar cámara del celular para capturar serie"):
-        st.markdown("Toma una foto clara de la etiqueta con la serie o código de barras:")
-        foto = st.camera_input("Capturar etiqueta", key=f"cam_{key_suffix}")
-        if foto is not None:
-            st.success("✅ ¡Foto capturada correctamente! (Escribe el número de serie visualizado abajo en el campo de texto si el código es pequeño).")
-    return serie_detectada
 
 # Funciones de estilo de celdas
 def colorear_ubicaciones(val):
@@ -262,10 +259,12 @@ menu = st.sidebar.selectbox(
     ]
 )
 
-# Encabezado principal
+# Encabezado principal con diseño de columnas (Título a la izquierda, Logo Local a la derecha)
 col_titulo, col_logo = st.columns([4, 1])
+
 with col_titulo:
     st.markdown("<h1 style='color: #E60012; margin-top: 0;'>❄️ Control de Inventarios de Refrigeradores</h1>", unsafe_allow_html=True)
+
 with col_logo:
     if os.path.exists("Logo_Bepensa.png"):
         st.image("Logo_Bepensa.png", width=160)
@@ -281,6 +280,7 @@ if menu == "📊 Inventario General":
     df_con_dias = calcular_dias_sin_movimiento(df_inv)
     
     col1, col2, col3, col4, col5 = st.columns(5)
+    
     total_eq = len(df_inv)
     en_taller = len(df_inv[df_inv['Ubicación'] == 'En taller']) if not df_inv.empty else 0
     para_reparar = len(df_inv[(df_inv['Estatus'] == 'Para Reparar') & (df_inv['Ubicación'] != 'En taller')]) if not df_inv.empty else 0
@@ -325,7 +325,6 @@ if menu == "📊 Inventario General":
         
     st.markdown("<br>", unsafe_allow_html=True)
     
-    escanear_codigo_barras("buscador_general")
     busqueda = st.text_input("🔍 Buscar por número de serie o modelo:").strip()
     
     if busqueda:
@@ -353,6 +352,7 @@ if menu == "📊 Inventario General":
     df_filtrado = df_filtrado[[col for col in columnas_visibles if col in df_filtrado.columns]]
     
     if not df_filtrado.empty:
+        # Forzar formato limpio de fecha estrictamente a YYYY-MM-DD antes de mostrar en tabla
         df_mostrar = df_filtrado.copy()
         if 'Ultimo_Movimiento' in df_mostrar.columns:
             df_mostrar['Ultimo_Movimiento'] = pd.to_datetime(df_mostrar['Ultimo_Movimiento'], errors='coerce').dt.strftime('%Y-%m-%d').fillna(df_mostrar['Ultimo_Movimiento'])
@@ -364,10 +364,10 @@ if menu == "📊 Inventario General":
     else:
         st.dataframe(df_filtrado, use_container_width=True)
 
-# 2. ESTADÍA
+# 2. ESTADÍA (GRÁFICAS SEPARADAS PARA TRADICIONAL Y MODERNO)
 elif menu == "📈 Estadía":
     st.subheader("📈 Promedio de Días en Estadía por Canal")
-    st.markdown("Análisis del promedio de días sin movimiento agrupados por ubicación.")
+    st.markdown("Análisis del promedio de días sin movimiento agrupados por ubicación, divididos por canal de operación. Las barras que superan los **40 días** se destacan en **Rojo ⚠️**.")
     st.markdown("---")
     
     df_con_dias = calcular_dias_sin_movimiento(df_inv)
@@ -375,6 +375,7 @@ elif menu == "📈 Estadía":
     if not df_con_dias.empty:
         df_con_dias['Días sin movimiento'] = pd.to_numeric(df_con_dias['Días sin movimiento'], errors='coerce')
         
+        # --- SECCIÓN 1: CANAL TRADICIONAL ---
         st.markdown("### 🏬 Canal Tradicional")
         df_trad = df_con_dias[
             (df_con_dias['Canal'] == 'Tradicional') & 
@@ -388,6 +389,7 @@ elif menu == "📈 Estadía":
             fig_t, ax_t = plt.subplots(figsize=(10, 4.5))
             colores_t = ['#E60012' if x > 40 else '#2563eb' for x in df_prom_trad['Promedio de Días']]
             bars_t = ax_t.bar(df_prom_trad['Ubicación'], df_prom_trad['Promedio de Días'], color=colores_t, width=0.55, edgecolor='black', linewidth=0.8)
+            
             ax_t.axhline(40, color='#dc2626', linestyle='--', linewidth=1.5, label='Límite de Alerta (40 días)')
             
             for bar in bars_t:
@@ -401,6 +403,7 @@ elif menu == "📈 Estadía":
             plt.xticks(rotation=15, ha='right')
             ax_t.grid(axis='y', linestyle=':', alpha=0.6)
             ax_t.legend(loc='upper right')
+            
             st.pyplot(fig_t)
             
             df_t_tabla = df_prom_trad.copy()
@@ -408,10 +411,11 @@ elif menu == "📈 Estadía":
             df_t_tabla['Promedio de Días'] = df_t_tabla['Promedio de Días'].round(1)
             st.dataframe(df_t_tabla, use_container_width=True)
         else:
-            st.info("ℹ️ No hay equipos registrados para el Canal Tradicional.")
+            st.info("ℹ️ No hay equipos registrados para el Canal Tradicional (excluyendo Uso Interno y Baja).")
             
         st.markdown("<br><hr><br>", unsafe_allow_html=True)
         
+        # --- SECCIÓN 2: CANAL MODERNO ---
         st.markdown("### 🛒 Canal Moderno")
         df_mod = df_con_dias[
             (df_con_dias['Canal'] == 'Moderno') & 
@@ -425,6 +429,7 @@ elif menu == "📈 Estadía":
             fig_m, ax_m = plt.subplots(figsize=(10, 4.5))
             colores_m = ['#E60012' if x > 40 else '#10b981' for x in df_prom_mod['Promedio de Días']]
             bars_m = ax_m.bar(df_prom_mod['Ubicación'], df_prom_mod['Promedio de Días'], color=colores_m, width=0.55, edgecolor='black', linewidth=0.8)
+            
             ax_m.axhline(40, color='#dc2626', linestyle='--', linewidth=1.5, label='Límite de Alerta (40 días)')
             
             for bar in bars_m:
@@ -438,6 +443,7 @@ elif menu == "📈 Estadía":
             plt.xticks(rotation=15, ha='right')
             ax_m.grid(axis='y', linestyle=':', alpha=0.6)
             ax_m.legend(loc='upper right')
+            
             st.pyplot(fig_m)
             
             df_m_tabla = df_prom_mod.copy()
@@ -445,9 +451,10 @@ elif menu == "📈 Estadía":
             df_m_tabla['Promedio de Días'] = df_m_tabla['Promedio de Días'].round(1)
             st.dataframe(df_m_tabla, use_container_width=True)
         else:
-            st.info("ℹ️ No hay equipos registrados para el Canal Moderno.")
+            st.info("ℹ️ No hay equipos registrados para el Canal Moderno (excluyendo Uso Interno y Baja).")
+            
     else:
-        st.info("ℹ️ No hay datos suficientes en el inventario.")
+        st.info("ℹ️ No hay datos suficientes en el inventario para generar las gráficas de estadía.")
 
 # 3. EQUIPOS DISPONIBLES
 elif menu == "📦 Equipos Disponibles":
@@ -460,34 +467,40 @@ elif menu == "📦 Equipos Disponibles":
             (df_inv['Ubicación'].isin(["En almacén de Comodatos", "En almacén de Publicidad"])) |
             ((df_inv['Ubicación'] == "En patios") & (df_inv['Estatus'] == "Reparado"))
         )
+        
         df_disp = df_inv[condicion_disponibles].copy()
         
+        # --- TABLA 1: CANAL TRADICIONAL ---
         st.markdown("### 🏬 Canal Tradicional")
         df_trad_disp = df_disp[df_disp['Canal'] == 'Tradicional']
+        
         if not df_trad_disp.empty:
-            st.dataframe(df_trad_disp.groupby(['Modelo', 'Estatus']).size().reset_index(name='Cantidad Disponible'), use_container_width=True)
+            df_grouped_trad = df_trad_disp.groupby(['Modelo', 'Estatus']).size().reset_index(name='Cantidad Disponible')
+            st.dataframe(df_grouped_trad, use_container_width=True)
         else:
-            st.info("ℹ️ No hay equipos disponibles para el Canal Tradicional.")
+            st.info("ℹ️ No hay equipos disponibles bajo los criterios seleccionados para el Canal Tradicional.")
             
         st.markdown("<br>", unsafe_allow_html=True)
         
+        # --- TABLA 2: CANAL MODERNO ---
         st.markdown("### 🛒 Canal Moderno")
         df_mod_disp = df_disp[df_disp['Canal'] == 'Moderno']
+        
         if not df_mod_disp.empty:
-            st.dataframe(df_mod_disp.groupby(['Modelo', 'Estatus']).size().reset_index(name='Cantidad Disponible'), use_container_width=True)
+            df_grouped_mod = df_mod_disp.groupby(['Modelo', 'Estatus']).size().reset_index(name='Cantidad Disponible')
+            st.dataframe(df_grouped_mod, use_container_width=True)
         else:
-            st.info("ℹ️ No hay equipos disponibles para el Canal Moderno.")
+            st.info("ℹ️ No hay equipos disponibles bajo los criterios seleccionados para el Canal Moderno.")
+            
     else:
         st.info("ℹ️ El inventario se encuentra vacío actualmente.")
 
-# 4. REGISTRAR ENTRADA
+# 4. REGISTRAR ENTRADA (Asigna la fecha al ÚLTIMO MOVIMIENTO)
 elif menu == "📥 Registrar Entrada":
     st.subheader("📥 Registrar Entrada de Nuevo Equipo")
     
-    escanear_codigo_barras("registrar_entrada")
-    
     with st.form("form_entrada", clear_on_submit=True):
-        serie = st.text_input("🏷️ Número de Serie:").strip()
+        serie = st.text_input("🏷️ Número de Serie (Escanee o escriba):").strip()
         modelo = st.text_input("🧊 Modelo del Refrigerador:").strip()
         canal = st.selectbox("🏬 Canal:", CANALES)
         ubicacion = st.selectbox("📍 Ubicación inicial", UBICACIONES)
@@ -514,14 +527,13 @@ elif menu == "📥 Registrar Entrada":
                 df_inv = pd.concat([df_inv, nueva_fila], ignore_index=True)
                 guardar_datos(df_inv)
                 registrar_historial(serie, modelo, "ENTRADA", f"Canal: {canal} | Ubicación: {ubicacion} | Estatus: {estatus} | Fecha: {fecha_str}")
-                st.success("¡Se ha generado un nuevo registro en el inventario!")
+                st.success(f"✅ ¡Equipo con serie {serie} registrado exitosamente!")
 
 # 5. SALIDA DE EQUIPOS
 elif menu == "📤 Salida de Equipos":
     st.subheader("📤 Salida de Equipos del Inventario")
     
-    escanear_codigo_barras("salida_equipos")
-    serie_buscar = st.text_input("🔍 Escribe la serie del equipo para dar salida:").strip()
+    serie_buscar = st.text_input("🔍 Escanee o escriba la serie del equipo para dar salida:").strip()
     
     if serie_buscar:
         equipo = df_inv[df_inv['Serie'] == serie_buscar]
@@ -554,13 +566,13 @@ elif menu == "📤 Salida de Equipos":
                     
                     df_inv = df_inv.drop(idx).reset_index(drop=True)
                     guardar_datos(df_inv)
+                    
                     st.success(f"✅ ¡Salida confirmada! El equipo con serie {serie_buscar} ha sido eliminado del inventario general.")
 
-# 6. EDITAR / ELIMINAR EQUIPO
+# 6. EDITAR / ELIMINAR EQUIPO (Actualiza Ultimo_Movimiento si cambia la ubicación)
 elif menu == "✏️ Editar / Eliminar":
     st.subheader("✏️ Gestión, Corrección y Depuración de Equipos")
     
-    escanear_codigo_barras("editar_equipo")
     serie_edit = st.text_input("🔍 Ingrese la serie del equipo a editar o eliminar:").strip()
     
     if serie_edit:
@@ -624,7 +636,7 @@ elif menu == "📜 Historial de Movimientos":
 # 8. EXPORTAR A EXCEL
 elif menu == "💾 Exportar a Excel":
     st.subheader("💾 Exportar Base de Datos a Formato Excel")
-    st.markdown("Genera un archivo completo con el inventario actual y la bitácora de movimientos.")
+    st.markdown("Genera un archivo completo con el inventario actual (incluyendo el canal, los días sin movimiento) y la bitácora de movimientos en pestañas separadas.")
     
     if st.button("📥 Generar Archivo Excel"):
         output_file = "Reporte_Inventario_Refrigeradores_Bepensa.xlsx"
