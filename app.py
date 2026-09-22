@@ -21,7 +21,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# Estilos CSS personalizados (Sidebar naranja y tarjetas de KPI estilizadas)
+# Estilos CSS personalizados (Sidebar naranja, tarjetas de KPI y estilo del login sin recuadro)
 st.markdown("""
     <style>
     .main {
@@ -51,6 +51,21 @@ st.markdown("""
     }
     [data-testid="stSidebar"] .stSelectbox div[data-baseweb="select"] * {
         color: #111827 !important;
+    }
+
+    /* Color personalizado para el botón de Iniciar Sesión (#003049) */
+    div.stFormSubmitButton > button {
+        background-color: #003049 !important;
+        color: white !important;
+        border-radius: 8px;
+        padding: 8px 16px;
+        font-weight: bold;
+        border: none;
+        width: 100%;
+    }
+    div.stFormSubmitButton > button:hover {
+        background-color: #001d2d !important;
+        color: white !important;
     }
 
     /* Tarjetas KPI con estilos personalizados de colores */
@@ -88,10 +103,17 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Archivos CSV locales y nueva URL de Google Apps Script integrada
+# Archivos CSV locales y URL de Google Apps Script integrada
 INVENTARIO_FILE = "inventario_refrigeradores.csv"
 HISTORIAL_FILE = "historial_movimientos.csv"
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz0uHPmSFwpgWRhmDApRKHyQyP1FK10d8vy3TlG5UNi5RpqhgpnZbBDEL8q93s9MfVf7Q/exec"
+
+# Definición de las 3 personas autorizadas actualizadas
+USUARIOS_AUTORIZADOS = {
+    "evelasquezg": "Bepensa2026!",
+    "siencinop": "Bepensa2026!",
+    "edriverac": "Bepensa2026!"
+}
 
 # Opciones fijas de Canales
 CANALES = [
@@ -141,12 +163,10 @@ def cargar_datos():
         else:
             df = pd.DataFrame(columns=ESQUEMA_COLUMNAS)
         
-    # Asegurar que existan todas las columnas del esquema simplificado
     for col in ESQUEMA_COLUMNAS:
         if col not in df.columns:
             df[col] = ""
 
-    # Limpieza absoluta y conversión estricta a formato YYYY-MM-DD
     def limpiar_fecha_estricta(val):
         val_s = str(val).strip()
         if not val_s or val_s.lower() == 'nan' or val_s.lower() == 'nat':
@@ -169,9 +189,15 @@ def cargar_datos():
 
 def cargar_historial():
     if os.path.exists(HISTORIAL_FILE):
-        return pd.read_csv(HISTORIAL_FILE, dtype=str)
+        df_h = pd.read_csv(HISTORIAL_FILE, dtype=str)
     else:
-        return pd.DataFrame(columns=["Fecha_Hora", "Serie", "Modelo", "Tipo_Movimiento", "Detalles"])
+        df_h = pd.DataFrame(columns=["Fecha_Hora", "Usuario", "Serie", "Modelo", "Tipo_Movimiento", "Detalles"])
+    
+    # Asegurar compatibilidad si el archivo histórico anterior no tenía la columna Usuario
+    if "Usuario" not in df_h.columns:
+        df_h["Usuario"] = "Sistema / Desconocido"
+        
+    return df_h
 
 def guardar_datos(df):
     df.to_csv(INVENTARIO_FILE, index=False)
@@ -182,9 +208,11 @@ def guardar_datos(df):
         st.error(f"⚠️ Error al sincronizar con Google Sheets: {e}")
 
 def registrar_historial(serie, modelo, tipo_movimiento, detalles):
+    usuario_actual = st.session_state.get('usuario_actual', 'Sistema')
     df_h = cargar_historial()
     nuevo_mov = pd.DataFrame([{
         "Fecha_Hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "Usuario": str(usuario_actual),
         "Serie": str(serie),
         "Modelo": str(modelo),
         "Tipo_Movimiento": tipo_movimiento,
@@ -193,7 +221,6 @@ def registrar_historial(serie, modelo, tipo_movimiento, detalles):
     df_h = pd.concat([df_h, nuevo_mov], ignore_index=True)
     df_h.to_csv(HISTORIAL_FILE, index=False)
 
-# Función precisa para calcular los días sin movimiento
 def calcular_dias_sin_movimiento(df):
     if df.empty:
         return df
@@ -214,7 +241,6 @@ def calcular_dias_sin_movimiento(df):
     df_calc['Días sin movimiento'] = dias_lista
     return df_calc
 
-# Funciones de estilo de celdas
 def colorear_ubicaciones(val):
     val_lower = str(val).strip()
     if val_lower in ["En almacén de Comodatos", "En almacén de Publicidad"]:
@@ -237,33 +263,74 @@ def colorear_dias(val):
         pass
     return ''
 
-# Cargar inventario actual
 df_inv = cargar_datos()
 
-# --- BARRA LATERAL PERSONALIZADA ---
+# --- GESTIÓN DE SESIÓN EN LA BARRA LATERAL ---
+if 'autenticado' not in st.session_state:
+    st.session_state['autenticado'] = False
+if 'usuario_actual' not in st.session_state:
+    st.session_state['usuario_actual'] = ""
+
 st.sidebar.markdown("<h2 style='color: white; text-align: center;'>❄️ Bepensa</h2>", unsafe_allow_html=True)
-st.sidebar.markdown("<p style='text-align: center; color: white;'><b>Control de Refrigeradores</b></p>", unsafe_allow_html=True)
+st.sidebar.markdown("<p style='text-align: center; color: white;'><b>Control de Inventario</b></p>", unsafe_allow_html=True)
 st.sidebar.markdown("---")
 
-menu = st.sidebar.selectbox(
-    "Menú de Navegación",
-    [
-        "📊 Inventario General", 
-        "📈 Estadía", 
-        "📦 Equipos Disponibles", 
-        "📥 Registrar Entrada", 
-        "📤 Salida de Equipos", 
-        "✏️ Editar / Eliminar", 
-        "📜 Historial de Movimientos", 
-        "💾 Exportar a Excel"
-    ]
-)
+# Definir opciones de menú según el rol
+if st.session_state['autenticado']:
+    st.sidebar.success(f"🔓 Sesión Activa: {st.session_state['usuario_actual']}")
+    menu = st.sidebar.selectbox(
+        "Menú de Navegación",
+        [
+            "📊 Inventario General", 
+            "📈 Estadía", 
+            "📦 Equipos Disponibles", 
+            "📥 Registrar Entrada", 
+            "📤 Salida de Equipos", 
+            "✏️ Editar / Eliminar", 
+            "📜 Historial de Movimientos", 
+            "💾 Exportar a Excel"
+        ]
+    )
+    if st.sidebar.button("🔒 Cerrar Sesión"):
+        st.session_state['autenticado'] = False
+        st.session_state['usuario_actual'] = ""
+        st.rerun()
+else:
+    # Menú restringido solo para consulta pública
+    menu = st.sidebar.selectbox(
+        "Menú de Navegación",
+        [
+            "📊 Inventario General", 
+            "📈 Estadía", 
+            "📦 Equipos Disponibles"
+        ]
+    )
+    
+    st.sidebar.markdown("---")
+    
+    # Texto limpio directamente sobre el color naranja de la barra lateral
+    st.sidebar.markdown("<p style='color: #FFFFFF; font-weight: bold; text-align: center;'>🔒 Acceso Administrativo</p>", unsafe_allow_html=True)
+    
+    # Formulario de login sin recuadro
+    with st.sidebar.form("form_login"):
+        user_input = st.text_input("👤 Usuario:").strip()
+        pass_input = st.text_input("🔑 Contraseña:", type="password").strip()
+        btn_login = st.form_submit_button("Iniciar Sesión")
+        
+        if btn_login:
+            if user_input in USUARIOS_AUTORIZADOS and USUARIOS_AUTORIZADOS[user_input] == pass_input:
+                st.session_state['autenticado'] = True
+                st.session_state['usuario_actual'] = user_input
+                st.success("✅ ¡Acceso concedido!")
+                st.rerun()
+            else:
+                st.error("❌ Usuario o contraseña incorrectos.")
 
-# Encabezado principal con diseño de columnas (Título a la izquierda, Logo Local a la derecha)
+# Encabezado principal
 col_titulo, col_logo = st.columns([4, 1])
 
 with col_titulo:
-    st.markdown("<h1 style='color: #E60012; margin-top: 0;'>❄️ Control de Inventarios de Refrigeradores</h1>", unsafe_allow_html=True)
+    st.markdown("<h1 style='color: #E60012; margin-top: 0;'>❄️ Control de Inventarios de Capacidades</h1>", unsafe_allow_html=True)
 
 with col_logo:
     if os.path.exists("Logo_Bepensa.png"):
@@ -273,7 +340,7 @@ with col_logo:
 
 st.markdown("---")
 
-# 1. INVENTARIO GENERAL Y BUSCADOR
+# 1. INVENTARIO GENERAL Y BUSCADOR (PÚBLICO)
 if menu == "📊 Inventario General":
     st.subheader("📋 Inventario Actual de Equipos")
     
@@ -352,19 +419,18 @@ if menu == "📊 Inventario General":
     df_filtrado = df_filtrado[[col for col in columnas_visibles if col in df_filtrado.columns]]
     
     if not df_filtrado.empty:
-        # Forzar formato limpio de fecha estrictamente a YYYY-MM-DD antes de mostrar en tabla
         df_mostrar = df_filtrado.copy()
         if 'Ultimo_Movimiento' in df_mostrar.columns:
             df_mostrar['Ultimo_Movimiento'] = pd.to_datetime(df_mostrar['Ultimo_Movimiento'], errors='coerce').dt.strftime('%Y-%m-%d').fillna(df_mostrar['Ultimo_Movimiento'])
 
         df_estilizado = df_mostrar.style.map(colorear_ubicaciones, subset=['Ubicación'])
-        if 'Días sin movimiento' in df_mostrar.columns:
+        if 'Días sin movimiento' in df_filtrado.columns:
             df_estilizado = df_estilizado.map(colorear_dias, subset=['Días sin movimiento'])
         st.dataframe(df_estilizado, use_container_width=True)
     else:
         st.dataframe(df_filtrado, use_container_width=True)
 
-# 2. ESTADÍA (GRÁFICAS SEPARADAS PARA TRADICIONAL Y MODERNO)
+# 2. ESTADÍA (PÚBLICO)
 elif menu == "📈 Estadía":
     st.subheader("📈 Promedio de Días en Estadía por Canal")
     st.markdown("Análisis del promedio de días sin movimiento agrupados por ubicación, divididos por canal de operación. Las barras que superan los **40 días** se destacan en **Rojo ⚠️**.")
@@ -375,7 +441,6 @@ elif menu == "📈 Estadía":
     if not df_con_dias.empty:
         df_con_dias['Días sin movimiento'] = pd.to_numeric(df_con_dias['Días sin movimiento'], errors='coerce')
         
-        # --- SECCIÓN 1: CANAL TRADICIONAL ---
         st.markdown("### 🏬 Canal Tradicional")
         df_trad = df_con_dias[
             (df_con_dias['Canal'] == 'Tradicional') & 
@@ -389,7 +454,6 @@ elif menu == "📈 Estadía":
             fig_t, ax_t = plt.subplots(figsize=(10, 4.5))
             colores_t = ['#E60012' if x > 40 else '#2563eb' for x in df_prom_trad['Promedio de Días']]
             bars_t = ax_t.bar(df_prom_trad['Ubicación'], df_prom_trad['Promedio de Días'], color=colores_t, width=0.55, edgecolor='black', linewidth=0.8)
-            
             ax_t.axhline(40, color='#dc2626', linestyle='--', linewidth=1.5, label='Límite de Alerta (40 días)')
             
             for bar in bars_t:
@@ -403,7 +467,6 @@ elif menu == "📈 Estadía":
             plt.xticks(rotation=15, ha='right')
             ax_t.grid(axis='y', linestyle=':', alpha=0.6)
             ax_t.legend(loc='upper right')
-            
             st.pyplot(fig_t)
             
             df_t_tabla = df_prom_trad.copy()
@@ -411,11 +474,10 @@ elif menu == "📈 Estadía":
             df_t_tabla['Promedio de Días'] = df_t_tabla['Promedio de Días'].round(1)
             st.dataframe(df_t_tabla, use_container_width=True)
         else:
-            st.info("ℹ️ No hay equipos registrados para el Canal Tradicional (excluyendo Uso Interno y Baja).")
+            st.info("ℹ️ No hay equipos registrados para el Canal Tradicional.")
             
         st.markdown("<br><hr><br>", unsafe_allow_html=True)
         
-        # --- SECCIÓN 2: CANAL MODERNO ---
         st.markdown("### 🛒 Canal Moderno")
         df_mod = df_con_dias[
             (df_con_dias['Canal'] == 'Moderno') & 
@@ -429,7 +491,6 @@ elif menu == "📈 Estadía":
             fig_m, ax_m = plt.subplots(figsize=(10, 4.5))
             colores_m = ['#E60012' if x > 40 else '#10b981' for x in df_prom_mod['Promedio de Días']]
             bars_m = ax_m.bar(df_prom_mod['Ubicación'], df_prom_mod['Promedio de Días'], color=colores_m, width=0.55, edgecolor='black', linewidth=0.8)
-            
             ax_m.axhline(40, color='#dc2626', linestyle='--', linewidth=1.5, label='Límite de Alerta (40 días)')
             
             for bar in bars_m:
@@ -443,7 +504,6 @@ elif menu == "📈 Estadía":
             plt.xticks(rotation=15, ha='right')
             ax_m.grid(axis='y', linestyle=':', alpha=0.6)
             ax_m.legend(loc='upper right')
-            
             st.pyplot(fig_m)
             
             df_m_tabla = df_prom_mod.copy()
@@ -451,12 +511,11 @@ elif menu == "📈 Estadía":
             df_m_tabla['Promedio de Días'] = df_m_tabla['Promedio de Días'].round(1)
             st.dataframe(df_m_tabla, use_container_width=True)
         else:
-            st.info("ℹ️ No hay equipos registrados para el Canal Moderno (excluyendo Uso Interno y Baja).")
-            
+            st.info("ℹ️ No hay equipos registrados para el Canal Moderno.")
     else:
-        st.info("ℹ️ No hay datos suficientes en el inventario para generar las gráficas de estadía.")
+        st.info("ℹ️ No hay datos suficientes en el inventario.")
 
-# 3. EQUIPOS DISPONIBLES
+# 3. EQUIPOS DISPONIBLES (PÚBLICO)
 elif menu == "📦 Equipos Disponibles":
     st.subheader("📦 Reporte de Equipos Disponibles")
     st.markdown("Equipos listos para distribución por canal.")
@@ -467,40 +526,32 @@ elif menu == "📦 Equipos Disponibles":
             (df_inv['Ubicación'].isin(["En almacén de Comodatos", "En almacén de Publicidad"])) |
             ((df_inv['Ubicación'] == "En patios") & (df_inv['Estatus'] == "Reparado"))
         )
-        
         df_disp = df_inv[condicion_disponibles].copy()
         
-        # --- TABLA 1: CANAL TRADICIONAL ---
         st.markdown("### 🏬 Canal Tradicional")
         df_trad_disp = df_disp[df_disp['Canal'] == 'Tradicional']
-        
         if not df_trad_disp.empty:
-            df_grouped_trad = df_trad_disp.groupby(['Modelo', 'Estatus']).size().reset_index(name='Cantidad Disponible')
-            st.dataframe(df_grouped_trad, use_container_width=True)
+            st.dataframe(df_trad_disp.groupby(['Modelo', 'Estatus']).size().reset_index(name='Cantidad Disponible'), use_container_width=True)
         else:
-            st.info("ℹ️ No hay equipos disponibles bajo los criterios seleccionados para el Canal Tradicional.")
+            st.info("ℹ️ No hay equipos disponibles para el Canal Tradicional.")
             
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- TABLA 2: CANAL MODERNO ---
         st.markdown("### 🛒 Canal Moderno")
         df_mod_disp = df_disp[df_disp['Canal'] == 'Moderno']
-        
         if not df_mod_disp.empty:
-            df_grouped_mod = df_mod_disp.groupby(['Modelo', 'Estatus']).size().reset_index(name='Cantidad Disponible')
-            st.dataframe(df_grouped_mod, use_container_width=True)
+            st.dataframe(df_mod_disp.groupby(['Modelo', 'Estatus']).size().reset_index(name='Cantidad Disponible'), use_container_width=True)
         else:
-            st.info("ℹ️ No hay equipos disponibles bajo los criterios seleccionados para el Canal Moderno.")
-            
+            st.info("ℹ️ No hay equipos disponibles para el Canal Moderno.")
     else:
         st.info("ℹ️ El inventario se encuentra vacío actualmente.")
 
-# 4. REGISTRAR ENTRADA (Asigna la fecha al ÚLTIMO MOVIMIENTO)
-elif menu == "📥 Registrar Entrada":
+# 4. REGISTRAR ENTRADA (SOLO ADMINISTRADORES)
+elif menu == "📥 Registrar Entrada" and st.session_state['autenticado']:
     st.subheader("📥 Registrar Entrada de Nuevo Equipo")
     
     with st.form("form_entrada", clear_on_submit=True):
-        serie = st.text_input("🏷️ Número de Serie (Escanee o escriba):").strip()
+        serie = st.text_input("🏷️ Número de Serie:").strip()
         modelo = st.text_input("🧊 Modelo del Refrigerador:").strip()
         canal = st.selectbox("🏬 Canal:", CANALES)
         ubicacion = st.selectbox("📍 Ubicación inicial", UBICACIONES)
@@ -527,13 +578,13 @@ elif menu == "📥 Registrar Entrada":
                 df_inv = pd.concat([df_inv, nueva_fila], ignore_index=True)
                 guardar_datos(df_inv)
                 registrar_historial(serie, modelo, "ENTRADA", f"Canal: {canal} | Ubicación: {ubicacion} | Estatus: {estatus} | Fecha: {fecha_str}")
-                st.success(f"✅ ¡Equipo con serie {serie} registrado exitosamente!")
+                st.success("¡Se ha generado un nuevo registro en el inventario!")
 
-# 5. SALIDA DE EQUIPOS
-elif menu == "📤 Salida de Equipos":
+# 5. SALIDA DE EQUIPOS (SOLO ADMINISTRADORES)
+elif menu == "📤 Salida de Equipos" and st.session_state['autenticado']:
     st.subheader("📤 Salida de Equipos del Inventario")
     
-    serie_buscar = st.text_input("🔍 Escanee o escriba la serie del equipo para dar salida:").strip()
+    serie_buscar = st.text_input("Escriba la serie del equipo para dar salida:").strip()
     
     if serie_buscar:
         equipo = df_inv[df_inv['Serie'] == serie_buscar]
@@ -566,11 +617,10 @@ elif menu == "📤 Salida de Equipos":
                     
                     df_inv = df_inv.drop(idx).reset_index(drop=True)
                     guardar_datos(df_inv)
-                    
                     st.success(f"✅ ¡Salida confirmada! El equipo con serie {serie_buscar} ha sido eliminado del inventario general.")
 
-# 6. EDITAR / ELIMINAR EQUIPO (Actualiza Ultimo_Movimiento si cambia la ubicación)
-elif menu == "✏️ Editar / Eliminar":
+# 6. EDITAR / ELIMINAR EQUIPO (SOLO ADMINISTRADORES)
+elif menu == "✏️ Editar / Eliminar" and st.session_state['autenticado']:
     st.subheader("✏️ Gestión, Corrección y Depuración de Equipos")
     
     serie_edit = st.text_input("🔍 Ingrese la serie del equipo a editar o eliminar:").strip()
@@ -624,8 +674,8 @@ elif menu == "✏️ Editar / Eliminar":
                     registrar_historial(serie_edit, modelo_eliminado, "ELIMINACIÓN", "Equipo eliminado del inventario.")
                     st.success("🗑️ ¡Equipo eliminado permanentemente del sistema!")
 
-# 7. HISTORIAL DE MOVIMIENTOS
-elif menu == "📜 Historial de Movimientos":
+# 7. HISTORIAL DE MOVIMIENTOS (SOLO ADMINISTRADORES)
+elif menu == "📜 Historial de Movimientos" and st.session_state['autenticado']:
     st.subheader("📜 Bitácora de Entradas, Salidas y Cambios de Ubicación")
     df_h = cargar_historial()
     if df_h.empty:
@@ -633,13 +683,13 @@ elif menu == "📜 Historial de Movimientos":
     else:
         st.dataframe(df_h.sort_values(by="Fecha_Hora", ascending=False), use_container_width=True)
 
-# 8. EXPORTAR A EXCEL
-elif menu == "💾 Exportar a Excel":
+# 8. EXPORTAR A EXCEL (SOLO ADMINISTRADORES)
+elif menu == "💾 Exportar a Excel" and st.session_state['autenticado']:
     st.subheader("💾 Exportar Base de Datos a Formato Excel")
-    st.markdown("Genera un archivo completo con el inventario actual (incluyendo el canal, los días sin movimiento) y la bitácora de movimientos en pestañas separadas.")
+    st.markdown("Genera un archivo completo con el inventario actual y la bitácora de movimientos (incluyendo el usuario responsable) en pestañas separadas.")
     
     if st.button("📥 Generar Archivo Excel"):
-        output_file = "Reporte_Inventario_Refrigeradores_Bepensa.xlsx"
+        output_file = "Reporte_Inventario_Capacidades_Bepensa.xlsx"
         df_export = calcular_dias_sin_movimiento(df_inv)
         
         with pd.ExcelWriter(output_file, engine='openpyxl') as writer:
@@ -654,4 +704,4 @@ elif menu == "💾 Exportar a Excel":
                 file_name=output_file,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
-        st.success("✅ ¡Archivo Excel generado correctamente!")
+        st.success("✅ ¡Archivo Excel generado correctamente con la columna de usuarios!")
