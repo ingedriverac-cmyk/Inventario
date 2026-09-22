@@ -172,7 +172,7 @@ def registrar_historial(serie, modelo, tipo_movimiento, detalles):
     df_h = pd.concat([df_h, nuevo_mov], ignore_index=True)
     df_h.to_csv(HISTORIAL_FILE, index=False)
 
-# Función para calcular los días sin movimiento
+# Función mejorada para calcular los días sin movimiento (limpia formatos de fecha complejos o en inglés)
 def calcular_dias_sin_movimiento(df):
     if df.empty:
         return df
@@ -183,8 +183,16 @@ def calcular_dias_sin_movimiento(df):
     dias_lista = []
     for fecha_str in df_calc['Ultimo_Movimiento']:
         try:
-            f_mov = datetime.strptime(str(fecha_str).split()[0], "%Y-%m-%d").date()
-        except ValueError:
+            val_limpia = str(fecha_str).strip()
+            if len(val_limpia) >= 10 and '-' in val_limpia[:10]:
+                f_mov = datetime.strptime(val_limpia[:10], "%Y-%m-%d").date()
+            else:
+                f_mov = pd.to_datetime(val_limpia, errors='coerce')
+                if pd.isna(f_mov):
+                    f_mov = fecha_actual
+                else:
+                    f_mov = f_mov.date()
+        except Exception:
             f_mov = fecha_actual
                 
         dias = (fecha_actual - f_mov).days
