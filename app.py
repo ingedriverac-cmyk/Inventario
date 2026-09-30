@@ -515,7 +515,7 @@ st.sidebar.markdown("<div style='flex-grow: 1;'></div>", unsafe_allow_html=True)
 st.sidebar.markdown("---")
 st.sidebar.markdown(
     """<p style='text-align: center; font-size: 12px; color: #FFFFFF; line-height: 1.4; margin-bottom: 10px;'>
-    🛠️ <b>Desarrollado y diseñado por:</b><br>
+    🛠️️ <b>Desarrollado y diseñado por:</b><br>
     Eduardo Rivera Chulin<br><br>
     © 2026 Bepensa / Coca-Cola.<br>
     Todos los derechos reservados.
@@ -645,7 +645,7 @@ elif menu == "📈 Estadía":
     st.markdown("Análisis del promedio de días sin movimiento y saturación de inventario por ubicación, canal, modelos e imágenes. Las barras que superan los **40 días** se destacan en **Rojo ⚠**.")
     st.markdown("---")
     
-    opciones_estadia_filtro = ["Todos"] + [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
+    opciones_estadia_filtro = [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
     canal_estadia_seleccionado = st.selectbox("🎯 Seleccione el Canal a visualizar:", opciones_estadia_filtro)
     st.markdown("---")
     
@@ -667,125 +667,120 @@ elif menu == "📈 Estadía":
             </style>
         """, unsafe_allow_html=True)
         
-        mostrar_todo = (canal_estadia_seleccionado == "Todos")
-        canales_a_mostrar = [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]] if mostrar_todo else [canal_estadia_seleccionado]
+        c_val = canal_estadia_seleccionado
         
-        for c_val in canales_a_mostrar:
-            col_t_title, col_t_btn1, col_t_btn2 = st.columns([2, 1, 1])
-            with col_t_title:
-                st.markdown(f"### 🏬 Canal {c_val}")
-            
-            key_btn_ubicacion = f"btn_ubicacion_{c_val}"
-            key_btn_modelo = f"btn_modelo_{c_val}"
-            
-            if key_btn_ubicacion not in st.session_state:
-                st.session_state[key_btn_ubicacion] = True
-            if key_btn_modelo not in st.session_state:
-                st.session_state[key_btn_modelo] = False
+        col_t_title, col_t_btn1, col_t_btn2 = st.columns([2, 1, 1])
+        with col_t_title:
+            st.markdown(f"### 🏬 Canal {c_val}")
+        
+        key_btn_ubicacion = f"btn_ubicacion_{c_val}"
+        key_btn_modelo = f"btn_modelo_{c_val}"
+        
+        if key_btn_ubicacion not in st.session_state:
+            st.session_state[key_btn_ubicacion] = True
+        if key_btn_modelo not in st.session_state:
+            st.session_state[key_btn_modelo] = False
 
-            def toggle_ubicacion(k_ub=key_btn_ubicacion, k_mod=key_btn_modelo):
-                st.session_state[k_ub] = True
-                st.session_state[k_mod] = False
+        def toggle_ubicacion(k_ub=key_btn_ubicacion, k_mod=key_btn_modelo):
+            st.session_state[k_ub] = True
+            st.session_state[k_mod] = False
 
-            def toggle_modelo(k_ub=key_btn_ubicacion, k_mod=key_btn_modelo):
-                st.session_state[k_mod] = True
-                st.session_state[k_ub] = False
+        def toggle_modelo(k_ub=key_btn_ubicacion, k_mod=key_btn_modelo):
+            st.session_state[k_mod] = True
+            st.session_state[k_ub] = False
 
-            with col_t_btn1:
-                st.button(f"📍 Por Ubicación ({c_val})", key=f"click_ub_{c_val}", on_click=toggle_ubicacion)
-            with col_t_btn2:
-                st.button(f"📊 Por Modelo e Imagen ({c_val})", key=f"click_mod_{c_val}", on_click=toggle_modelo)
-            
-            df_canal = df_con_dias[
-                (df_con_dias['Canal'] == c_val) & 
-                (~df_con_dias['Ubicación'].isin(['Uso Interno', 'En proceso de Baja', 'Asignado a Cliente']))
-            ].copy()
-            
-            if not df_canal.empty:
-                if st.session_state[key_btn_ubicacion]:
-                    df_prom_mean = df_canal.groupby('Ubicación')['Días sin movimiento'].mean().reset_index()
-                    df_prom_count = df_canal.groupby('Ubicación')['Días sin movimiento'].count().reset_index()
-                    df_prom = pd.merge(df_prom_mean, df_prom_count, on='Ubicación')
-                    df_prom.columns = ['Ubicación', 'Promedio de Días', 'Cantidad']
-                    df_prom = df_prom[['Ubicación', 'Cantidad', 'Promedio de Días']]
-                    df_prom = df_prom.sort_values(by='Promedio de Días', ascending=False)
-                    
-                    fig_c, ax_c = plt.subplots(figsize=(10, 4.5))
-                    colores_c = ['#E60012' if x > 40 else '#2563eb' for x in df_prom['Promedio de Días']]
-                    bars_c = ax_c.bar(df_prom['Ubicación'], df_prom['Promedio de Días'], color=colores_c, width=0.55, edgecolor='black', linewidth=0.8)
-                    ax_c.axhline(40, color='#dc2626', linestyle='--', linewidth=1.5, label='Límite de Alerta (40 días)')
-                    
-                    for bar in bars_c:
-                        yval = bar.get_height()
-                        alerta_txt = f" ⚠️ ({yval:.1f}d)" if yval > 40 else f" ({yval:.1f}d)"
-                        ax_c.text(bar.get_x() + bar.get_width()/2.0, yval + 1, alerta_txt, ha='center', va='bottom', fontsize=9, fontweight='bold', color='#111827')
-
-                    ax_c.set_ylabel('Promedio de Días', fontsize=10, fontweight='bold')
-                    ax_c.set_xlabel('Ubicación', fontsize=10, fontweight='bold')
-                    ax_c.set_title(f'Estadía Promedio - Canal {c_val} (Por Ubicación)', fontsize=12, fontweight='bold', pad=12)
-                    plt.xticks(rotation=15, ha='right')
-                    ax_c.grid(axis='y', linestyle=':', alpha=0.6)
-                    ax_c.legend(loc='upper right')
-                    st.pyplot(fig_c)
-                    
-                    df_c_tabla = df_prom.copy()
-                    df_c_tabla['Estado de Alerta'] = df_c_tabla['Promedio de Días'].apply(lambda x: "🚨 Alerta: Supera los 40 días" if x > 40 else "✅ Normal")
-                    df_c_tabla['Promedio de Días'] = df_c_tabla['Promedio de Días'].round(1)
-                    st.dataframe(df_c_tabla, use_container_width=True, hide_index=True)
-
-                elif st.session_state[key_btn_modelo]:
-                    df_modelo_grafica = df_canal.groupby('Modelo')['Días sin movimiento'].mean().reset_index()
-                    df_modelo_grafica.columns = ['Modelo', 'Promedio de Días']
-                    df_modelo_grafica = df_modelo_grafica.sort_values(by='Promedio de Días', ascending=False)
-                    
-                    fig_m, ax_m = plt.subplots(figsize=(10, 4.5))
-                    colores_m = ['#E60012' if x > 40 else '#2563eb' for x in df_modelo_grafica['Promedio de Días']]
-                    bars_m = ax_m.bar(df_modelo_grafica['Modelo'], df_modelo_grafica['Promedio de Días'], color=colores_m, width=0.55, edgecolor='black', linewidth=0.8)
-                    ax_m.axhline(40, color='#dc2626', linestyle='--', linewidth=1.5, label='Límite de Alerta (40 días)')
-                    
-                    for bar in bars_m:
-                        yval = bar.get_height()
-                        alerta_txt = f" ⚠️ ({yval:.1f}d)" if yval > 40 else f" ({yval:.1f}d)"
-                        ax_m.text(bar.get_x() + bar.get_width()/2.0, yval + 1, alerta_txt, ha='center', va='bottom', fontsize=9, fontweight='bold', color='#111827')
-
-                    ax_m.set_ylabel('Promedio de Días', fontsize=10, fontweight='bold')
-                    ax_m.set_xlabel('Modelo', fontsize=10, fontweight='bold')
-                    ax_m.set_title(f'Estadía Promedio - Canal {c_val} (Por Modelo)', fontsize=12, fontweight='bold', pad=12)
-                    plt.xticks(rotation=25, ha='right')
-                    ax_m.grid(axis='y', linestyle=':', alpha=0.6)
-                    ax_m.legend(loc='upper right')
-                    st.pyplot(fig_m)
-
-                    st.markdown(f"#### 🧊 Desglose por Modelo e Imagen - Canal {c_val}")
-                    df_modelo_imagen_mean = df_canal.groupby(['Modelo', 'Imagen'])['Días sin movimiento'].mean().reset_index()
-                    df_modelo_imagen_count = df_canal.groupby(['Modelo', 'Imagen'])['Días sin movimiento'].count().reset_index()
-                    df_modelo_imagen = pd.merge(df_modelo_imagen_mean, df_modelo_imagen_count, on=['Modelo', 'Imagen'])
-                    df_modelo_imagen.columns = ['Modelo', 'Imagen', 'Promedio de Días', 'Cantidad']
-                    df_modelo_imagen = df_modelo_imagen[['Modelo', 'Imagen', 'Cantidad', 'Promedio de Días']]
-                    df_modelo_imagen = df_modelo_imagen.sort_values(by='Promedio de Días', ascending=False)
-                    
-                    df_m_tabla = df_modelo_imagen.copy()
-                    df_m_tabla['Estado de Alerta'] = df_m_tabla['Promedio de Días'].apply(lambda x: "🚨 Alerta: Supera los 40 días" if x > 40 else "✅ Normal")
-                    df_m_tabla['Promedio de Días'] = df_m_tabla['Promedio de Días'].round(1)
-                    st.dataframe(df_m_tabla, use_container_width=True, hide_index=True)
-
-                if st.session_state.get('autenticado', False):
-                    with st.expander(f"🔍 Ver el listado exacto de Series de Equipos - Canal {c_val}"):
-                        df_detalle_series = df_canal[['Serie', 'Tipo', 'Modelo', 'Imagen', 'Ubicación', 'Estatus', 'Días sin movimiento', 'Ultimo_Movimiento']].copy()
-                        df_detalle_series['Días sin movimiento'] = pd.to_numeric(df_detalle_series['Días sin movimiento'], errors='coerce')
-                        df_detalle_series = df_detalle_series.sort_values(by='Días sin movimiento', ascending=False)
-                        df_detalle_series = df_detalle_series.rename(columns={'Ultimo_Movimiento': 'Último Movimiento'})
-                        
-                        df_series_estilizado = df_detalle_series.style.map(colorear_ubicaciones, subset=['Ubicación']).map(colorear_dias, subset=['Días sin movimiento'])
-                        st.dataframe(df_series_estilizado, use_container_width=True, hide_index=True)
-
-            else:
-                st.info(f"ℹ️ No hay equipos registrados para el Canal {c_val}.")
+        with col_t_btn1:
+            st.button(f"📍 Por Ubicación ({c_val})", key=f"click_ub_{c_val}", on_click=toggle_ubicacion)
+        with col_t_btn2:
+            st.button(f"📊 Por Modelo e Imagen ({c_val})", key=f"click_mod_{c_val}", on_click=toggle_modelo)
+        
+        df_canal = df_con_dias[
+            (df_con_dias['Canal'] == c_val) & 
+            (~df_con_dias['Ubicación'].isin(['Uso Interno', 'En proceso de Baja', 'Asignado a Cliente']))
+        ].copy()
+        
+        if not df_canal.empty:
+            if st.session_state[key_btn_ubicacion]:
+                df_prom_mean = df_canal.groupby('Ubicación')['Días sin movimiento'].mean().reset_index()
+                df_prom_count = df_canal.groupby('Ubicación')['Días sin movimiento'].count().reset_index()
+                df_prom = pd.merge(df_prom_mean, df_prom_count, on='Ubicación')
+                df_prom.columns = ['Ubicación', 'Promedio de Días', 'Cantidad']
+                df_prom = df_prom[['Ubicación', 'Cantidad', 'Promedio de Días']]
+                df_prom = df_prom.sort_values(by='Promedio de Días', ascending=False)
                 
-            if mostrar_todo:
-                st.markdown("<br><hr><br>", unsafe_allow_html=True)
+                fig_c, ax_c = plt.subplots(figsize=(10, 4.5))
+                colores_c = ['#E60012' if x > 40 else '#2563eb' for x in df_prom['Promedio de Días']]
+                bars_c = ax_c.bar(df_prom['Ubicación'], df_prom['Promedio de Días'], color=colores_c, width=0.55, edgecolor='black', linewidth=0.8)
+                ax_c.axhline(40, color='#dc2626', linestyle='--', linewidth=1.5, label='Límite de Alerta (40 días)')
+                
+                for bar in bars_c:
+                    yval = bar.get_height()
+                    alerta_txt = f" ⚠️️ ({yval:.1f}d)" if yval > 40 else f" ({yval:.1f}d)"
+                    ax_c.text(bar.get_x() + bar.get_width()/2.0, yval + 1, alerta_txt, ha='center', va='bottom', fontsize=9, fontweight='bold', color='#111827')
+
+                ax_c.set_ylabel('Promedio de Días', fontsize=10, fontweight='bold')
+                ax_c.set_xlabel('Ubicación', fontsize=10, fontweight='bold')
+                ax_c.set_title(f'Estadía Promedio - Canal {c_val} (Por Ubicación)', fontsize=12, fontweight='bold', pad=12)
+                plt.xticks(rotation=15, ha='right')
+                ax_c.grid(axis='y', linestyle=':', alpha=0.6)
+                ax_c.legend(loc='upper right')
+                st.pyplot(fig_c)
+                
+                df_c_tabla = df_prom.copy()
+                df_c_tabla['Estado de Alerta'] = df_c_tabla['Promedio de Días'].apply(lambda x: "🚨 Alerta: Supera los 40 días" if x > 40 else "✅ Normal")
+                df_c_tabla['Promedio de Días'] = df_c_tabla['Promedio de Días'].round(1)
+                st.dataframe(df_c_tabla, use_container_width=True, hide_index=True)
+
+            elif st.session_state[key_btn_modelo]:
+                df_modelo_grafica = df_canal.groupby('Modelo')['Días sin movimiento'].mean().reset_index()
+                df_modelo_grafica.columns = ['Modelo', 'Promedio de Días']
+                df_modelo_grafica = df_modelo_grafica.sort_values(by='Promedio de Días', ascending=False)
+                
+                fig_m, ax_m = plt.subplots(figsize=(10, 4.5))
+                colores_m = ['#E60012' if x > 40 else '#2563eb' for x in df_modelo_grafica['Promedio de Días']]
+                bars_m = ax_m.bar(df_modelo_grafica['Modelo'], df_modelo_grafica['Promedio de Días'], color=colores_m, width=0.55, edgecolor='black', linewidth=0.8)
+                ax_m.axhline(40, color='#dc2626', linestyle='--', linewidth=1.5, label='Límite de Alerta (40 días)')
+                
+                for bar in bars_m:
+                    yval = bar.get_height()
+                    alerta_txt = f" ⚠️ ({yval:.1f}d)" if yval > 40 else f" ({yval:.1f}d)"
+                    ax_m.text(bar.get_x() + bar.get_width()/2.0, yval + 1, alerta_txt, ha='center', va='bottom', fontsize=9, fontweight='bold', color='#111827')
+
+                ax_m.set_ylabel('Promedio de Días', fontsize=10, fontweight='bold')
+                ax_m.set_xlabel('Modelo', fontsize=10, fontweight='bold')
+                ax_m.set_title(f'Estadía Promedio - Canal {c_val} (Por Modelo)', fontsize=12, fontweight='bold', pad=12)
+                plt.xticks(rotation=25, ha='right')
+                ax_m.grid(axis='y', linestyle=':', alpha=0.6)
+                ax_m.legend(loc='upper right')
+                st.pyplot(fig_m)
+
+                st.markdown(f"#### 🧊 Desglose por Modelo e Imagen - Canal {c_val}")
+                df_modelo_imagen_mean = df_canal.groupby(['Modelo', 'Imagen'])['Días sin movimiento'].mean().reset_index()
+                df_modelo_imagen_count = df_canal.groupby(['Modelo', 'Imagen'])['Días sin movimiento'].count().reset_index()
+                df_modelo_imagen = pd.merge(df_modelo_imagen_mean, df_modelo_imagen_count, on=['Modelo', 'Imagen'])
+                df_modelo_imagen.columns = ['Modelo', 'Imagen', 'Promedio de Días', 'Cantidad']
+                df_modelo_imagen = df_modelo_imagen[['Modelo', 'Imagen', 'Cantidad', 'Promedio de Días']]
+                df_modelo_imagen = df_modelo_imagen.sort_values(by='Promedio de Días', ascending=False)
+                
+                df_m_tabla = df_modelo_imagen.copy()
+                df_m_tabla['Estado de Alerta'] = df_m_tabla['Promedio de Días'].apply(lambda x: "🚨 Alerta: Supera los 40 días" if x > 40 else "✅ Normal")
+                df_m_tabla['Promedio de Días'] = df_m_tabla['Promedio de Días'].round(1)
+                st.dataframe(df_m_tabla, use_container_width=True, hide_index=True)
+
+            if st.session_state.get('autenticado', False):
+                with st.expander(f"🔍 Ver el listado exacto de Series de Equipos - Canal {c_val}"):
+                    df_detalle_series = df_canal[['Serie', 'Tipo', 'Modelo', 'Imagen', 'Ubicación', 'Estatus', 'Días sin movimiento', 'Ultimo_Movimiento']].copy()
+                    df_detalle_series['Días sin movimiento'] = pd.to_numeric(df_detalle_series['Días sin movimiento'], errors='coerce')
+                    df_detalle_series = df_detalle_series.sort_values(by='Días sin movimiento', ascending=False)
+                    df_detalle_series = df_detalle_series.rename(columns={'Ultimo_Movimiento': 'Último Movimiento'})
+                    
+                    df_series_estilizado = df_detalle_series.style.map(colorear_ubicaciones, subset=['Ubicación']).map(colorear_dias, subset=['Días sin movimiento'])
+                    st.dataframe(df_series_estilizado, use_container_width=True, hide_index=True)
+
+        else:
+            st.info(f"ℹ️ No hay equipos registrados para el Canal {c_val}.")
     else:
-        st.info("ℹ️️ No hay datos suficientes en el inventario.")
+        st.info("ℹ No hay datos suficientes en el inventario.")
 
 # 3. INVENTARIO GENERAL Y BUSCADOR (SOLO ADMINISTRADORES)
 elif menu == "📊 Inventario General" and st.session_state['autenticado']:
@@ -1141,7 +1136,7 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
                         with col_btn1:
                             btn_actualizar = st.form_submit_button("💾 Guardar Cambios en la Solicitud")
                         with col_btn2:
-                            btn_eliminar_individual = st.form_submit_button("🗑️️ Eliminar esta Solicitud")
+                            btn_eliminar_individual = st.form_submit_button("🗑 Eliminar esta Solicitud")
                         
                         if btn_actualizar:
                             status_validos_verificacion = obtener_status_validos(movimiento_edit)
@@ -1199,7 +1194,7 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
                             cuc_borrado = row_sel['CUC']
                             df_sol = df_sol.drop(idx_seleccionado).reset_index(drop=True)
                             if guardar_solicitudes_seguro(df_sol):
-                                st.success(f"🗑️️ ¡Solicitud eliminada con éxito! El registro del cliente '{cliente_borrado}' (CUC: {cuc_borrado}) fue dado de baja definitivamente del sistema.")
+                                st.success(f"🗑 ¡Solicitud eliminada con éxito! El registro del cliente '{cliente_borrado}' (CUC: {cuc_borrado}) fue dado de baja definitivamente del sistema.")
                                 if 'df_pend_busq_resultado' in st.session_state:
                                     del st.session_state['df_pend_busq_resultado']
                                 time.sleep(2.5)
