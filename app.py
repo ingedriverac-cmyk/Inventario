@@ -134,7 +134,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# Archivos CSV locales y URL de Google Apps Script integrada
+# Archivos CSV locales originales
 INVENTARIO_FILE = "inventario_refrigeradores.csv"
 HISTORIAL_FILE = "historial_movimientos.csv"
 LEVANTAMIENTOS_FILE = "levantamientos.csv"
@@ -463,7 +463,7 @@ st.sidebar.markdown("---")
 
 if st.session_state['autenticado']:
     st.sidebar.success(f"🔓 Sesión Activa: {st.session_state['usuario_actual']}")
-    # Menú para administradores con el orden de menú actualizado
+    # Menú para administradores (con Levantamientos incluido)
     menu = st.sidebar.selectbox(
         "Menú de Navegación",
         [
@@ -485,13 +485,12 @@ if st.session_state['autenticado']:
         st.session_state['usuario_actual'] = ""
         st.rerun()
 else:
-    # Menú para usuarios generales con el orden actualizado
+    # Menú para usuarios generales (SIN Levantamientos)
     menu = st.sidebar.selectbox(
         "Menú de Navegación",
         [
             "📦 Equipos Disponibles",
             "📈 Estadía",
-            "📝 Levantamientos",
             "📅 Solicitudes Diarias"
         ]
     )
@@ -543,7 +542,7 @@ st.markdown("---")
 # 1. EQUIPOS DISPONIBLES (PÚBLICO Y PRIMERA OPCIÓN PARA GENERALES)
 if menu == "📦 Equipos Disponibles":
     st.subheader("📦 Reporte de Equipos Disponibles")
-    st.markdown("Equipos listos para distribución.") # Modificación estética solicitada (sin paréntesis)
+    st.markdown("Equipos listos para distribución.")
     
     canales_validos_kpi = [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
     
@@ -645,7 +644,7 @@ elif menu == "📈 Estadía":
         st.markdown("<br>", unsafe_allow_html=True)
 
     st.subheader("📈 Promedio de Estadía y Saturación de Equipos")
-    st.markdown("Análisis del promedio de días sin movimiento y saturación de inventario. Las barras que superan los **40 días** se destacan en **Rojo ⚠**.") # Descripción acortada solicitada
+    st.markdown("Análisis del promedio de días sin movimiento y saturación de inventario. Las barras que superan los **40 días** se destacan en **Rojo ⚠**.")
     st.markdown("---")
     
     opciones_estadia_filtro = [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
@@ -718,7 +717,7 @@ elif menu == "📈 Estadía":
                 
                 for bar in bars_c:
                     yval = bar.get_height()
-                    alerta_txt = f" ⚠️ ({yval:.1f}d)" if yval > 40 else f" ({yval:.1f}d)"
+                    alerta_txt = f" ⚠️️ ({yval:.1f}d)" if yval > 40 else f" ({yval:.1f}d)"
                     ax_c.text(bar.get_x() + bar.get_width()/2.0, yval + 1, alerta_txt, ha='center', va='bottom', fontsize=9, fontweight='bold', color='#111827')
 
                 ax_c.set_ylabel('Promedio de Días', fontsize=10, fontweight='bold')
@@ -788,7 +787,6 @@ elif menu == "📈 Estadía":
 # 3. SOLICITUDES DIARIAS (PÚBLICO / GENERAL Y ADMINISTRADOR)
 elif menu == "📅 Solicitudes Diarias":
     st.subheader("📅 Solicitudes Diarias y Seguimiento por Fecha")
-    # Descripción eliminada por completo
     st.markdown("---")
     
     df_sol_diarias = cargar_solicitudes()
@@ -807,7 +805,6 @@ elif menu == "📅 Solicitudes Diarias":
 
         df_sol_diarias['Fecha_Entregado_Limpia'] = df_sol_diarias['Fecha_Entregado'].apply(limpiar_fecha_str)
         
-        # Filtros en cascada
         col_f1, col_f2, col_f3 = st.columns(3)
         with col_f1:
             fecha_consulta = st.date_input("📅 Seleccione la Fecha:", value=date.today())
@@ -815,7 +812,6 @@ elif menu == "📅 Solicitudes Diarias":
         fecha_consulta_str = fecha_consulta.strftime("%Y-%m-%d")
         df_filtradas_dia = df_sol_diarias[df_sol_diarias['Fecha_Entregado_Limpia'] == fecha_consulta_str].copy()
         
-        # Opciones en cascada para Canal
         canales_disponibles = ["Todos"] + sorted(df_filtradas_dia['Canal'].dropna().unique().tolist()) if not df_filtradas_dia.empty else ["Todos"]
         with col_f2:
             filtro_canal_dia = st.selectbox("🏬 Filtrar por Canal:", canales_disponibles)
@@ -823,7 +819,6 @@ elif menu == "📅 Solicitudes Diarias":
         if filtro_canal_dia != "Todos":
             df_filtradas_dia = df_filtradas_dia[df_filtradas_dia['Canal'] == filtro_canal_dia]
             
-        # Opciones en cascada para Jefe de Venta
         jefes_disponibles = ["Todos"] + sorted(df_filtradas_dia['Jefe_de_Venta'].dropna().unique().tolist()) if not df_filtradas_dia.empty else ["Todos"]
         with col_f3:
             filtro_jefe_dia = st.selectbox("👤 Filtrar por Jefe de Venta:", jefes_disponibles)
@@ -851,7 +846,6 @@ elif menu == "📊 Inventario General" and st.session_state['autenticado']:
     
     df_con_dias = calcular_dias_sin_movimiento(df_inv)
     
-    # Filtros avanzados cerrados por defecto al iniciar
     with st.expander("🔍 Filtros Avanzados y Búsqueda Rápida", expanded=False):
         f_col1, f_col2, f_col3 = st.columns(3)
         with f_col1:
@@ -1299,7 +1293,7 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
                 else:
                     st.warning("⚠️ No se encontraron solicitudes que coincidan con el CUC buscado.")
             else:
-                st.info("ℹ️️ No hay solicitudes con estatus Entregado, Transferido, Realizado o Levantado registradas todavía.")
+                st.info("ℹ️ No hay solicitudes con estatus Entregado, Transferido, Realizado o Levantado registradas todavía.")
         else:
             st.info("ℹ El archivo de solicitudes está vacío.")
 
@@ -1510,7 +1504,7 @@ elif menu == "📥 Registrar Entrada" and st.session_state['autenticado']:
                     st.balloons()
                     st.success(f"🎉 ¡Se procesaron e importaron exitosamente {count_nuevos} equipos al inventario general[cite: 1]!")
                     if alertas_duplicadas > 0:
-                        st.warning(f"⚠️ Se omitieron {alertas_duplicadas} registros por tener series que ya existían en el Inventario General (evitando duplicados)[cite: 1].")
+                        st.warning(f"⚠️️ Se omitieron {alertas_duplicadas} registros por tener series que ya existían en el Inventario General (evitando duplicados)[cite: 1].")
             except Exception as e:
                 st.error(f"⚠️ Ocurrió un error al procesar el archivo Excel: {e}")
 
