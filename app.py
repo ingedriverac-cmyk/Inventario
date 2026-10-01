@@ -463,7 +463,7 @@ st.sidebar.markdown("---")
 
 if st.session_state['autenticado']:
     st.sidebar.success(f"🔓 Sesión Activa: {st.session_state['usuario_actual']}")
-    # Menú para administradores en el orden exacto solicitado
+    # Menú para administradores con el orden de menú actualizado
     menu = st.sidebar.selectbox(
         "Menú de Navegación",
         [
@@ -472,6 +472,7 @@ if st.session_state['autenticado']:
             "📈 Estadía",
             "📋 Solicitudes",
             "📝 Levantamientos",
+            "📅 Solicitudes Diarias",
             "📥 Registrar Entrada",
             "📤 Registrar Salida",
             "✏️ Editar / Eliminar",
@@ -484,12 +485,14 @@ if st.session_state['autenticado']:
         st.session_state['usuario_actual'] = ""
         st.rerun()
 else:
-    # Menú para usuarios generales (Equipos Disponibles primero, luego Estadía)
+    # Menú para usuarios generales con el orden actualizado
     menu = st.sidebar.selectbox(
         "Menú de Navegación",
         [
             "📦 Equipos Disponibles",
-            "📈 Estadía"
+            "📈 Estadía",
+            "📝 Levantamientos",
+            "📅 Solicitudes Diarias"
         ]
     )
     
@@ -515,7 +518,7 @@ st.sidebar.markdown("<div style='flex-grow: 1;'></div>", unsafe_allow_html=True)
 st.sidebar.markdown("---")
 st.sidebar.markdown(
     """<p style='text-align: center; font-size: 12px; color: #FFFFFF; line-height: 1.4; margin-bottom: 10px;'>
-    🛠️️ <b>Desarrollado y diseñado por:</b><br>
+    🛠 <b>Desarrollado y diseñado por:</b><br>
     Eduardo Rivera Chulin<br><br>
     © 2026 Bepensa / Coca-Cola.<br>
     Todos los derechos reservados.
@@ -540,7 +543,7 @@ st.markdown("---")
 # 1. EQUIPOS DISPONIBLES (PÚBLICO Y PRIMERA OPCIÓN PARA GENERALES)
 if menu == "📦 Equipos Disponibles":
     st.subheader("📦 Reporte de Equipos Disponibles")
-    st.markdown("Equipos listos para distribución (Almacén de Comodatos, Almacén de Publicidad o Patios con estatus Nuevo/Reparado).")
+    st.markdown("Equipos listos para distribución.") # Modificación estética solicitada (sin paréntesis)
     
     canales_validos_kpi = [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
     
@@ -642,7 +645,7 @@ elif menu == "📈 Estadía":
         st.markdown("<br>", unsafe_allow_html=True)
 
     st.subheader("📈 Promedio de Estadía y Saturación de Equipos")
-    st.markdown("Análisis del promedio de días sin movimiento y saturación de inventario por ubicación, canal, modelos e imágenes. Las barras que superan los **40 días** se destacan en **Rojo ⚠**.")
+    st.markdown("Análisis del promedio de días sin movimiento y saturación de inventario. Las barras que superan los **40 días** se destacan en **Rojo ⚠**.") # Descripción acortada solicitada
     st.markdown("---")
     
     opciones_estadia_filtro = [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
@@ -715,7 +718,7 @@ elif menu == "📈 Estadía":
                 
                 for bar in bars_c:
                     yval = bar.get_height()
-                    alerta_txt = f" ⚠️️ ({yval:.1f}d)" if yval > 40 else f" ({yval:.1f}d)"
+                    alerta_txt = f" ⚠️ ({yval:.1f}d)" if yval > 40 else f" ({yval:.1f}d)"
                     ax_c.text(bar.get_x() + bar.get_width()/2.0, yval + 1, alerta_txt, ha='center', va='bottom', fontsize=9, fontweight='bold', color='#111827')
 
                 ax_c.set_ylabel('Promedio de Días', fontsize=10, fontweight='bold')
@@ -782,13 +785,74 @@ elif menu == "📈 Estadía":
     else:
         st.info("ℹ No hay datos suficientes en el inventario.")
 
-# 3. INVENTARIO GENERAL Y BUSCADOR (SOLO ADMINISTRADORES)
+# 3. SOLICITUDES DIARIAS (PÚBLICO / GENERAL Y ADMINISTRADOR)
+elif menu == "📅 Solicitudes Diarias":
+    st.subheader("📅 Solicitudes Diarias y Seguimiento por Fecha")
+    # Descripción eliminada por completo
+    st.markdown("---")
+    
+    df_sol_diarias = cargar_solicitudes()
+    
+    if not df_sol_diarias.empty:
+        def limpiar_fecha_str(val):
+            val_s = str(val).strip()
+            if not val_s or val_s.lower() == 'nan' or val_s.lower() == 'nat':
+                return ""
+            if re.match(r'^\d{4}-\d{2}-\d{2}$', val_s[:10]):
+                return val_s[:10]
+            dt_parsed = pd.to_datetime(val_s, errors='coerce', dayfirst=True)
+            if not pd.isna(dt_parsed):
+                return dt_parsed.strftime('%Y-%m-%d')
+            return val_s[:10]
+
+        df_sol_diarias['Fecha_Entregado_Limpia'] = df_sol_diarias['Fecha_Entregado'].apply(limpiar_fecha_str)
+        
+        # Filtros en cascada
+        col_f1, col_f2, col_f3 = st.columns(3)
+        with col_f1:
+            fecha_consulta = st.date_input("📅 Seleccione la Fecha:", value=date.today())
+        
+        fecha_consulta_str = fecha_consulta.strftime("%Y-%m-%d")
+        df_filtradas_dia = df_sol_diarias[df_sol_diarias['Fecha_Entregado_Limpia'] == fecha_consulta_str].copy()
+        
+        # Opciones en cascada para Canal
+        canales_disponibles = ["Todos"] + sorted(df_filtradas_dia['Canal'].dropna().unique().tolist()) if not df_filtradas_dia.empty else ["Todos"]
+        with col_f2:
+            filtro_canal_dia = st.selectbox("🏬 Filtrar por Canal:", canales_disponibles)
+        
+        if filtro_canal_dia != "Todos":
+            df_filtradas_dia = df_filtradas_dia[df_filtradas_dia['Canal'] == filtro_canal_dia]
+            
+        # Opciones en cascada para Jefe de Venta
+        jefes_disponibles = ["Todos"] + sorted(df_filtradas_dia['Jefe_de_Venta'].dropna().unique().tolist()) if not df_filtradas_dia.empty else ["Todos"]
+        with col_f3:
+            filtro_jefe_dia = st.selectbox("👤 Filtrar por Jefe de Venta:", jefes_disponibles)
+            
+        if filtro_jefe_dia != "Todos":
+            df_filtradas_dia = df_filtradas_dia[df_filtradas_dia['Jefe_de_Venta'] == filtro_jefe_dia]
+        
+        st.markdown(f"### 📋 Listado de Solicitudes para el día: `{fecha_consulta_str}`")
+        
+        if not df_filtradas_dia.empty:
+            df_tabla_diaria = df_filtradas_dia[['Proyecto', 'CUC', 'Cliente', 'Modelo', 'Serie', 'Canal', 'Jefe_de_Venta', 'Supervisor', 'Ruta', 'Status']].copy()
+            df_tabla_diaria = df_tabla_diaria.rename(columns={
+                'Jefe_de_Venta': 'Jefe de Venta'
+            })
+            st.dataframe(df_tabla_diaria, use_container_width=True, hide_index=True)
+            st.success(f"✅ Se encontraron {len(df_tabla_diaria)} solicitudes registradas bajo los criterios seleccionados.")
+        else:
+            st.info(f"ℹ️ No hay solicitudes registradas que coincidan con los filtros seleccionados para el día {fecha_consulta_str}.")
+    else:
+        st.info("ℹ El archivo de solicitudes se encuentra vacío.")
+
+# 4. INVENTARIO GENERAL Y BUSCADOR (SOLO ADMINISTRADORES)
 elif menu == "📊 Inventario General" and st.session_state['autenticado']:
     st.subheader("📋 Inventario Actual de Equipos")
     
     df_con_dias = calcular_dias_sin_movimiento(df_inv)
     
-    with st.expander("🔍 Filtros Avanzados y Búsqueda Rápida", expanded=True):
+    # Filtros avanzados cerrados por defecto al iniciar
+    with st.expander("🔍 Filtros Avanzados y Búsqueda Rápida", expanded=False):
         f_col1, f_col2, f_col3 = st.columns(3)
         with f_col1:
             busqueda = st.text_input("🔍 Buscar Serie o Modelo:").strip()
@@ -802,20 +866,20 @@ elif menu == "📊 Inventario General" and st.session_state['autenticado']:
 
     df_filtrado = df_con_dias.copy()
 
-    if busqueda:
+    if 'busqueda' in locals() and busqueda:
         df_filtrado = df_filtrado[
             df_filtrado['Serie'].str.contains(busqueda, case=False, na=False) | 
             df_filtrado['Modelo'].str.contains(busqueda, case=False, na=False)
         ]
-    if filtro_tipo != "Todos":
+    if 'filtro_tipo' in locals() and filtro_tipo != "Todos":
         df_filtrado = df_filtrado[df_filtrado['Tipo'] == filtro_tipo]
-    if filtro_imagen != "Todos":
+    if 'filtro_imagen' in locals() and filtro_imagen != "Todos":
         df_filtrado = df_filtrado[df_filtrado['Imagen'] == filtro_imagen]
-    if filtro_canal != "Todos":
+    if 'filtro_canal' in locals() and filtro_canal != "Todos":
         df_filtrado = df_filtrado[df_filtrado['Canal'] == filtro_canal]
-    if filtro_ubicacion != "Todos":
+    if 'filtro_ubicacion' in locals() and filtro_ubicacion != "Todos":
         df_filtrado = df_filtrado[df_filtrado['Ubicación'] == filtro_ubicacion]
-    if filtro_estatus != "Todos":
+    if 'filtro_estatus' in locals() and filtro_estatus != "Todos":
         df_filtrado = df_filtrado[df_filtrado['Estatus'] == filtro_estatus]
 
     st.markdown("<br>", unsafe_allow_html=True)
@@ -887,7 +951,7 @@ elif menu == "📊 Inventario General" and st.session_state['autenticado']:
     else:
         st.dataframe(df_filtrado, use_container_width=True, hide_index=True)
 
-# 4. SOLICITUDES (SOLO ADMINISTRADORES)
+# 5. SOLICITUDES (SOLO ADMINISTRADORES)
 elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
     st.subheader("📋 Registro de Solicitudes y Entregas de Equipos")
     
@@ -980,19 +1044,17 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
                     df_sol = pd.concat([df_sol, nueva_sol], ignore_index=True)
                     
                     if guardar_solicitudes_seguro(df_sol):
-                        status_ok_lista = ["Entregado", "Realizado", "Transferido", "Levantado"]
-                        if status_sol in status_ok_lista and serie_sol:
+                        status_ok_eliminar = ["entregado", "realizado", "transferido"]
+                        if status_sol.strip().lower() in status_ok_eliminar and serie_sol:
                             if not df_inv.empty and serie_sol in df_inv['Serie'].values:
-                                idx = df_inv[df_inv['Serie'] == serie_sol].index[0]
-                                df_inv.loc[idx, 'Ubicación'] = "Asignado a Cliente"
-                                df_inv.loc[idx, 'Estatus'] = "En Uso"
-                                if incluir_fecha_entregado and fecha_e_str:
-                                    df_inv.loc[idx, 'Ultimo_Movimiento'] = fecha_e_str
+                                df_inv = df_inv[df_inv['Serie'] != serie_sol].reset_index(drop=True)
                                 guardar_datos(df_inv)
-                                registrar_historial(serie_sol, modelo_sol, f"SOLICITUD {status_sol.upper()}", f"Cliente: {cliente_sol} | Ruta: {ruta_sol} | CUC: {cuc}")
-                                st.success(f"✅ ¡Solicitud guardada y procesada! La serie {serie_sol} fue dada de baja de equipos disponibles al cambiar a '{status_sol}'.")
+                                registrar_historial(serie_sol, modelo_sol, f"SOLICITUD {status_sol.upper()}", f"Cliente: {cliente_sol} | CUC: {cuc} | Eliminado del Inventario General por estatus OK")
+                                st.success(f"✅ ¡Solicitud guardada! La serie {serie_sol} ha sido eliminada automáticamente del Inventario General debido al estatus '{status_sol}'.")
+                            else:
+                                st.success("✅ ¡Solicitud guardada correctamente!")
                         else:
-                            st.success("✅ ¡Solicitud guardada correctamente!")
+                            st.success("✅ ¡Solicitud guardada correctamente (sin afectar el Inventario General)!")
 
     elif modo_solicitud == "🔍 Actualizar o Eliminar Solicitudes":
         st.markdown("#### 🔍 Buscar Solicitud en el Sistema")
@@ -1171,15 +1233,12 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
                                 df_sol.loc[idx_seleccionado, 'Observaciones'] = observaciones_edit
                                 
                                 if guardar_solicitudes_seguro(df_sol):
-                                    status_ok_lista = ["Entregado", "Realizado", "Transferido", "Levantado"]
-                                    if status_edit in status_ok_lista and serie_edit:
+                                    status_ok_eliminar = ["entregado", "realizado", "transferido"]
+                                    if status_edit.strip().lower() in status_ok_eliminar and serie_edit:
                                         if not df_inv.empty and serie_edit in df_inv['Serie'].values:
-                                            idx_inv = df_inv[df_inv['Serie'] == serie_edit].index[0]
-                                            df_inv.loc[idx_inv, 'Ubicación'] = "Asignado a Cliente"
-                                            df_inv.loc[idx_inv, 'Estatus'] = "En Uso"
-                                            df_inv.loc[idx_inv, 'Ultimo_Movimiento'] = f_ent_str if f_ent_str else datetime.now().strftime("%Y-%m-%d")
+                                            df_inv = df_inv[df_inv['Serie'] != serie_edit].reset_index(drop=True)
                                             guardar_datos(df_inv)
-                                            registrar_historial(serie_edit, modelo_edit, f"SOLICITUD {status_edit.upper()}", f"Cliente: {cliente_edit} | CUC: {cuc_edit}")
+                                            registrar_historial(serie_edit, modelo_edit, f"SOLICITUD {status_edit.upper()}", f"Cliente: {cliente_edit} | CUC: {cuc_edit} | Eliminado por actualización a estatus OK")
                                     
                                     st.success("🎉 ¡Cambios guardados con éxito! La solicitud ha sido actualizada y sincronizada correctamente en el sistema.")
                                     if 'df_pend_busq_resultado' in st.session_state:
@@ -1240,7 +1299,7 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
                 else:
                     st.warning("⚠️ No se encontraron solicitudes que coincidan con el CUC buscado.")
             else:
-                st.info("ℹ️ No hay solicitudes con estatus Entregado, Transferido, Realizado o Levantado registradas todavía.")
+                st.info("ℹ️️ No hay solicitudes con estatus Entregado, Transferido, Realizado o Levantado registradas todavía.")
         else:
             st.info("ℹ El archivo de solicitudes está vacío.")
 
@@ -1263,7 +1322,7 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
             except Exception as e:
                 st.error(f"⚠ Error al leer el archivo Excel: {e}")
 
-# 5. LEVANTAMIENTOS (SOLO ADMINISTRADORES)
+# 6. LEVANTAMIENTOS (SOLO ADMINISTRADORES)
 elif menu == "📝 Levantamientos" and st.session_state['autenticado']:
     st.subheader("📝 Gestión de Levantamientos (Equipos Recolectados)")
     
@@ -1278,7 +1337,7 @@ elif menu == "📝 Levantamientos" and st.session_state['autenticado']:
     st.markdown("---")
     
     if modo_levantamiento == "➕ Registrar Levantamiento":
-        st.markdown("Registra los equipos levantados. Si el estatus indica 'Levantado', el equipo se integra al inventario general, y solo pasa a Equipos Disponibles si su Estatus es 'Reparado' o 'Nuevo'.")
+        st.markdown("Registra los equipos levantados. Se agregarán automáticamente al Inventario General[cite: 1].")
         
         with st.form("form_levantamiento", clear_on_submit=True):
             col_l1, col_l2 = st.columns(2)
@@ -1320,30 +1379,18 @@ elif menu == "📝 Levantamientos" and st.session_state['autenticado']:
                     except PermissionError:
                         st.error("⚠️ Error: El archivo 'levantamientos.csv' está abierto en Excel. Ciérralo para guardar.")
                     
-                    if status_lev.lower() not in ["pendiente", "cancelado"]:
-                        if not df_inv.empty and serie in df_inv['Serie'].values:
-                            idx = df_inv[df_inv['Serie'] == serie].index[0]
-                            df_inv.loc[idx, 'Modelo'] = modelo
-                            df_inv.loc[idx, 'Tipo'] = tipo
-                            df_inv.loc[idx, 'Imagen'] = imagen
-                            df_inv.loc[idx, 'Canal'] = canal
-                            df_inv.loc[idx, 'Ubicación'] = ubicacion
-                            df_inv.loc[idx, 'Estatus'] = status_lev
-                            df_inv.loc[idx, 'Ultimo_Movimiento'] = fecha_str
-                        else:
-                            nueva_inv = pd.DataFrame([{
-                                "Serie": serie, "Modelo": modelo, "Tipo": tipo, "Imagen": imagen,
-                                "Canal": canal, "Ubicación": ubicacion, "Estatus": status_lev, "Ultimo_Movimiento": fecha_str
-                            }])
-                            df_inv = pd.concat([df_inv, nueva_inv], ignore_index=True)
-                        guardar_datos(df_inv)
+                    serie_limpia = str(serie).strip()
+                    if not df_inv.empty and serie_limpia in df_inv['Serie'].values:
+                        st.warning(f"🚨 ALERTA: La serie '{serie_limpia}' ya se encuentra registrada en el Inventario General. Los datos no se duplicaron[cite: 1].")
                     else:
-                        if not df_inv.empty and serie in df_inv['Serie'].values:
-                            df_inv = df_inv[df_inv['Serie'] != serie].reset_index(drop=True)
-                            guardar_datos(df_inv)
-
-                    registrar_historial(serie, modelo, "LEVANTAMIENTO", f"Cliente: {cliente} | CUC: {cuc_lev} | Status: {status_lev} | Tipo: {tipo} | Ubicación: {ubicacion}")
-                    st.success(f"✅ ¡Levantamiento de la serie {serie} (CUC: {cuc_lev}) registrado correctamente!")
+                        nueva_inv = pd.DataFrame([{
+                            "Serie": serie_limpia, "Modelo": modelo, "Tipo": tipo, "Imagen": imagen,
+                            "Canal": canal, "Ubicación": ubicacion, "Estatus": status_lev, "Ultimo_Movimiento": fecha_str
+                        }])
+                        df_inv = pd.concat([df_inv, nueva_inv], ignore_index=True)
+                        guardar_datos(df_inv)
+                        registrar_historial(serie_limpia, modelo, "LEVANTAMIENTO", f"Cliente: {cliente} | CUC: {cuc_lev} | Agregado automáticamente al Inventario General")
+                        st.success(f"✅ ¡Levantamiento registrado y serie {serie_limpia} agregada automáticamente al Inventario General[cite: 1]!")
 
     elif modo_levantamiento == "📊 Equipos Levantados":
         st.markdown("#### 📊 Historial de Equipos Levantados")
@@ -1369,7 +1416,7 @@ elif menu == "📝 Levantamientos" and st.session_state['autenticado']:
         else:
             st.info("ℹ Aún no hay equipos levantados registrados en el sistema.")
 
-# 6. REGISTRAR ENTRADA (SOLO ADMINISTRADORES)
+# 7. REGISTRAR ENTRADA (SOLO ADMINISTRADORES)
 elif menu == "📥 Registrar Entrada" and st.session_state['autenticado']:
     st.subheader("📥 Registrar Entrada de Equipos")
     
@@ -1401,18 +1448,13 @@ elif menu == "📥 Registrar Entrada" and st.session_state['autenticado']:
                     st.error("⚠️ Por favor, completa la serie y el modelo.")
                 else:
                     fecha_str = fecha_entrada.strftime("%Y-%m-%d")
-                    if not df_inv.empty and serie in df_inv['Serie'].values:
-                        idx = df_inv[df_inv['Serie'] == serie].index[0]
-                        df_inv.loc[idx, 'Modelo'] = modelo
-                        df_inv.loc[idx, 'Tipo'] = tipo
-                        df_inv.loc[idx, 'Imagen'] = imagen
-                        df_inv.loc[idx, 'Canal'] = canal
-                        df_inv.loc[idx, 'Ubicación'] = ubicacion
-                        df_inv.loc[idx, 'Estatus'] = estatus
-                        df_inv.loc[idx, 'Ultimo_Movimiento'] = fecha_str
+                    serie_limpia = str(serie).strip()
+                    
+                    if not df_inv.empty and serie_limpia in df_inv['Serie'].values:
+                        st.warning(f"🚨 ALERTA: La serie '{serie_limpia}' ya se encuentra registrada en el Inventario General. No se permiten series duplicadas[cite: 1].")
                     else:
                         nueva_fila = pd.DataFrame([{
-                            "Serie": serie,
+                            "Serie": serie_limpia,
                             "Modelo": modelo,
                             "Tipo": tipo,
                             "Imagen": imagen,
@@ -1422,9 +1464,9 @@ elif menu == "📥 Registrar Entrada" and st.session_state['autenticado']:
                             "Ultimo_Movimiento": fecha_str
                         }])
                         df_inv = pd.concat([df_inv, nueva_fila], ignore_index=True)
-                    guardar_datos(df_inv)
-                    registrar_historial(serie, modelo, "ENTRADA", f"Tipo: {tipo} | Imagen: {imagen} | Canal: {canal} | Ubicación: {ubicacion} | Estatus: {estatus} | Fecha: {fecha_str}")
-                    st.success("¡Se ha registrado la entrada del equipo correctamente en el inventario sin duplicados!")
+                        guardar_datos(df_inv)
+                        registrar_historial(serie_limpia, modelo, "ENTRADA", f"Tipo: {tipo} | Canal: {canal} | Ubicación: {ubicacion} | Estatus: {estatus}")
+                        st.success(f"✅ ¡Entrada registrada correctamente! La serie {serie_limpia} se agregó al Inventario General[cite: 1].")
 
     elif modo_entrada == "📂 Carga Masiva (Excel)":
         st.markdown("Sube un archivo Excel (.xlsx o .xls) con múltiples equipos para darles entrada de forma masiva.")
@@ -1440,10 +1482,15 @@ elif menu == "📥 Registrar Entrada" and st.session_state['autenticado']:
                 
                 if st.button("🚀 Confirmar e Importar Entradas Masivas"):
                     count_nuevos = 0
+                    alertas_duplicadas = 0
                     for _, row in df_subido_masivo.iterrows():
                         s_val = str(row.get('Serie', '')).strip()
                         m_val = str(row.get('Modelo', '')).strip()
                         if s_val and m_val:
+                            if not df_inv.empty and s_val in df_inv['Serie'].values:
+                                alertas_duplicadas += 1
+                                continue
+                                
                             t_val = str(row.get('Tipo', 'Enfriador'))
                             i_val = str(row.get('Imagen', 'Sin Imagen'))
                             c_val = str(row.get('Canal', 'Tradicional'))
@@ -1451,31 +1498,23 @@ elif menu == "📥 Registrar Entrada" and st.session_state['autenticado']:
                             e_val = str(row.get('Estatus', 'Nuevo'))
                             f_val = str(row.get('Ultimo_Movimiento', datetime.now().strftime("%Y-%m-%d")))
                             
-                            if not df_inv.empty and s_val in df_inv['Serie'].values:
-                                idx = df_inv[df_inv['Serie'] == s_val].index[0]
-                                df_inv.loc[idx, 'Modelo'] = m_val
-                                df_inv.loc[idx, 'Tipo'] = t_val
-                                df_inv.loc[idx, 'Imagen'] = i_val
-                                df_inv.loc[idx, 'Canal'] = c_val
-                                df_inv.loc[idx, 'Ubicación'] = u_val
-                                df_inv.loc[idx, 'Estatus'] = e_val
-                                df_inv.loc[idx, 'Ultimo_Movimiento'] = f_val
-                            else:
-                                nueva_f = pd.DataFrame([{
-                                    "Serie": s_val, "Modelo": m_val, "Tipo": t_val, "Imagen": i_val,
-                                    "Canal": c_val, "Ubicación": u_val, "Estatus": e_val, "Ultimo_Movimiento": f_val
-                                }])
-                                df_inv = pd.concat([df_inv, nueva_f], ignore_index=True)
+                            nueva_f = pd.DataFrame([{
+                                "Serie": s_val, "Modelo": m_val, "Tipo": t_val, "Imagen": i_val,
+                                "Canal": c_val, "Ubicación": u_val, "Estatus": e_val, "Ultimo_Movimiento": f_val
+                            }])
+                            df_inv = pd.concat([df_inv, nueva_f], ignore_index=True)
                             count_nuevos += 1
-                            registrar_historial(s_val, m_val, "ENTRADA MASIVA", f"Carga masiva desde archivo Excel. Ubicación: {u_val} | Estatus: {e_val}")
+                            registrar_historial(s_val, m_val, "ENTRADA MASIVA", f"Carga masiva. Ubicación: {u_val} | Estatus: {e_val}")
                     
                     guardar_datos(df_inv)
                     st.balloons()
-                    st.success(f"🎉 ¡Se procesaron e importaron exitosamente {count_nuevos} equipos al inventario general!")
+                    st.success(f"🎉 ¡Se procesaron e importaron exitosamente {count_nuevos} equipos al inventario general[cite: 1]!")
+                    if alertas_duplicadas > 0:
+                        st.warning(f"⚠️ Se omitieron {alertas_duplicadas} registros por tener series que ya existían en el Inventario General (evitando duplicados)[cite: 1].")
             except Exception as e:
                 st.error(f"⚠️ Ocurrió un error al procesar el archivo Excel: {e}")
 
-# 7. REGISTRAR SALIDA (SOLO ADMINISTRADORES)
+# 8. REGISTRAR SALIDA (SOLO ADMINISTRADORES)
 elif menu == "📤 Registrar Salida" and st.session_state['autenticado']:
     st.subheader("📤 Salida de Equipos del Inventario")
     
@@ -1517,7 +1556,7 @@ elif menu == "📤 Registrar Salida" and st.session_state['autenticado']:
                     guardar_datos(df_inv)
                     st.success(f"✅ ¡Salida confirmada! El equipo con serie {serie_buscar} ha sido eliminado del inventario general.")
 
-# 8. EDITAR / ELIMINAR EQUIPO (SOLO ADMINISTRADORES)
+# 9. EDITAR / ELIMINAR EQUIPO (SOLO ADMINISTRADORES)
 elif menu == "✏️ Editar / Eliminar" and st.session_state['autenticado']:
     st.subheader("✏️ Gestión, Corrección y Depuración de Equipos")
     
@@ -1583,7 +1622,7 @@ elif menu == "✏️ Editar / Eliminar" and st.session_state['autenticado']:
                     registrar_historial(serie_edit, modelo_eliminado, "ELIMINACIÓN", "Equipo eliminado del inventario.")
                     st.success("🗑️ ¡Equipo eliminado permanentemente del sistema!")
 
-# 9. HISTORIAL DE MOVIMIENTOS (SOLO ADMINISTRADORES)
+# 10. HISTORIAL DE MOVIMIENTOS (SOLO ADMINISTRADORES)
 elif menu == "📜 Historial de Movimientos" and st.session_state['autenticado']:
     st.subheader("📜 Bitácora de Entradas, Salidas y Cambios de Ubicación")
     df_h = cargar_historial()
@@ -1594,7 +1633,7 @@ elif menu == "📜 Historial de Movimientos" and st.session_state['autenticado']
         df_h = df_h[[col for col in columnas_ordenadas if col in df_h.columns]]
         st.dataframe(df_h.sort_values(by="Fecha_Hora", ascending=False), use_container_width=True, hide_index=True)
 
-# 10. EXPORTAR A EXCEL (SOLO ADMINISTRADORES)
+# 11. EXPORTAR A EXCEL (SOLO ADMINISTRADORES)
 elif menu == "💾 Exportar a Excel" and st.session_state['autenticado']:
     st.subheader("💾 Exportar e Importar Base de Datos Completa")
     
