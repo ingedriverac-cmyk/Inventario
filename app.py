@@ -141,11 +141,18 @@ LEVANTAMIENTOS_FILE = "levantamientos.csv"
 SOLICITUDES_FILE = "solicitudes.csv"
 WEB_APP_URL = "https://script.google.com/macros/s/AKfycbz0uHPmSFwpgWRhmDApRKHyQyP1FK10d8vy3TlG5UNi5RpqhgpnZbBDEL8q93s9MfVf7Q/exec"
 
-# Definición de las 3 personas autorizadas actualizadas
+# Definición de las 3 personas autorizadas administradoras actualizadas
 USUARIOS_AUTORIZADOS = {
     "evelasquezg": "Bepensa2026!",
     "siencinop": "Bepensa2026!",
     "edriverac": "Bepensa2026!"
+}
+
+# Credenciales específicas para los 3 choferes solicitados
+CHOFERES_AUTORIZADOS = {
+    "Adolfo": "Bepensa2026",
+    "Eddie": "Bepensa2026",
+    "Luis": "Bepensa2026"
 }
 
 OPCIONES_PROYECTOS = [
@@ -454,8 +461,12 @@ df_inv = cargar_datos()
 # --- GESTIÓN DE SESIÓN EN LA BARRA LATERAL ---
 if 'autenticado' not in st.session_state:
     st.session_state['autenticado'] = False
+if 'es_chofer' not in st.session_state:
+    st.session_state['es_chofer'] = False
 if 'usuario_actual' not in st.session_state:
     st.session_state['usuario_actual'] = ""
+if 'nombre_chofer' not in st.session_state:
+    st.session_state['nombre_chofer'] = ""
 
 st.sidebar.markdown("<h2 style='color: white; text-align: center;'>❄️ Bepensa</h2>", unsafe_allow_html=True)
 st.sidebar.markdown("<p style='text-align: center; color: white;'><b>Control de Inventario</b></p>", unsafe_allow_html=True)
@@ -463,7 +474,7 @@ st.sidebar.markdown("---")
 
 if st.session_state['autenticado']:
     st.sidebar.success(f"🔓 Sesión Activa: {st.session_state['usuario_actual']}")
-    # Menú para administradores (con Levantamientos incluido)
+    # Menú para administradores
     menu = st.sidebar.selectbox(
         "Menú de Navegación",
         [
@@ -482,10 +493,29 @@ if st.session_state['autenticado']:
     )
     if st.sidebar.button("🔒 Cerrar Sesión"):
         st.session_state['autenticado'] = False
+        st.session_state['es_chofer'] = False
         st.session_state['usuario_actual'] = ""
+        st.session_state['nombre_chofer'] = ""
         st.rerun()
+
+elif st.session_state['es_chofer']:
+    st.sidebar.success(f"🚚 Chofer en Ruta: {st.session_state['nombre_chofer']}")
+    # Menú exclusivo para Choferes (solo Solicitudes Diarias filtradas)
+    menu = st.sidebar.selectbox(
+        "Menú de Chofer",
+        [
+            "📅 Solicitudes Diarias"
+        ]
+    )
+    if st.sidebar.button("🔒 Cerrar Sesión"):
+        st.session_state['autenticado'] = False
+        st.session_state['es_chofer'] = False
+        st.session_state['usuario_actual'] = ""
+        st.session_state['nombre_chofer'] = ""
+        st.rerun()
+
 else:
-    # Menú para usuarios generales (SIN Levantamientos)
+    # Menú para usuarios generales (Público)
     menu = st.sidebar.selectbox(
         "Menú de Navegación",
         [
@@ -496,21 +526,39 @@ else:
     )
     
     st.sidebar.markdown("---")
-    st.sidebar.markdown("<p style='color: #FFFFFF; font-weight: bold; text-align: center;'>🔒 Acceso Administrativo</p>", unsafe_allow_html=True)
+    st.sidebar.markdown("<p style='color: #FFFFFF; font-weight: bold; text-align: center;'>🔒 Accesos del Sistema</p>", unsafe_allow_html=True)
     
-    with st.sidebar.form("form_login"):
-        user_input = st.text_input("👤 Usuario:").strip()
-        pass_input = st.text_input("🔑 Contraseña:", type="password").strip()
-        btn_login = st.form_submit_button("Iniciar Sesión")
-        
-        if btn_login:
-            if user_input in USUARIOS_AUTORIZADOS and USUARIOS_AUTORIZADOS[user_input] == pass_input:
-                st.session_state['autenticado'] = True
-                st.session_state['usuario_actual'] = user_input
-                st.success("✅ ¡Acceso concedido!")
-                st.rerun()
-            else:
-                st.error("❌ Usuario o contraseña incorrectos.")
+    tipo_acceso = st.sidebar.radio("Tipo de Acceso:", ["Administrativo", "Chofer en Ruta"], horizontal=True)
+    
+    if tipo_acceso == "Administrativo":
+        with st.sidebar.form("form_login_admin"):
+            user_input = st.text_input("👤 Usuario Admin:").strip()
+            pass_input = st.text_input("🔑 Contraseña Admin:", type="password").strip()
+            btn_login = st.form_submit_button("Iniciar Sesión Admin")
+            
+            if btn_login:
+                if user_input in USUARIOS_AUTORIZADOS and USUARIOS_AUTORIZADOS[user_input] == pass_input:
+                    st.session_state['autenticado'] = True
+                    st.session_state['usuario_actual'] = user_input
+                    st.success("✅ ¡Acceso administrativo concedido!")
+                    st.rerun()
+                else:
+                    st.error("❌ Usuario o contraseña incorrectos.")
+    else:
+        with st.sidebar.form("form_login_chofer"):
+            chofer_input = st.text_input("🚚 Usuario Chofer:").strip()
+            pass_chofer = st.text_input("🔑 Contraseña Chofer:", type="password").strip()
+            btn_login_ch = st.form_submit_button("Iniciar Sesión Chofer")
+            
+            if btn_login_ch:
+                if chofer_input in CHOFERES_AUTORIZADOS and CHOFERES_AUTORIZADOS[chofer_input] == pass_chofer:
+                    st.session_state['es_chofer'] = True
+                    st.session_state['nombre_chofer'] = chofer_input
+                    st.session_state['usuario_actual'] = f"Chofer ({chofer_input})"
+                    st.success(f"✅ ¡Bienvenido, {chofer_input}!")
+                    st.rerun()
+                else:
+                    st.error("❌ Usuario o contraseña de chofer incorrectos.")
 
 # Pie de página fijo al fondo de la barra lateral (Copyright)
 st.sidebar.markdown("<div style='flex-grow: 1;'></div>", unsafe_allow_html=True)
@@ -717,7 +765,7 @@ elif menu == "📈 Estadía":
                 
                 for bar in bars_c:
                     yval = bar.get_height()
-                    alerta_txt = f" ⚠️️ ({yval:.1f}d)" if yval > 40 else f" ({yval:.1f}d)"
+                    alerta_txt = f" ⚠️ ({yval:.1f}d)" if yval > 40 else f" ({yval:.1f}d)"
                     ax_c.text(bar.get_x() + bar.get_width()/2.0, yval + 1, alerta_txt, ha='center', va='bottom', fontsize=9, fontweight='bold', color='#111827')
 
                 ax_c.set_ylabel('Promedio de Días', fontsize=10, fontweight='bold')
@@ -784,9 +832,16 @@ elif menu == "📈 Estadía":
     else:
         st.info("ℹ No hay datos suficientes en el inventario.")
 
-# 3. SOLICITUDES DIARIAS (PÚBLICO / GENERAL Y ADMINISTRADOR)
+# 3. SOLICITUDES DIARIAS (ADMINISTRADORES Y CHOFERES CON FILTRO Y EDICIÓN RÁPIDA)
 elif menu == "📅 Solicitudes Diarias":
     st.subheader("📅 Solicitudes Diarias y Seguimiento por Fecha")
+    
+    if st.session_state['es_chofer']:
+        chofer_activo = st.session_state['nombre_chofer']
+        st.info(f"🚚 **Panel de Chofer ({chofer_activo}):** Se muestran exclusivamente las solicitudes asignadas a su nombre en la columna **Ruta**. Puede seleccionar una solicitud para actualizar su estatus y motivo.")
+    elif st.session_state['autenticado']:
+        st.info(f"🔓 **Panel de Administrador:** Puede visualizar cualquier solicitud del día y actualizar su estatus o motivo directamente.")
+    
     st.markdown("---")
     
     df_sol_diarias = cargar_solicitudes()
@@ -805,23 +860,29 @@ elif menu == "📅 Solicitudes Diarias":
 
         df_sol_diarias['Fecha_Entregado_Limpia'] = df_sol_diarias['Fecha_Entregado'].apply(limpiar_fecha_str)
         
+        # Filtrado previo si es chofer por su nombre en la columna 'Ruta'
+        df_base_consulta = df_sol_diarias.copy()
+        if st.session_state['es_chofer']:
+            chofer_activo = st.session_state['nombre_chofer']
+            df_base_consulta = df_base_consulta[df_base_consulta['Ruta'].str.strip().str.lower() == chofer_activo.lower()].copy()
+
         col_f1, col_f2, col_f3 = st.columns(3)
         with col_f1:
-            fecha_consulta = st.date_input("📅 Seleccione la Fecha:", value=date.today())
+            fecha_consulta = st.date_input("📅 Seleccione la Fecha:", value=date.today(), key="input_fecha_sol_diarias")
         
         fecha_consulta_str = fecha_consulta.strftime("%Y-%m-%d")
-        df_filtradas_dia = df_sol_diarias[df_sol_diarias['Fecha_Entregado_Limpia'] == fecha_consulta_str].copy()
+        df_filtradas_dia = df_base_consulta[df_base_consulta['Fecha_Entregado_Limpia'] == fecha_consulta_str].copy()
         
         canales_disponibles = ["Todos"] + sorted(df_filtradas_dia['Canal'].dropna().unique().tolist()) if not df_filtradas_dia.empty else ["Todos"]
         with col_f2:
-            filtro_canal_dia = st.selectbox("🏬 Filtrar por Canal:", canales_disponibles)
+            filtro_canal_dia = st.selectbox("🏬 Filtrar por Canal:", canales_disponibles, key="filtro_canal_sol_diarias")
         
         if filtro_canal_dia != "Todos":
             df_filtradas_dia = df_filtradas_dia[df_filtradas_dia['Canal'] == filtro_canal_dia]
             
         jefes_disponibles = ["Todos"] + sorted(df_filtradas_dia['Jefe_de_Venta'].dropna().unique().tolist()) if not df_filtradas_dia.empty else ["Todos"]
         with col_f3:
-            filtro_jefe_dia = st.selectbox("👤 Filtrar por Jefe de Venta:", jefes_disponibles)
+            filtro_jefe_dia = st.selectbox("👤 Filtrar por Jefe de Venta:", jefes_disponibles, key="filtro_jefe_sol_diarias")
             
         if filtro_jefe_dia != "Todos":
             df_filtradas_dia = df_filtradas_dia[df_filtradas_dia['Jefe_de_Venta'] == filtro_jefe_dia]
@@ -829,14 +890,74 @@ elif menu == "📅 Solicitudes Diarias":
         st.markdown(f"### 📋 Listado de Solicitudes para el día: `{fecha_consulta_str}`")
         
         if not df_filtradas_dia.empty:
-            df_tabla_diaria = df_filtradas_dia[['Proyecto', 'CUC', 'Cliente', 'Modelo', 'Serie', 'Canal', 'Jefe_de_Venta', 'Supervisor', 'Ruta', 'Status']].copy()
-            df_tabla_diaria = df_tabla_diaria.rename(columns={
-                'Jefe_de_Venta': 'Jefe de Venta'
-            })
+            # Panel interactivo de actualización de estatus y motivo disponible tanto para Admins como para Choferes
+            if st.session_state['es_chofer'] or st.session_state['autenticado']:
+                st.markdown("---")
+                st.markdown("#### ⚡ Actualización de Estatus y Motivo en Ruta")
+                
+                indices_dia = df_filtradas_dia.index.tolist()
+                def format_opcion_usuario(idx_i):
+                    r = df_sol_diarias.loc[idx_i]
+                    ruta_txt = f" | Ruta: {r['Ruta']}" if not st.session_state['es_chofer'] else ""
+                    return f"CUC: {r['CUC']} - Cliente: {r['Cliente']} (Modelo: {r['Modelo']}{ruta_txt} | Estatus: {r['Status']})"
+                
+                idx_sel_user = st.selectbox("📌 Seleccione la solicitud que desea actualizar:", indices_dia, format_func=format_opcion_usuario, key="sel_solicitud_diaria_act")
+                
+                if idx_sel_user < len(df_sol_diarias):
+                    row_user = df_sol_diarias.loc[idx_sel_user]
+                    mov_u = str(row_user.get('Movimiento', 'Entrega'))
+                    status_permitidos_u = obtener_status_validos(mov_u)
+                    
+                    st.markdown("")
+                    with st.form(f"form_usuario_update_{idx_sel_user}"):
+                        st.markdown(f"**Cliente:** `{row_user['Cliente']}` | **CUC:** `{row_user['CUC']}` | **Modelo:** `{row_user['Modelo']}` | **Serie:** `{row_user['Serie']}`")
+                        
+                        st_actual = row_user['Status']
+                        idx_def = status_permitidos_u.index(st_actual) if st_actual in status_permitidos_u else 0
+                        
+                        nuevo_estatus_user = st.selectbox("⚡ Cambiar Estatus:", status_permitidos_u, index=idx_def, key=f"new_st_u_{idx_sel_user}")
+                        observacion_user = st.text_input("📝 Motivo / Comentarios:", value=str(row_user.get('Observaciones', '')), key=f"obs_u_{idx_sel_user}").strip()
+                        
+                        st.markdown("<br>", unsafe_allow_html=True)
+                        btn_guardar_user = st.form_submit_button("💾 Guardar y Actualizar Estatus")
+                        
+                        if btn_guardar_user:
+                            df_sol_diarias.loc[idx_sel_user, 'Status'] = nuevo_estatus_user
+                            if observacion_user:
+                                df_sol_diarias.loc[idx_sel_user, 'Observaciones'] = observacion_user
+                                
+                            if guardar_solicitudes_seguro(df_sol_diarias):
+                                serie_usr = str(row_user.get('Serie', '')).strip()
+                                modelo_usr = str(row_user.get('Modelo', '')).strip()
+                                cliente_usr = str(row_user.get('Cliente', '')).strip()
+                                cuc_usr = str(row_user.get('CUC', '')).strip()
+                                
+                                status_ok_eliminar = ["entregado", "realizado", "transferido"]
+                                if nuevo_estatus_user.strip().lower() in status_ok_eliminar and serie_usr:
+                                    if not df_inv.empty and serie_usr in df_inv['Serie'].values:
+                                        df_inv = df_inv[df_inv['Serie'] != serie_usr].reset_index(drop=True)
+                                        guardar_datos(df_inv)
+                                        usr_tipo_log = st.session_state['usuario_actual']
+                                        registrar_historial(serie_usr, modelo_usr, f"SOLICITUD {nuevo_estatus_user.upper()} ({usr_tipo_log.upper()})", f"Usuario: {usr_tipo_log} | Cliente: {cliente_usr} | CUC: {cuc_usr} | Actualizado en Solicitudes Diarias")
+                                
+                                st.success("✅ ¡Estatus y motivo actualizados con éxito!")
+                                time.sleep(1.5)
+                                st.rerun()
+                            else:
+                                st.error("❌ Error al guardar el cambio en el archivo de solicitudes.")
+                
+                st.markdown("---")
+
+            # Mostrar la tabla general informativa del día
+            df_tabla_diaria = df_filtradas_dia[['Proyecto', 'CUC', 'Cliente', 'Modelo', 'Serie', 'Canal', 'Jefe_de_Venta', 'Supervisor', 'Ruta', 'Status', 'Observaciones']].copy()
+            df_tabla_diaria = df_tabla_diaria.rename(columns={'Jefe_de_Venta': 'Jefe de Venta', 'Observaciones': 'Motivo / Comentarios'})
             st.dataframe(df_tabla_diaria, use_container_width=True, hide_index=True)
             st.success(f"✅ Se encontraron {len(df_tabla_diaria)} solicitudes registradas bajo los criterios seleccionados.")
         else:
-            st.info(f"ℹ️ No hay solicitudes registradas que coincidan con los filtros seleccionados para el día {fecha_consulta_str}.")
+            if st.session_state['es_chofer']:
+                st.info(f"ℹ️ No hay solicitudes asignadas a su nombre ('{st.session_state['nombre_chofer']}') para el día {fecha_consulta_str}.")
+            else:
+                st.info(f"ℹ️ No hay solicitudes registradas que coincidan con los filtros seleccionados para el día {fecha_consulta_str}.")
     else:
         st.info("ℹ El archivo de solicitudes se encuentra vacío.")
 
@@ -1504,7 +1625,7 @@ elif menu == "📥 Registrar Entrada" and st.session_state['autenticado']:
                     st.balloons()
                     st.success(f"🎉 ¡Se procesaron e importaron exitosamente {count_nuevos} equipos al inventario general[cite: 1]!")
                     if alertas_duplicadas > 0:
-                        st.warning(f"⚠️️ Se omitieron {alertas_duplicadas} registros por tener series que ya existían en el Inventario General (evitando duplicados)[cite: 1].")
+                        st.warning(f"⚠️ Se omitieron {alertas_duplicadas} registros por tener series que ya existían en el Inventario General (evitando duplicados)[cite: 1].")
             except Exception as e:
                 st.error(f"⚠️ Ocurrió un error al procesar el archivo Excel: {e}")
 
@@ -1594,7 +1715,7 @@ elif menu == "✏️ Editar / Eliminar" and st.session_state['autenticado']:
                 with col1:
                     btn_guardar = st.form_submit_button("💾 Guardar Cambios")
                 with col2:
-                    btn_eliminar = st.form_submit_button("🗑️ Eliminar Equipo")
+                    btn_eliminar = st.form_submit_button("🗑 Eliminar Equipo")
                 
                 if btn_guardar:
                     df_inv.loc[idx, 'Modelo'] = mod_modelo
@@ -1706,7 +1827,7 @@ elif menu == "💾 Exportar a Excel" and st.session_state['autenticado']:
                         
                     if hoja_solicitudes != "(No importar esta sección)":
                         df_temp = pd.read_excel(xls, sheet_name=hoja_solicitudes, dtype=str).fillna("")
-                        df_temp = limpiar_y_mapear_columnas(df_temp, COLUMNAS_SOLICITUDES)
+                        df_temp = limpiar_y_mapear_columnas(df_temp, COLUMNAS_LEVANTAMIENTOS)
                         guardar_solicitudes_seguro(df_temp)
                         import_count += 1
                         st.success(f"✅ Solicitudes Actualizadas: {len(df_temp)} registros importados desde la pestaña '{hoja_solicitudes}'.")
