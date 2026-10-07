@@ -234,13 +234,13 @@ def porcentaje_texto(parte, total, sufijo="del total"):
 
 
 def _etiqueta_menu(opcion):
-    """Quita el emoji inicial de la opción de menú solo para mostrarla (el valor interno no cambia)."""
+    """El emoji inicial de la opción de menú solo para mostrar (el valor interno no cambia)."""
     return re.sub(r'^[^\w]+', '', str(opcion)).strip()
 
 
 def _estilo_grafica(fig, titulo=None, alto=360):
     fig.update_layout(
-        title=dict(text=titulo, x=0, xanchor="left", font=dict(size=15, color="#003B5C")) if titulo else None,
+        title=dict(text=titulo, x=0, xanchor="left", font=dict(size=15, color="#E66B0C")) if titulo else None,
         height=alto,
         paper_bgcolor="rgba(0,0,0,0)",
         plot_bgcolor="rgba(0,0,0,0)",
@@ -355,7 +355,7 @@ INVENTARIO_FILE = "inventario_refrigeradores.csv"
 HISTORIAL_FILE = "historial_movimientos.csv"
 LEVANTAMIENTOS_FILE = "levantamientos.csv"
 SOLICITUDES_FILE = "solicitudes.csv"
-# Credenciales y URL: se leen de .streamlit/secrets.toml (nunca se escriben en el código)
+# Credenciales y URL: se leen de .streamlit/secrets.toml
 def _leer_secreto(clave, defecto=""):
     try:
         return st.secrets[clave]
@@ -917,7 +917,7 @@ if menu == "📦 Equipos Disponibles":
 elif menu == "📈 Estadía":
     if not df_inv.empty:
         st.markdown("### Mapa de saturación por ubicación")
-        st.caption("Haz clic en un bloque para ver el detalle por canal, modelo e imagen. Los colores coinciden con las tablas.")
+        st.caption("Haz clic en un bloque para ver el detalle por canal, modelo e imagen.")
         fig_treemap = px.treemap(
             df_inv,
             path=['Ubicación', 'Canal', 'Modelo', 'Imagen'],
