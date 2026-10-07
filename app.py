@@ -1023,7 +1023,7 @@ elif menu == "📅 Solicitudes Diarias":
     
     if st.session_state['es_chofer']:
         chofer_activo = st.session_state['nombre_chofer']
-        st.info(f"🚚 **Panel de Chofer ({chofer_activo}):** Se muestran exclusivamente las solicitudes asignadas a su nombre en la columna **Ruta**. Puede seleccionar una solicitud para actualizar su estatus y motivo.")
+        st.info(f"🚚 **Panel de Chofer ({chofer_activo}):** Se muestran exclusivamente las solicitudes asignadas a su nombre. Puede seleccionar una solicitud para actualizar su estatus y motivo.")
     elif st.session_state['autenticado']:
         st.info(f"🔓 **Panel de Administrador:** Puede visualizar cualquier solicitud del día y actualizar su estatus o motivo directamente.")
     
