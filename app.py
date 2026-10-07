@@ -922,13 +922,13 @@ elif menu == "📈 Estadía":
             df_inv,
             path=['Ubicación', 'Canal', 'Modelo', 'Imagen'],
             color='Ubicación',
-            color_discrete_map={**COLOR_UBICACION, "(?)": "#CBD5E1"},
+            color_discrete_map={**COLOR_UBICACION, "(?)": "#1965C1"},
             maxdepth=2
         )
-        fig_treemap.update_traces(textinfo="label+value", root_color="#F5F7FA")
+        fig_treemap.update_traces(textinfo="label+value", root_color="#ECE5E1")
         fig_treemap.update_layout(
-            margin=dict(t=10, l=0, r=0, b=0), height=460,
-            paper_bgcolor="rgba(0,0,0,0)", font=dict(family=FUENTE_GRAFICAS, size=13)
+            margin=dict(t=20, l=0, r=0, b=0), height=460,
+            paper_bgcolor="#ECE5E1", font=dict(family=FUENTE_GRAFICAS, size=13)
         )
         st.plotly_chart(fig_treemap, use_container_width=True)
         st.markdown("<br>", unsafe_allow_html=True)
