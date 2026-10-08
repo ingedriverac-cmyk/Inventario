@@ -18,6 +18,7 @@ import io
 import re
 import hmac
 import time
+from PIL import Image
 
 # Configuración de la página y diseño estético
 st.set_page_config(
@@ -377,6 +378,8 @@ INVENTARIO_FILE = "inventario_refrigeradores.csv"
 HISTORIAL_FILE = "historial_movimientos.csv"
 LEVANTAMIENTOS_FILE = "levantamientos.csv"
 SOLICITUDES_FILE = "solicitudes.csv"
+ESPECIFICACIONES_FILE = "especificaciones_equipos.csv"
+
 # Credenciales y URL: se leen de .streamlit/secrets.toml
 def _leer_secreto(clave, defecto=""):
     try:
@@ -563,6 +566,28 @@ def cargar_datos():
         
     return df
 
+def cargar_especificaciones():
+    if os.path.exists(ESPECIFICACIONES_FILE):
+        try:
+            return pd.read_csv(ESPECIFICACIONES_FILE, dtype=str)
+        except Exception:
+            pass
+    return pd.DataFrame([
+        {"Modelo": "Visi Cooler 1 Pta (NV-10)", "Tipo": "Enfriador", "Puertas": "1 Puerta", "Capacidad (Litros)": "310 Lts", "Dimensiones (Al x An x Pr)": "178 x 62 x 65 cm", "Peso Aprox.": "75 kg", "Voltaje": "115V / 60Hz"},
+        {"Modelo": "Visi Cooler 2 Ptas (NV-20)", "Tipo": "Enfriador", "Puertas": "2 Puertas", "Capacidad (Litros)": "650 Lts", "Dimensiones (Al x An x Pr)": "200 x 110 x 70 cm", "Peso Aprox.": "130 kg", "Voltaje": "115V / 60Hz"},
+        {"Modelo": "Horizontal / Cofre (CH-400)", "Tipo": "Enfriador", "Puertas": "Tapa Ciega", "Capacidad (Litros)": "400 Lts", "Dimensiones (Al x An x Pr)": "90 x 130 x 70 cm", "Peso Aprox.": "65 kg", "Voltaje": "115V / 60Hz"},
+        {"Modelo": "PostMix 4 Válvulas", "Tipo": "PostMix", "Puertas": "N/A", "Capacidad (Litros)": "Sistema Dispensador", "Dimensiones (Al x An x Pr)": "85 x 55 x 60 cm", "Peso Aprox.": "50 kg", "Voltaje": "115V / 60Hz"},
+        {"Modelo": "Vending Glass", "Tipo": "Vending", "Puertas": "1 Puerta Automática", "Capacidad (Litros)": "Selecciones Múltiples", "Dimensiones (Al x An x Pr)": "183 x 100 x 80 cm", "Peso Aprox.": "280 kg", "Voltaje": "115V / 60Hz"}
+    ])
+
+def guardar_especificaciones(df_specs):
+    try:
+        df_specs.to_csv(ESPECIFICACIONES_FILE, index=False)
+        return True
+    except PermissionError:
+        st.error(f"⚠️ Error de permiso: El archivo '{ESPECIFICACIONES_FILE}' está abierto en Excel.")
+        return False
+
 def cargar_historial():
     if os.path.exists(HISTORIAL_FILE):
         try:
@@ -729,6 +754,7 @@ if st.session_state['autenticado']:
             "📋 Solicitudes",
             "📝 Levantamientos",
             "📅 Solicitudes Diarias",
+            "📐 Especificaciones de Equipos",
             "📥 Registrar Entrada",
             "📤 Registrar Salida",
             "✏️ Editar / Eliminar",
@@ -748,11 +774,12 @@ if st.session_state['autenticado']:
 
 elif st.session_state['es_chofer']:
     st.sidebar.markdown(f'<div class="session-chip"><span class="dot"></span>Chofer en ruta: <b>{st.session_state["nombre_chofer"]}</b></div>', unsafe_allow_html=True)
-    # Menú exclusivo para Choferes (solo Solicitudes Diarias filtradas)
+    # Menú exclusivo para Choferes (Solicitudes Diarias + Especificaciones)
     menu = st.sidebar.radio(
         "Menú de Chofer",
         [
-            "📅 Solicitudes Diarias"
+            "📅 Solicitudes Diarias",
+            "📐 Especificaciones de Equipos"
         ],
         format_func=_etiqueta_menu,
         key="nav_chofer",
@@ -772,7 +799,8 @@ else:
         [
             "📦 Equipos Disponibles",
             "📈 Estadía",
-            "📅 Solicitudes Diarias"
+            "📅 Solicitudes Diarias",
+            "📐 Especificaciones de Equipos"
         ],
         format_func=_etiqueta_menu,
         key="nav_publico",
@@ -829,9 +857,9 @@ st.sidebar.markdown(
     unsafe_allow_html=True
 )
 
-# Encabezado principal
+# Encabezado principal centrado en barra superior naranja con fecha en blanco
 st.markdown(
-    f'<div class="top-bar-naranja"><div class="app-header"><h1>Sistema de Gestión Integral de Equipos y Activos Fijos</h1><p>Información al {datetime.now().strftime("%d/%m/%Y")}</p></div></div>', 
+    f'<div class="top-bar-naranja"><div class="app-header"><h1>Control de inventarios de capacidades</h1><p>Información al {datetime.now().strftime("%d/%m/%Y")}</p></div></div>', 
     unsafe_allow_html=True
 )
 
@@ -1186,6 +1214,101 @@ elif menu == "📅 Solicitudes Diarias":
     else:
         st.info("ℹ El archivo de solicitudes se encuentra vacío.")
 
+# --- APARTADO: ESPECIFICACIONES DE EQUIPOS (MEJORADO CON FILTRO POR TIPO Y MODELO) ---
+elif menu == "📐 Especificaciones de Equipos":
+    st.subheader("Catálogo de Especificaciones y Modelos de Equipos")
+    st.markdown("Consulte las dimensiones, peso, capacidad y número de puertas de los modelos de enfriadores y equipos de frío.")
+    
+    # CARGA EXCLUSIVA DE EXCEL DE ESPECIFICACIONES PARA ADMINISTRADORES
+    if st.session_state.get('autenticado', False):
+        with st.expander("🛠️ [Administrador] Actualizar o Subir Tabla de Especificaciones via Excel", expanded=False):
+            st.markdown("Sube un archivo Excel con las columnas: `Modelo`, `Tipo`, `Puertas`, `Capacidad (Litros)`, `Dimensiones (Al x An x Pr)`, `Peso Aprox.`, `Voltaje`.")
+            archivo_specs = st.file_uploader("📂 Archivo Excel de Especificaciones", type=["xlsx", "xls"], key="up_specs")
+            if archivo_specs is not None:
+                try:
+                    df_nuevo_s = pd.read_excel(archivo_specs, dtype=str).fillna("")
+                    if st.button("🚀 Guardar y Actualizar Especificaciones"):
+                        if guardar_especificaciones(df_nuevo_s):
+                            st.success("🎉 ¡Especificaciones actualizadas correctamente desde el archivo Excel!")
+                            time.sleep(1.5)
+                            st.rerun()
+                except Exception as e:
+                    st.error(f"⚠️ Error al leer el archivo: {e}")
+
+    st.markdown("---")
+    
+    df_specs = cargar_especificaciones()
+    
+    # FILTROS SUPERIORES: POR TIPO Y POR MODELO
+    col_filtro1, col_filtro2 = st.columns(2)
+    
+    with col_filtro1:
+        tipos_disponibles = ["Todos"] + sorted(df_specs['Tipo'].dropna().unique().tolist()) if 'Tipo' in df_specs.columns else ["Todos"]
+        filtro_tipo_spec = st.selectbox("📌 Filtrar por Tipo de Equipo:", tipos_disponibles)
+        
+    if filtro_tipo_spec != "Todos":
+        df_specs = df_specs[df_specs['Tipo'] == filtro_tipo_spec]
+        
+    with col_filtro2:
+        modelos_disponibles = ["Todos"] + sorted(df_specs['Modelo'].dropna().unique().tolist()) if 'Modelo' in df_specs.columns else ["Todos"]
+        filtro_modelo_spec = st.selectbox("🔍 Filtrar por Modelo:", modelos_disponibles)
+        
+    if filtro_modelo_spec != "Todos":
+        df_specs = df_specs[df_specs['Modelo'] == filtro_modelo_spec]
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    if df_specs.empty:
+        st.warning("⚠️ No se encontraron equipos con los filtros seleccionados.")
+    else:
+        for _, row in df_specs.iterrows():
+            mod_nombre = str(row.get('Modelo', 'Equipo')).strip()
+            tipo_eq = str(row.get('Tipo', 'Enfriador')).strip()
+            puertas = str(row.get('Puertas', 'N/A')).strip()
+            capacidad = str(row.get('Capacidad (Litros)', 'N/A')).strip()
+            dimensiones = str(row.get('Dimensiones (Al x An x Pr)', 'N/A')).strip()
+            peso = str(row.get('Peso Aprox.', 'N/A')).strip()
+            voltaje = str(row.get('Voltaje', 'N/A')).strip()
+            
+            # BUSCAR IMAGEN LOCAL EN CARPETA 'img_equipos/'
+            img_path_local = f"img_equipos/{mod_nombre}.jpg"
+            if not os.path.exists(img_path_local):
+                img_path_local = f"img_equipos/{mod_nombre}.png"
+                
+            with st.container():
+                col_img, col_info = st.columns([1.2, 2.8])
+                with col_img:
+                    if os.path.exists(img_path_local):
+                        try:
+                            imagen_pil = Image.open(img_path_local)
+                            st.image(imagen_pil, caption=f"{mod_nombre} (Clic para ampliar)", use_column_width=True)
+                            with st.expander("🔍 Ver Imagen en Grande"):
+                                st.image(imagen_pil, caption=mod_nombre, use_column_width=True)
+                        except Exception:
+                            st.info("🖼️ Sin imagen disponible")
+                    else:
+                        st.markdown(f"""
+                            <div style="background: #E5E7EB; border-radius: 8px; padding: 40px 10px; text-align: center; color: #6B7280; font-size: 13px;">
+                                📷 <b>Sin imagen cargada</b><br><small>Coloca '{mod_nombre}.jpg' en la carpeta <code>img_equipos/</code></small>
+                            </div>
+                        """, unsafe_allow_html=True)
+                        
+                with col_info:
+                    st.markdown(f"""
+                        <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 18px 22px;">
+                            <h3 style="color: #003B5C; margin-top: 0; margin-bottom: 8px;">{mod_nombre}</h3>
+                            <p style="font-size: 13px; color: #E60012; font-weight: 700; text-transform: uppercase; margin-bottom: 12px;">{tipo_eq}</p>
+                            <ul style="list-style-type: none; padding-left: 0; margin: 0; line-height: 1.8; font-size: 14px;">
+                                <li>🚪 <b>Puertas:</b> {puertas}</li>
+                                <li>📦 <b>Capacidad:</b> {capacidad}</li>
+                                <li>📏 <b>Dimensiones (Al x An x Pr):</b> {dimensiones}</li>
+                                <li>⚖️ <b>Peso Aproximado:</b> {peso}</li>
+                                <li>⚡ <b>Voltaje / Eléctrico:</b> {voltaje}</li>
+                            </ul>
+                        </div>
+                    """, unsafe_allow_html=True)
+                st.markdown("<br>", unsafe_allow_html=True)
+
 # 4. INVENTARIO GENERAL Y BUSCADOR (SOLO ADMINISTRADORES)
 elif menu == "📊 Inventario General" and st.session_state['autenticado']:
     st.subheader("Inventario Actual de Equipos")
@@ -1385,7 +1508,7 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
                             if not df_inv.empty and serie_sol in df_inv['Serie'].values:
                                 df_inv = df_inv[df_inv['Serie'] != serie_sol].reset_index(drop=True)
                                 guardar_datos(df_inv)
-                                registrar_historial(serie_sol, modelo_sol, f"SOLICITUD {status_sol.upper()}", f"Cliente: {cliente_sol} | CUC: {cuc} | Eliminado del Inventario General por estatus OK")
+                                registrar_historial(serie_sol, modelo_sol, f"SOLICITUD {status_sol.upper()}", f"Cliente: {cliente_sol} | CUC: {cuc} | Eliminado automáticamente del Inventario General por estatus OK")
                                 st.success(f"✅ ¡Solicitud guardada! La serie {serie_sol} ha sido eliminada automáticamente del Inventario General debido al estatus '{status_sol}'.")
                             else:
                                 st.success("✅ ¡Solicitud guardada correctamente!")
