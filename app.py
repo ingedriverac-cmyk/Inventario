@@ -60,7 +60,7 @@ st.markdown("""
     }
     [data-testid="stAppViewContainer"] > .main > .block-container {
         flex: 1;
-        padding-top: 2rem;
+        padding-top: 1rem;
     }
 
     /* Títulos */
@@ -68,11 +68,37 @@ st.markdown("""
     h3 { font-weight: 700; }
     hr { border-color: var(--borde) !important; margin: 1.2rem 0 !important; }
 
-    /* Encabezado de la aplicación */
-    .app-header { position: relative; padding: 2px 0 16px 0; margin-bottom: 18px; border-bottom: 1px solid var(--borde); }
-    .app-header::after { content: ""; position: absolute; left: 0; bottom: -1px; width: 72px; height: 3px; background: var(--rojo); }
-    .app-header h1 { margin: 0 !important; padding: 0 !important; font-size: 1.9rem; font-weight: 700; color: var(--azul); }
-    .app-header p { margin: 4px 0 0 0; font-size: .95rem; color: var(--texto-sec); }
+    /* Barra superior naranja con texto en negro y alineación vertical */
+    .top-bar {
+        background-color: #FF7F00;
+        padding: 12px 20px;
+        border-radius: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 18px;
+    }
+    .top-bar-title {
+        font-size: 1.7rem;
+        font-weight: 700;
+        margin: 0;
+        color: #000000;
+        text-align: center;
+        flex-grow: 1;
+    }
+    .top-bar-date {
+        font-size: 0.95rem;
+        font-weight: 600;
+        color: #000000;
+        white-space: nowrap;
+        margin: 0;
+    }
+
+    /* Ajuste para que los elementos dentro de las columnas de la barra superior queden centrados verticalmente */
+    [data-testid="column"] {
+        display: flex;
+        align-items: center;
+    }
 
     /* Barra lateral */
     [data-testid="stSidebar"] {
@@ -807,17 +833,26 @@ st.sidebar.markdown(
     unsafe_allow_html=True
 )
 
-# Encabezado principal
-col_titulo, col_logo = st.columns([4, 1])
+# --- BARRA SUPERIOR NARANJA (LOGO, TÍTULO Y FECHA EN NEGRO) ---
+fecha_info = datetime.now().strftime("%d/%m/%Y")
 
-with col_titulo:
-    st.markdown(f'<div class="app-header"><h1>Control de inventarios de capacidades</h1><p>Información al {datetime.now().strftime("%d/%m/%Y")}</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="top-bar">', unsafe_allow_html=True)
+col_logo, col_title, col_date = st.columns([1, 4, 1])
 
 with col_logo:
     if os.path.exists("Logo_Bepensa.png"):
-        st.image("Logo_Bepensa.png", width=160)
+        st.image("Logo_Bepensa.png", width=140)
     else:
-        st.warning("⚠️ No se encontró 'Logo_Bepensa.png' en la carpeta.")
+        st.markdown("<b style='color: #000000;'>Logo Bepensa</b>", unsafe_allow_html=True)
+
+with col_title:
+    st.markdown('<p class="top-bar-title">Control de inventarios de capacidades</p>', unsafe_allow_html=True)
+
+with col_date:
+    st.markdown(f'<p class="top-bar-date" style="text-align: right; width: 100%;">Información al {fecha_info}</p>', unsafe_allow_html=True)
+
+st.markdown('</div>', unsafe_allow_html=True)
+
 
 # 1. EQUIPOS DISPONIBLES (PÚBLICO Y PRIMERA OPCIÓN PARA GENERALES)
 if menu == "📦 Equipos Disponibles":
@@ -908,6 +943,14 @@ if menu == "📦 Equipos Disponibles":
             if not df_tabla_filtrada.empty:
                 st.plotly_chart(grafica_barras_conteo(df_tabla_filtrada, 'Modelo', f"Equipos disponibles por modelo en {c_d}", top=12), use_container_width=True)
                 st.dataframe(df_tabla_filtrada.groupby(['Tipo', 'Modelo', 'Imagen', 'Estatus']).size().reset_index(name='Cantidad Disponible'), use_container_width=True, hide_index=True)
+                
+                # Desplegable exacto de series solo visible para administradores
+                if st.session_state.get('autenticado', False):
+                    with st.expander(f"🔍 Ver el listado exacto de Series de Equipos - Canal {c_d}"):
+                        df_det_disp = df_tabla_filtrada[['Serie', 'Tipo', 'Modelo', 'Imagen', 'Ubicación', 'Estatus', 'Ultimo_Movimiento']].copy()
+                        df_det_disp = df_det_disp.rename(columns={'Ultimo_Movimiento': 'Último Movimiento'})
+                        df_det_disp_estilizado = df_det_disp.style.map(colorear_ubicaciones, subset=['Ubicación'])
+                        st.dataframe(df_det_disp_estilizado, use_container_width=True, hide_index=True)
             else:
                 st.info(f"ℹ️ No hay equipos disponibles que coincidan con los filtros seleccionados para {c_d}.")
     else:
