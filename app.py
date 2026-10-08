@@ -68,36 +68,32 @@ st.markdown("""
     h3 { font-weight: 700; }
     hr { border-color: var(--borde) !important; margin: 1.2rem 0 !important; }
 
-    /* Barra superior naranja con texto en negro y alineación vertical */
-    .top-bar {
+    /* Barra superior naranja con texto centrado y fecha en blanco */
+    .top-bar-naranja {
         background-color: #FF7F00;
-        padding: 12px 20px;
+        padding: 14px 20px;
         border-radius: 8px;
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
         margin-bottom: 18px;
-    }
-    .top-bar-title {
-        font-size: 1.7rem;
-        font-weight: 700;
-        margin: 0;
-        color: #000000;
         text-align: center;
-        flex-grow: 1;
     }
-    .top-bar-date {
-        font-size: 0.95rem;
-        font-weight: 600;
-        color: #000000;
-        white-space: nowrap;
+    .top-bar-naranja .app-header {
+        position: relative;
+        padding: 0;
         margin: 0;
+        border-bottom: none;
     }
-
-    /* Ajuste para que los elementos dentro de las columnas de la barra superior queden centrados verticalmente */
-    [data-testid="column"] {
-        display: flex;
-        align-items: center;
+    .top-bar-naranja .app-header::after { display: none; }
+    .top-bar-naranja .app-header h1 {
+        margin: 0 !important;
+        padding: 0 !important;
+        font-size: 1.9rem;
+        font-weight: 700;
+        color: var(--azul);
+    }
+    .top-bar-naranja .app-header p {
+        margin: 4px 0 0 0;
+        font-size: .95rem;
+        color: #FFFFFF !important;
     }
 
     /* Barra lateral */
@@ -718,7 +714,7 @@ if 'usuario_actual' not in st.session_state:
 if 'nombre_chofer' not in st.session_state:
     st.session_state['nombre_chofer'] = ""
 
-st.sidebar.markdown('<div class="side-brand"><div class="t">Bepensa</div><div class="s">Control de inventario</div></div>', unsafe_allow_html=True)
+st.sidebar.markdown('<div class="side-brand"><div class="t">Capacidades</div><div class="s">Control de inventario</div></div>', unsafe_allow_html=True)
 st.sidebar.markdown("---")
 
 if st.session_state['autenticado']:
@@ -833,25 +829,11 @@ st.sidebar.markdown(
     unsafe_allow_html=True
 )
 
-# --- BARRA SUPERIOR NARANJA (LOGO, TÍTULO Y FECHA EN NEGRO) ---
-fecha_info = datetime.now().strftime("%d/%m/%Y")
-
-st.markdown('<div class="top-bar">', unsafe_allow_html=True)
-col_logo, col_title, col_date = st.columns([1, 4, 1])
-
-with col_logo:
-    if os.path.exists("Logo_Bepensa.png"):
-        st.image("Logo_Bepensa.png", width=140)
-    else:
-        st.markdown("<b style='color: #000000;'>Logo Bepensa</b>", unsafe_allow_html=True)
-
-with col_title:
-    st.markdown('<p class="top-bar-title">Control de inventarios de capacidades</p>', unsafe_allow_html=True)
-
-with col_date:
-    st.markdown(f'<p class="top-bar-date" style="text-align: right; width: 100%;">Información al {fecha_info}</p>', unsafe_allow_html=True)
-
-st.markdown('</div>', unsafe_allow_html=True)
+# Encabezado principal
+st.markdown(
+    f'<div class="top-bar-naranja"><div class="app-header"><h1>Sistema de Gestión Integral de Equipos y Activos Fijos</h1><p>Información al {datetime.now().strftime("%d/%m/%Y")}</p></div></div>', 
+    unsafe_allow_html=True
+)
 
 
 # 1. EQUIPOS DISPONIBLES (PÚBLICO Y PRIMERA OPCIÓN PARA GENERALES)
