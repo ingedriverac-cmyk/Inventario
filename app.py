@@ -588,6 +588,39 @@ def guardar_especificaciones(df_specs):
         st.error(f"⚠️ Error de permiso: El archivo '{ESPECIFICACIONES_FILE}' está abierto en Excel.")
         return False
 
+# --- IMÁGENES DE EQUIPOS (una por modelo, carpeta img_equipos/) ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+IMG_DIR = os.path.join(BASE_DIR, "img_equipos")
+EXTENSIONES_IMG = (".jpg", ".jpeg", ".png", ".webp")
+
+def _clave_modelo(texto):
+    """Normaliza un nombre de modelo/archivo: 'V-17', 'v17' y 'V 17' -> 'v17'."""
+    return re.sub(r"[^a-z0-9]+", "", str(texto).lower())
+
+def indice_imagenes():
+    """Devuelve {clave_modelo: ruta} leyendo img_equipos/ (ignora mayúsculas y extensión)."""
+    indice = {}
+    if os.path.isdir(IMG_DIR):
+        for nombre in sorted(os.listdir(IMG_DIR)):
+            base, ext = os.path.splitext(nombre)
+            if ext.lower() in EXTENSIONES_IMG:
+                indice[_clave_modelo(base)] = os.path.join(IMG_DIR, nombre)
+    return indice
+
+def guardar_imagen_modelo(archivo_subido, modelo):
+    """Guarda la imagen como img_equipos/<modelo>.jpg (RGB, máx. 900 px de lado)."""
+    os.makedirs(IMG_DIR, exist_ok=True)
+    img = Image.open(archivo_subido).convert("RGB")
+    img.thumbnail((900, 900))
+    nombre_seguro = re.sub(r'[\\/:*?"<>|]+', "-", str(modelo).strip())
+    img.save(os.path.join(IMG_DIR, f"{nombre_seguro}.jpg"), "JPEG", quality=85)
+
+def mostrar_imagen(img, caption=None):
+    try:
+        st.image(img, caption=caption, use_container_width=True)
+    except TypeError:  # versiones antiguas de Streamlit
+        st.image(img, caption=caption, use_column_width=True)
+
 def cargar_historial():
     if os.path.exists(HISTORIAL_FILE):
         try:
@@ -1069,7 +1102,7 @@ elif menu == "📈 Estadía":
             st.info(f"ℹ️ No hay equipos registrados para el Canal {c_val}.")
     else:
         st.info("ℹ No hay datos suficientes en el inventario.")
-
+    
 # 3. SOLICITUDES DIARIAS (ADMINISTRADORES Y CHOFERES CON FILTRO Y EDICIÓN RÁPIDA)
 elif menu == "📅 Solicitudes Diarias":
     st.subheader("Solicitudes Diarias y Seguimiento por Fecha")
@@ -1235,9 +1268,36 @@ elif menu == "📐 Especificaciones de Equipos":
                 except Exception as e:
                     st.error(f"⚠️ Error al leer el archivo: {e}")
 
+        with st.expander("🖼️ [Administrador] Cargar imágenes de modelos", expanded=False):
+            st.markdown("Sube varias imágenes a la vez. **El nombre de cada archivo debe ser el modelo** (ej. `V17.jpg`). No importan mayúsculas ni la extensión.")
+            _df_todos = cargar_especificaciones()
+            _modelos_csv = _df_todos['Modelo'].dropna().astype(str).str.strip().tolist() if 'Modelo' in _df_todos.columns else []
+            _mapa_modelos = {_clave_modelo(m): m for m in _modelos_csv}
+            archivos_img = st.file_uploader("📂 Imágenes (JPG / PNG / WEBP)", type=["jpg", "jpeg", "png", "webp"],
+                                            accept_multiple_files=True, key="up_imgs_modelos")
+            if archivos_img:
+                reconocidos = [(a, _mapa_modelos[_clave_modelo(os.path.splitext(a.name)[0])]) for a in archivos_img
+                               if _clave_modelo(os.path.splitext(a.name)[0]) in _mapa_modelos]
+                sin_match = [a.name for a in archivos_img if _clave_modelo(os.path.splitext(a.name)[0]) not in _mapa_modelos]
+                st.write(f"✅ {len(reconocidos)} coinciden con un modelo del catálogo.")
+                if sin_match:
+                    st.warning("Sin modelo coincidente (revisa el nombre): " + ", ".join(sin_match))
+                if reconocidos and st.button("💾 Guardar imágenes"):
+                    for archivo, modelo in reconocidos:
+                        guardar_imagen_modelo(archivo, modelo)
+                    st.success(f"🎉 {len(reconocidos)} imagen(es) guardada(s).")
+                    time.sleep(1.2)
+                    st.rerun()
+            _idx_img = indice_imagenes()
+            _faltan = [m for m in _modelos_csv if _clave_modelo(m) not in _idx_img]
+            st.caption(f"📊 {len(_modelos_csv) - len(_faltan)} de {len(_modelos_csv)} modelos con imagen.")
+            if _faltan:
+                st.markdown("**Modelos sin imagen:** " + ", ".join(_faltan))
+
     st.markdown("---")
     
     df_specs = cargar_especificaciones()
+    _idx_img = indice_imagenes()
     
     # FILTROS SUPERIORES: POR TIPO Y POR MODELO
     col_filtro1, col_filtro2 = st.columns(2)
@@ -1270,22 +1330,18 @@ elif menu == "📐 Especificaciones de Equipos":
             peso = str(row.get('Peso Aprox.', 'N/A')).strip()
             voltaje = str(row.get('Voltaje', 'N/A')).strip()
             
-            # BUSCAR IMAGEN LOCAL EN CARPETA 'img_equipos/'
-            img_path_local = f"img_equipos/{mod_nombre}.jpg"
-            if not os.path.exists(img_path_local):
-                img_path_local = f"img_equipos/{mod_nombre}.png"
+            # BUSCAR IMAGEN LOCAL EN CARPETA 'img_equipos/' (sin importar mayúsculas ni extensión)
+            img_path_local = _idx_img.get(_clave_modelo(mod_nombre))
                 
             with st.container():
                 col_img, col_info = st.columns([1.2, 2.8])
                 with col_img:
-                    if os.path.exists(img_path_local):
+                    if img_path_local:
                         try:
                             imagen_pil = Image.open(img_path_local)
-                            st.image(imagen_pil, caption=f"{mod_nombre} (Clic para ampliar)", use_column_width=True)
-                            with st.expander("🔍 Ver Imagen en Grande"):
-                                st.image(imagen_pil, caption=mod_nombre, use_column_width=True)
-                        except Exception:
-                            st.info("🖼️ Sin imagen disponible")
+                            mostrar_imagen(imagen_pil, caption=f"{mod_nombre} (Clic en la esquina para ampliar)")
+                        except Exception as e_img:
+                            st.info(f"🖼️ No se pudo abrir la imagen: {e_img}")
                     else:
                         st.markdown(f"""
                             <div style="background: #E5E7EB; border-radius: 8px; padding: 40px 10px; text-align: center; color: #6B7280; font-size: 13px;">
