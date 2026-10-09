@@ -609,6 +609,8 @@ def indice_imagenes():
 
 def guardar_imagen_modelo(archivo_subido, modelo):
     """Guarda la imagen como img_equipos/<modelo>.jpg (RGB, máx. 900 px de lado)."""
+    if os.path.isfile(IMG_DIR):
+        raise RuntimeError("En el repositorio existe un ARCHIVO llamado 'img_equipos'; debe ser una carpeta. Elimínalo y vuelve a crear la carpeta.")
     os.makedirs(IMG_DIR, exist_ok=True)
     img = Image.open(archivo_subido).convert("RGB")
     img.thumbnail((900, 900))
@@ -1283,11 +1285,16 @@ elif menu == "📐 Especificaciones de Equipos":
                 if sin_match:
                     st.warning("Sin modelo coincidente (revisa el nombre): " + ", ".join(sin_match))
                 if reconocidos and st.button("💾 Guardar imágenes"):
-                    for archivo, modelo in reconocidos:
-                        guardar_imagen_modelo(archivo, modelo)
-                    st.success(f"🎉 {len(reconocidos)} imagen(es) guardada(s).")
-                    time.sleep(1.2)
-                    st.rerun()
+                    try:
+                        for archivo, modelo in reconocidos:
+                            guardar_imagen_modelo(archivo, modelo)
+                        st.success(f"🎉 {len(reconocidos)} imagen(es) guardada(s).")
+                        time.sleep(1.2)
+                        st.rerun()
+                    except RuntimeError as e_g:
+                        st.error(f"⚠️ {e_g}")
+                    except OSError as e_g:
+                        st.error(f"⚠️ No se pudo guardar en el servidor: {e_g}")
             _idx_img = indice_imagenes()
             _faltan = [m for m in _modelos_csv if _clave_modelo(m) not in _idx_img]
             st.caption(f"📊 {len(_modelos_csv) - len(_faltan)} de {len(_modelos_csv)} modelos con imagen.")
