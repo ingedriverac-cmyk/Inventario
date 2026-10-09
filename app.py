@@ -15,6 +15,8 @@ import os
 import requests
 import json
 import io
+import html as _html
+import base64
 import re
 import hmac
 import time
@@ -209,6 +211,44 @@ st.markdown("""
     .kpi .val { font-size: 2rem; font-weight: 700; color: var(--texto); line-height: 1.15; font-variant-numeric: tabular-nums; }
     .kpi .sub { font-size: .8rem; color: var(--texto-sec); margin-top: 2px; }
 
+    /* ===== Catálogo de especificaciones ===== */
+    /* Banner de encabezado de cada apartado (naranja Bepensa) */
+    .page-hero { background: linear-gradient(135deg, #D95F00 0%, #FF7F00 58%, #FFA03A 100%); border-radius: 14px;
+        padding: 24px 32px; margin-bottom: 18px; position: relative; overflow: hidden;
+        display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap;
+        box-shadow: 0 6px 18px rgba(217,95,0,.25); }
+    .page-hero:after { content: ""; position: absolute; right: -50px; top: -70px; width: 230px; height: 230px;
+        border-radius: 50%; background: rgba(255,255,255,.16); }
+    .page-hero:before { content: ""; position: absolute; right: 120px; bottom: -90px; width: 170px; height: 170px;
+        border-radius: 50%; background: rgba(255,255,255,.10); }
+    .page-hero .ph-txt { position: relative; z-index: 1; }
+    .page-hero h2 { color: #FFFFFF !important; margin: 0 0 4px 0; font-size: 1.75rem; font-weight: 700;
+        text-shadow: 0 1px 2px rgba(0,0,0,.18); }
+    .page-hero p { color: #FFF4E5 !important; margin: 0; font-size: 1rem; text-shadow: 0 1px 2px rgba(0,0,0,.12); }
+    .page-hero .ph-date { position: relative; z-index: 1; background: rgba(255,255,255,.22); color: #FFFFFF;
+        font-size: .85rem; font-weight: 600; padding: 6px 14px; border-radius: 999px; white-space: nowrap; }
+    .sp-count { color: var(--texto-sec); font-size: .9rem; margin: 4px 0 14px 0; }
+    .sp-count b { color: var(--azul); }
+    .sp-card { background: #FFFFFF; border: 1px solid var(--borde); border-radius: 14px; overflow: hidden;
+        box-shadow: 0 1px 3px rgba(16,24,40,.06); transition: transform .15s ease, box-shadow .15s ease;
+        margin-bottom: 8px; }
+    .sp-card:hover { transform: translateY(-3px); box-shadow: 0 10px 24px rgba(0,59,92,.15); }
+    .sp-img { height: 210px; display: flex; align-items: center; justify-content: center;
+        background: radial-gradient(circle at 50% 40%, #FFFFFF 0%, #EEF2F7 100%); border-bottom: 1px solid var(--borde); padding: 10px; }
+    .sp-img img { max-height: 190px; max-width: 100%; object-fit: contain; mix-blend-mode: multiply; }
+    .sp-noimg { text-align: center; color: #9CA3AF; font-size: .85rem; }
+    .sp-noimg .ic { font-size: 2.4rem; display: block; margin-bottom: 4px; opacity: .8; }
+    .sp-body { padding: 16px 18px 18px 18px; }
+    .sp-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 14px; }
+    .sp-model { font-size: 1.35rem; font-weight: 700; color: var(--azul); line-height: 1.1; }
+    .sp-badge { background: #FDECEE; color: var(--rojo); font-size: .68rem; font-weight: 700; letter-spacing: .04em;
+        text-transform: uppercase; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+    .sp-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .sp-tile { background: #F5F7FA; border-radius: 10px; padding: 9px 12px; }
+    .sp-tile.full { grid-column: 1 / -1; }
+    .sp-tile .k { font-size: .68rem; font-weight: 600; color: var(--texto-sec); text-transform: uppercase; letter-spacing: .04em; }
+    .sp-tile .v { font-size: .98rem; font-weight: 700; color: var(--texto); margin-top: 1px; }
+
     /* Contenedores */
     [data-testid="stExpander"] { background: #FFFFFF; border: 1px solid var(--borde); border-radius: 8px; }
     [data-testid="stDataFrame"] { border: 1px solid var(--borde); border-radius: 8px; overflow: hidden; }
@@ -248,6 +288,16 @@ def render_kpi(etiqueta, valor, apoyo="", color="#003B5C"):
     st.markdown(
         f'<div class="kpi" style="--c:{color};"><div class="lbl">{etiqueta}</div>'
         f'<div class="val">{valor}</div>{sub}</div>',
+        unsafe_allow_html=True
+    )
+
+
+def render_banner(icono, titulo, subtitulo=""):
+    """Banner naranja de encabezado de cada apartado, con la fecha de la información a la derecha."""
+    sub = f"<p>{subtitulo}</p>" if subtitulo else ""
+    st.markdown(
+        f'<div class="page-hero"><div class="ph-txt"><h2>{icono} {titulo}</h2>{sub}</div>'
+        f'<div class="ph-date">📅 Información al {datetime.now().strftime("%d/%m/%Y")}</div></div>',
         unsafe_allow_html=True
     )
 
@@ -566,19 +616,33 @@ def cargar_datos():
         
     return df
 
+COLUMNAS_ESPECIFICACIONES = ['Modelo', 'Tipo', 'Marca', 'Puertas', 'Capacidad (Litros)',
+                             'Dimensiones (Al x An x Pr)', 'Consumo de Energía']
+
+def normalizar_especificaciones(df):
+    """Deja la tabla con las columnas vigentes: 'Voltaje' pasa a 'Consumo de Energía',
+    se agrega 'Marca' (vacía si no existe) y 'Peso Aprox.' ya no se usa."""
+    df = df.copy()
+    if 'Consumo de Energía' not in df.columns and 'Voltaje' in df.columns:
+        df = df.rename(columns={'Voltaje': 'Consumo de Energía'})
+    for c in COLUMNAS_ESPECIFICACIONES:
+        if c not in df.columns:
+            df[c] = ""
+    return df[COLUMNAS_ESPECIFICACIONES].fillna("")
+
 def cargar_especificaciones():
     if os.path.exists(ESPECIFICACIONES_FILE):
         try:
-            return pd.read_csv(ESPECIFICACIONES_FILE, dtype=str)
+            return normalizar_especificaciones(pd.read_csv(ESPECIFICACIONES_FILE, dtype=str))
         except Exception:
             pass
-    return pd.DataFrame([
-        {"Modelo": "Visi Cooler 1 Pta (NV-10)", "Tipo": "Enfriador", "Puertas": "1 Puerta", "Capacidad (Litros)": "310 Lts", "Dimensiones (Al x An x Pr)": "178 x 62 x 65 cm", "Peso Aprox.": "75 kg", "Voltaje": "115V / 60Hz"},
-        {"Modelo": "Visi Cooler 2 Ptas (NV-20)", "Tipo": "Enfriador", "Puertas": "2 Puertas", "Capacidad (Litros)": "650 Lts", "Dimensiones (Al x An x Pr)": "200 x 110 x 70 cm", "Peso Aprox.": "130 kg", "Voltaje": "115V / 60Hz"},
-        {"Modelo": "Horizontal / Cofre (CH-400)", "Tipo": "Enfriador", "Puertas": "Tapa Ciega", "Capacidad (Litros)": "400 Lts", "Dimensiones (Al x An x Pr)": "90 x 130 x 70 cm", "Peso Aprox.": "65 kg", "Voltaje": "115V / 60Hz"},
-        {"Modelo": "PostMix 4 Válvulas", "Tipo": "PostMix", "Puertas": "N/A", "Capacidad (Litros)": "Sistema Dispensador", "Dimensiones (Al x An x Pr)": "85 x 55 x 60 cm", "Peso Aprox.": "50 kg", "Voltaje": "115V / 60Hz"},
-        {"Modelo": "Vending Glass", "Tipo": "Vending", "Puertas": "1 Puerta Automática", "Capacidad (Litros)": "Selecciones Múltiples", "Dimensiones (Al x An x Pr)": "183 x 100 x 80 cm", "Peso Aprox.": "280 kg", "Voltaje": "115V / 60Hz"}
-    ])
+    return normalizar_especificaciones(pd.DataFrame([
+        {"Modelo": "Visi Cooler 1 Pta (NV-10)", "Tipo": "Enfriador", "Puertas": "1 Puerta", "Capacidad (Litros)": "310 Lts", "Dimensiones (Al x An x Pr)": "178 x 62 x 65 cm"},
+        {"Modelo": "Visi Cooler 2 Ptas (NV-20)", "Tipo": "Enfriador", "Puertas": "2 Puertas", "Capacidad (Litros)": "650 Lts", "Dimensiones (Al x An x Pr)": "200 x 110 x 70 cm"},
+        {"Modelo": "Horizontal / Cofre (CH-400)", "Tipo": "Enfriador", "Puertas": "Tapa Ciega", "Capacidad (Litros)": "400 Lts", "Dimensiones (Al x An x Pr)": "90 x 130 x 70 cm"},
+        {"Modelo": "PostMix 4 Válvulas", "Tipo": "PostMix", "Puertas": "N/A", "Capacidad (Litros)": "Sistema Dispensador", "Dimensiones (Al x An x Pr)": "85 x 55 x 60 cm"},
+        {"Modelo": "Vending Glass", "Tipo": "Vending", "Puertas": "1 Puerta Automática", "Capacidad (Litros)": "Selecciones Múltiples", "Dimensiones (Al x An x Pr)": "183 x 100 x 80 cm"}
+    ]))
 
 def guardar_especificaciones(df_specs):
     try:
@@ -607,21 +671,110 @@ def indice_imagenes():
                 indice[_clave_modelo(base)] = os.path.join(IMG_DIR, nombre)
     return indice
 
-def guardar_imagen_modelo(archivo_subido, modelo):
-    """Guarda la imagen como img_equipos/<modelo>.jpg (RGB, máx. 900 px de lado)."""
+def _nombre_archivo_modelo(modelo):
+    return re.sub(r'[\\/:*?"<>|]+', "-", str(modelo).strip()) + ".jpg"
+
+def procesar_imagen_jpeg(archivo_subido):
+    """Convierte cualquier imagen subida a JPEG RGB (máx. 900 px de lado) y devuelve los bytes."""
+    img = Image.open(archivo_subido).convert("RGB")
+    img.thumbnail((900, 900))
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=85)
+    return buf.getvalue()
+
+def guardar_imagen_local(jpeg_bytes, modelo):
+    """Copia local temporal (se pierde al reiniciar Streamlit Cloud; sirve para verla de inmediato)."""
     if os.path.isfile(IMG_DIR):
         raise RuntimeError("En el repositorio existe un ARCHIVO llamado 'img_equipos'; debe ser una carpeta. Elimínalo y vuelve a crear la carpeta.")
     os.makedirs(IMG_DIR, exist_ok=True)
-    img = Image.open(archivo_subido).convert("RGB")
-    img.thumbnail((900, 900))
-    nombre_seguro = re.sub(r'[\\/:*?"<>|]+', "-", str(modelo).strip())
-    img.save(os.path.join(IMG_DIR, f"{nombre_seguro}.jpg"), "JPEG", quality=85)
+    with open(os.path.join(IMG_DIR, _nombre_archivo_modelo(modelo)), "wb") as f:
+        f.write(jpeg_bytes)
+
+@st.cache_data(show_spinner=False)
+def _miniatura_b64(ruta, mtime):
+    """Miniatura JPEG (máx. 520 px) en base64 para incrustarla en la tarjeta HTML."""
+    img = Image.open(ruta).convert("RGB")
+    img.thumbnail((520, 520))
+    buf = io.BytesIO()
+    img.save(buf, "JPEG", quality=82)
+    return base64.b64encode(buf.getvalue()).decode()
+
+def _esc(valor):
+    texto = str(valor).strip()
+    return _html.escape(texto) if texto and texto.lower() != "nan" else "—"
+
+def _tiles_html(row):
+    cap = str(row.get("Capacidad (Litros)", ""))
+    unidad = " L" if re.fullmatch(r"\s*\d+([.,]\d+)?\s*", cap) else ""
+    return (
+        '<div class="sp-tiles">'
+        f'<div class="sp-tile"><div class="k">🚪 Puertas</div><div class="v">{_esc(row.get("Puertas",""))}</div></div>'
+        f'<div class="sp-tile"><div class="k">📦 Capacidad</div><div class="v">{_esc(cap)}{unidad}</div></div>'
+        f'<div class="sp-tile full"><div class="k">📏 Dimensiones (Al x An x Pr)</div><div class="v">{_esc(row.get("Dimensiones (Al x An x Pr)",""))}</div></div>'
+        f'<div class="sp-tile"><div class="k">🏷️ Marca</div><div class="v">{_esc(row.get("Marca",""))}</div></div>'
+        f'<div class="sp-tile"><div class="k">⚡ Consumo de Energía</div><div class="v">{_esc(row.get("Consumo de Energía",""))}</div></div>'
+        '</div>'
+    )
+
+def tarjeta_equipo_html(row, ruta_img):
+    if ruta_img:
+        try:
+            b64 = _miniatura_b64(ruta_img, os.path.getmtime(ruta_img))
+            zona_img = f'<img src="data:image/jpeg;base64,{b64}" alt="{_esc(row.get("Modelo",""))}">'
+        except Exception:
+            zona_img = '<div class="sp-noimg"><span class="ic">⚠️</span>No se pudo abrir la imagen</div>'
+    else:
+        zona_img = '<div class="sp-noimg"><span class="ic">📷</span>Imagen no disponible</div>'
+    return (
+        '<div class="sp-card">'
+        f'<div class="sp-img">{zona_img}</div>'
+        '<div class="sp-body">'
+        f'<div class="sp-head"><div class="sp-model">{_esc(row.get("Modelo",""))}</div>'
+        f'<div class="sp-badge">{_esc(row.get("Tipo",""))}</div></div>'
+        + _tiles_html(row) +
+        '</div></div>'
+    )
+
+def _contenido_ampliado(row, ruta):
+    """Contenido de la ventana de ampliación: imagen grande + especificaciones."""
+    st.markdown(
+        f'<div class="sp-head"><div class="sp-model" style="font-size:1.6rem;">{_esc(row.get("Modelo",""))}</div>'
+        f'<div class="sp-badge">{_esc(row.get("Tipo",""))}</div></div>', unsafe_allow_html=True)
+    try:
+        img = Image.open(ruta)
+        img.thumbnail((1400, 1400))
+        mostrar_imagen(img)
+    except Exception as e_img:
+        st.info(f"🖼️ No se pudo abrir la imagen: {e_img}")
+    st.markdown(_tiles_html(row), unsafe_allow_html=True)
+
+# st.dialog (Streamlit reciente) o st.experimental_dialog (versiones anteriores)
+_dialog_deco = getattr(st, "dialog", None) or getattr(st, "experimental_dialog", None)
+if _dialog_deco:
+    try:
+        _ventana_ampliada = _dialog_deco("🔍 Vista ampliada", width="large")(_contenido_ampliado)
+    except TypeError:
+        _ventana_ampliada = _dialog_deco("🔍 Vista ampliada")(_contenido_ampliado)
+else:
+    _ventana_ampliada = None
+
+def _boton_ancho(etiqueta, **kw):
+    """Botón de ancho completo, compatible con distintas versiones de Streamlit."""
+    for extra in ({"width": "stretch"}, {"use_container_width": True}, {}):
+        try:
+            return st.button(etiqueta, **kw, **extra)
+        except Exception:
+            continue
+    return False
 
 def mostrar_imagen(img, caption=None):
-    try:
-        st.image(img, caption=caption, use_container_width=True)
-    except TypeError:  # versiones antiguas de Streamlit
-        st.image(img, caption=caption, use_column_width=True)
+    """Imagen a todo el ancho, compatible con versiones nuevas y antiguas de Streamlit."""
+    for extra in ({"width": "stretch"}, {"use_container_width": True}, {"use_column_width": True}):
+        try:
+            return st.image(img, caption=caption, **extra)
+        except Exception:
+            continue
+    st.image(img, caption=caption)
 
 def cargar_historial():
     if os.path.exists(HISTORIAL_FILE):
@@ -789,7 +942,7 @@ if st.session_state['autenticado']:
             "📋 Solicitudes",
             "📝 Levantamientos",
             "📅 Solicitudes Diarias",
-            "📐 Especificaciones de Equipos",
+            "📐 Catálogo de Equipos",
             "📥 Registrar Entrada",
             "📤 Registrar Salida",
             "✏️ Editar / Eliminar",
@@ -814,7 +967,7 @@ elif st.session_state['es_chofer']:
         "Menú de Chofer",
         [
             "📅 Solicitudes Diarias",
-            "📐 Especificaciones de Equipos"
+            "📐 Catálogo de Equipos"
         ],
         format_func=_etiqueta_menu,
         key="nav_chofer",
@@ -835,7 +988,7 @@ else:
             "📦 Equipos Disponibles",
             "📈 Estadía",
             "📅 Solicitudes Diarias",
-            "📐 Especificaciones de Equipos"
+            "📐 Catálogo de Equipos"
         ],
         format_func=_etiqueta_menu,
         key="nav_publico",
@@ -892,17 +1045,9 @@ st.sidebar.markdown(
     unsafe_allow_html=True
 )
 
-# Encabezado principal centrado en barra superior naranja con fecha en blanco
-st.markdown(
-    f'<div class="top-bar-naranja"><div class="app-header"><h1>Control de inventarios de capacidades</h1><p>Información al {datetime.now().strftime("%d/%m/%Y")}</p></div></div>', 
-    unsafe_allow_html=True
-)
-
-
 # 1. EQUIPOS DISPONIBLES (PÚBLICO Y PRIMERA OPCIÓN PARA GENERALES)
 if menu == "📦 Equipos Disponibles":
-    st.subheader("Reporte de Equipos Disponibles")
-    st.markdown("Equipos listos para distribución.")
+    render_banner("📦", "Equipos Disponibles", "Equipos listos para distribución.")
     
     canales_validos_kpi = [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
     
@@ -1021,8 +1166,7 @@ elif menu == "📈 Estadía":
         st.plotly_chart(fig_treemap, use_container_width=True)
         st.markdown("<br>", unsafe_allow_html=True)
 
-    st.subheader("Promedio de Estadía y Saturación de Equipos")
-    st.markdown("Análisis del promedio de días sin movimiento y saturación de inventario. Las barras en **rojo** superan los **40 días**; las **ámbar** se acercan al límite.")
+    render_banner("📈", "Estadía y Saturación", "Promedio de días sin movimiento y saturación de inventario. Las barras en <b>rojo</b> superan los <b>40 días</b>; las <b>ámbar</b> se acercan al límite.")
     st.markdown("---")
     
     opciones_estadia_filtro = [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
@@ -1107,7 +1251,7 @@ elif menu == "📈 Estadía":
     
 # 3. SOLICITUDES DIARIAS (ADMINISTRADORES Y CHOFERES CON FILTRO Y EDICIÓN RÁPIDA)
 elif menu == "📅 Solicitudes Diarias":
-    st.subheader("Solicitudes Diarias y Seguimiento por Fecha")
+    render_banner("📅", "Solicitudes Diarias", "Seguimiento de solicitudes por fecha.")
     
     if st.session_state['es_chofer']:
         chofer_activo = st.session_state['nombre_chofer']
@@ -1250,20 +1394,19 @@ elif menu == "📅 Solicitudes Diarias":
         st.info("ℹ El archivo de solicitudes se encuentra vacío.")
 
 # --- APARTADO: ESPECIFICACIONES DE EQUIPOS (MEJORADO CON FILTRO POR TIPO Y MODELO) ---
-elif menu == "📐 Especificaciones de Equipos":
-    st.subheader("Catálogo de Especificaciones y Modelos de Equipos")
-    st.markdown("Consulte las dimensiones, peso, capacidad y número de puertas de los modelos de enfriadores y equipos de frío.")
+elif menu == "📐 Catálogo de Equipos":
+    render_banner("📐", "Especificaciones", "Consulta marca, dimensiones, capacidad, puertas y consumo de energía de cada modelo de enfriador y equipo de frío.")
     
     # CARGA EXCLUSIVA DE EXCEL DE ESPECIFICACIONES PARA ADMINISTRADORES
     if st.session_state.get('autenticado', False):
         with st.expander("🛠️ [Administrador] Actualizar o Subir Tabla de Especificaciones via Excel", expanded=False):
-            st.markdown("Sube un archivo Excel con las columnas: `Modelo`, `Tipo`, `Puertas`, `Capacidad (Litros)`, `Dimensiones (Al x An x Pr)`, `Peso Aprox.`, `Voltaje`.")
+            st.markdown("Sube un archivo Excel con las columnas: `Modelo`, `Tipo`, `Marca`, `Puertas`, `Capacidad (Litros)`, `Dimensiones (Al x An x Pr)`, `Consumo de Energía`.")
             archivo_specs = st.file_uploader("📂 Archivo Excel de Especificaciones", type=["xlsx", "xls"], key="up_specs")
             if archivo_specs is not None:
                 try:
                     df_nuevo_s = pd.read_excel(archivo_specs, dtype=str).fillna("")
                     if st.button("🚀 Guardar y Actualizar Especificaciones"):
-                        if guardar_especificaciones(df_nuevo_s):
+                        if guardar_especificaciones(normalizar_especificaciones(df_nuevo_s)):
                             st.success("🎉 ¡Especificaciones actualizadas correctamente desde el archivo Excel!")
                             time.sleep(1.5)
                             st.rerun()
@@ -1284,97 +1427,106 @@ elif menu == "📐 Especificaciones de Equipos":
                 st.write(f"✅ {len(reconocidos)} coinciden con un modelo del catálogo.")
                 if sin_match:
                     st.warning("Sin modelo coincidente (revisa el nombre): " + ", ".join(sin_match))
+                st.info("ℹ️ Lo que se sube aquí es temporal en Streamlit Cloud (se pierde al reiniciar). Para que sea permanente, copia las imágenes a la carpeta img_equipos/ del repositorio.")
                 if reconocidos and st.button("💾 Guardar imágenes"):
                     try:
-                        for archivo, modelo in reconocidos:
-                            guardar_imagen_modelo(archivo, modelo)
-                        st.success(f"🎉 {len(reconocidos)} imagen(es) guardada(s).")
+                        with st.spinner("Procesando imágenes..."):
+                            for archivo, modelo in reconocidos:
+                                guardar_imagen_local(procesar_imagen_jpeg(archivo), modelo)
+                        st.success(f"🎉 {len(reconocidos)} imagen(es) guardada(s) de forma temporal.")
                         time.sleep(1.2)
                         st.rerun()
                     except RuntimeError as e_g:
                         st.error(f"⚠️ {e_g}")
                     except OSError as e_g:
-                        st.error(f"⚠️ No se pudo guardar en el servidor: {e_g}")
+                        st.error(f"⚠️ No se pudo guardar: {e_g}")
             _idx_img = indice_imagenes()
             _faltan = [m for m in _modelos_csv if _clave_modelo(m) not in _idx_img]
             st.caption(f"📊 {len(_modelos_csv) - len(_faltan)} de {len(_modelos_csv)} modelos con imagen.")
             if _faltan:
                 st.markdown("**Modelos sin imagen:** " + ", ".join(_faltan))
 
-    st.markdown("---")
-    
     df_specs = cargar_especificaciones()
     _idx_img = indice_imagenes()
-    
-    # FILTROS SUPERIORES: POR TIPO Y POR MODELO
-    col_filtro1, col_filtro2 = st.columns(2)
-    
-    with col_filtro1:
-        tipos_disponibles = ["Todos"] + sorted(df_specs['Tipo'].dropna().unique().tolist()) if 'Tipo' in df_specs.columns else ["Todos"]
-        filtro_tipo_spec = st.selectbox("📌 Filtrar por Tipo de Equipo:", tipos_disponibles)
-        
+    for _c in COLUMNAS_ESPECIFICACIONES:
+        if _c not in df_specs.columns:
+            df_specs[_c] = ""
+    df_specs['Modelo'] = df_specs['Modelo'].astype(str).str.strip()
+    df_specs['_litros'] = pd.to_numeric(df_specs['Capacidad (Litros)'].astype(str).str.extract(r'(\d+[.,]?\d*)')[0].str.replace(',', '.'), errors='coerce')
+    df_specs['_con_img'] = df_specs['Modelo'].apply(lambda m: _clave_modelo(m) in _idx_img)
+
+    # Resumen del catálogo
+    _total = len(df_specs)
+    _n_img = int(df_specs['_con_img'].sum())
+    k1, k2, k3 = st.columns(3)
+    with k1:
+        render_kpi("Modelos en catálogo", _total, "Registrados con especificaciones", "#003B5C")
+    with k2:
+        render_kpi("Tipos de equipo", df_specs['Tipo'].replace("", pd.NA).dropna().nunique(), "Categorías distintas", "#005B8C")
+    with k3:
+        render_kpi("Modelos con imagen", _n_img, porcentaje_texto(_n_img, _total, "del catálogo"), "#E60012")
+
+    # Filtros
+    f1, f2, f3 = st.columns([2, 1.3, 1.5])
+    with f1:
+        busqueda_spec = st.text_input("🔎 Buscar modelo", placeholder="Ej. V17").strip()
+    with f2:
+        tipos_disponibles = ["Todos"] + sorted([t for t in df_specs['Tipo'].dropna().unique().tolist() if str(t).strip()])
+        filtro_tipo_spec = st.selectbox("📌 Tipo de equipo", tipos_disponibles)
+    with f3:
+        orden_spec = st.selectbox("↕️ Ordenar por", ["Modelo (A-Z)", "Capacidad (mayor a menor)", "Capacidad (menor a mayor)"])
+
+    if busqueda_spec:
+        df_specs = df_specs[df_specs['Modelo'].str.contains(busqueda_spec, case=False, na=False)]
     if filtro_tipo_spec != "Todos":
         df_specs = df_specs[df_specs['Tipo'] == filtro_tipo_spec]
-        
-    with col_filtro2:
-        modelos_disponibles = ["Todos"] + sorted(df_specs['Modelo'].dropna().unique().tolist()) if 'Modelo' in df_specs.columns else ["Todos"]
-        filtro_modelo_spec = st.selectbox("🔍 Filtrar por Modelo:", modelos_disponibles)
-        
-    if filtro_modelo_spec != "Todos":
-        df_specs = df_specs[df_specs['Modelo'] == filtro_modelo_spec]
-    
-    st.markdown("<br>", unsafe_allow_html=True)
-    
+    if orden_spec == "Capacidad (mayor a menor)":
+        df_specs = df_specs.sort_values('_litros', ascending=False, na_position='last')
+    elif orden_spec == "Capacidad (menor a mayor)":
+        df_specs = df_specs.sort_values('_litros', ascending=True, na_position='last')
+    else:
+        df_specs = df_specs.sort_values('Modelo', key=lambda c: c.str.lower())
+
+    vista_spec = st.radio("Vista", ["🗂️ Tarjetas", "📋 Tabla comparativa"], horizontal=True, label_visibility="collapsed")
+    st.markdown(f'<div class="sp-count">Mostrando <b>{len(df_specs)}</b> de <b>{_total}</b> modelos</div>', unsafe_allow_html=True)
+
     if df_specs.empty:
         st.warning("⚠️ No se encontraron equipos con los filtros seleccionados.")
+    elif vista_spec.startswith("📋"):
+        _cols_tabla = COLUMNAS_ESPECIFICACIONES
+        _df_tabla = df_specs[_cols_tabla].copy()
+        _df_tabla.insert(1, 'Imagen', df_specs['_con_img'].map({True: "✅", False: "—"}))
+        st.dataframe(_df_tabla, use_container_width=True, hide_index=True)
+        st.download_button("⬇️ Descargar tabla (CSV)", _df_tabla.to_csv(index=False).encode("utf-8-sig"),
+                           file_name="especificaciones_equipos.csv", mime="text/csv")
     else:
-        for _, row in df_specs.iterrows():
-            mod_nombre = str(row.get('Modelo', 'Equipo')).strip()
-            tipo_eq = str(row.get('Tipo', 'Enfriador')).strip()
-            puertas = str(row.get('Puertas', 'N/A')).strip()
-            capacidad = str(row.get('Capacidad (Litros)', 'N/A')).strip()
-            dimensiones = str(row.get('Dimensiones (Al x An x Pr)', 'N/A')).strip()
-            peso = str(row.get('Peso Aprox.', 'N/A')).strip()
-            voltaje = str(row.get('Voltaje', 'N/A')).strip()
-            
-            # BUSCAR IMAGEN LOCAL EN CARPETA 'img_equipos/' (sin importar mayúsculas ni extensión)
-            img_path_local = _idx_img.get(_clave_modelo(mod_nombre))
-                
-            with st.container():
-                col_img, col_info = st.columns([1.2, 2.8])
-                with col_img:
-                    if img_path_local:
-                        try:
-                            imagen_pil = Image.open(img_path_local)
-                            mostrar_imagen(imagen_pil, caption=f"{mod_nombre} (Clic en la esquina para ampliar)")
-                        except Exception as e_img:
-                            st.info(f"🖼️ No se pudo abrir la imagen: {e_img}")
+        POR_PAGINA = 9
+        _paginas = max(1, -(-len(df_specs) // POR_PAGINA))
+        pagina = 1
+        if _paginas > 1:
+            pagina = st.number_input(f"Página (de {_paginas})", min_value=1, max_value=_paginas, value=1, step=1)
+        _pagina_df = df_specs.iloc[(pagina - 1) * POR_PAGINA: pagina * POR_PAGINA]
+        _filas = [r for _, r in _pagina_df.iterrows()]
+        for i in range(0, len(_filas), 3):
+            cols_cards = st.columns(3)
+            for col, fila in zip(cols_cards, _filas[i:i + 3]):
+                with col:
+                    _ruta_f = _idx_img.get(_clave_modelo(fila['Modelo']))
+                    st.markdown(tarjeta_equipo_html(fila, _ruta_f), unsafe_allow_html=True)
+                    _kb = f"amp_{pagina}_{_clave_modelo(fila['Modelo'])}"
+                    if _ruta_f:
+                        if _boton_ancho("🔍 Ampliar imagen", key=_kb):
+                            if _ventana_ampliada:
+                                _ventana_ampliada(fila.to_dict(), _ruta_f)
+                            else:
+                                _contenido_ampliado(fila.to_dict(), _ruta_f)
                     else:
-                        st.markdown(f"""
-                            <div style="background: #E5E7EB; border-radius: 8px; padding: 40px 10px; text-align: center; color: #6B7280; font-size: 13px;">
-                                📷 <b>Sin imagen cargada</b><br><small>Coloca '{mod_nombre}.jpg' en la carpeta <code>img_equipos/</code></small>
-                            </div>
-                        """, unsafe_allow_html=True)
-                        
-                with col_info:
-                    st.markdown(f"""
-                        <div style="background: #FFFFFF; border: 1px solid #E5E7EB; border-radius: 8px; padding: 18px 22px;">
-                            <h3 style="color: #003B5C; margin-top: 0; margin-bottom: 8px;">{mod_nombre}</h3>
-                            <p style="font-size: 13px; color: #E60012; font-weight: 700; text-transform: uppercase; margin-bottom: 12px;">{tipo_eq}</p>
-                            <ul style="list-style-type: none; padding-left: 0; margin: 0; line-height: 1.8; font-size: 14px;">
-                                <li>🚪 <b>Puertas:</b> {puertas}</li>
-                                <li>📦 <b>Capacidad:</b> {capacidad}</li>
-                                <li>📏 <b>Dimensiones (Al x An x Pr):</b> {dimensiones}</li>
-                                <li>⚖️ <b>Peso Aproximado:</b> {peso}</li>
-                                <li>⚡ <b>Voltaje / Eléctrico:</b> {voltaje}</li>
-                            </ul>
-                        </div>
-                    """, unsafe_allow_html=True)
-                st.markdown("<br>", unsafe_allow_html=True)
+                        _boton_ancho("📷 Sin imagen", key=_kb, disabled=True)
+                    st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
 # 4. INVENTARIO GENERAL Y BUSCADOR (SOLO ADMINISTRADORES)
 elif menu == "📊 Inventario General" and st.session_state['autenticado']:
-    st.subheader("Inventario Actual de Equipos")
+    render_banner("📊", "Inventario General", "Inventario actual de equipos.")
     
     df_con_dias = calcular_dias_sin_movimiento(df_inv)
     
@@ -1475,7 +1627,7 @@ elif menu == "📊 Inventario General" and st.session_state['autenticado']:
 
 # 5. SOLICITUDES (SOLO ADMINISTRADORES)
 elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
-    st.subheader("Registro de Solicitudes y Entregas de Equipos")
+    render_banner("📋", "Solicitudes", "Registro de solicitudes y entregas de equipos.")
     
     modo_solicitud = st.radio(
         "Selecciona una acción:", 
@@ -1846,7 +1998,7 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
 
 # 6. LEVANTAMIENTOS (SOLO ADMINISTRADORES)
 elif menu == "📝 Levantamientos" and st.session_state['autenticado']:
-    st.subheader("Gestión de Levantamientos (Equipos Recolectados)")
+    render_banner("📝", "Levantamientos", "Gestión de equipos recolectados.")
     
     modo_levantamiento = st.radio(
         "Selecciona una acción:", 
@@ -1940,7 +2092,7 @@ elif menu == "📝 Levantamientos" and st.session_state['autenticado']:
 
 # 7. REGISTRAR ENTRADA (SOLO ADMINISTRADORES)
 elif menu == "📥 Registrar Entrada" and st.session_state['autenticado']:
-    st.subheader("Registrar Entrada de Equipos")
+    render_banner("📥", "Registrar Entrada", "Entrada de equipos al inventario.")
     
     modo_entrada = st.radio(
         "Selecciona el método de entrada:",
@@ -2038,7 +2190,7 @@ elif menu == "📥 Registrar Entrada" and st.session_state['autenticado']:
 
 # 8. REGISTRAR SALIDA (SOLO ADMINISTRADORES)
 elif menu == "📤 Registrar Salida" and st.session_state['autenticado']:
-    st.subheader("Salida de Equipos del Inventario")
+    render_banner("📤", "Registrar Salida", "Salida de equipos del inventario.")
     
     serie_buscar = st.text_input("Escriba la serie del equipo para dar salida:").strip()
     
@@ -2080,7 +2232,7 @@ elif menu == "📤 Registrar Salida" and st.session_state['autenticado']:
 
 # 9. EDITAR / ELIMINAR EQUIPO (SOLO ADMINISTRADORES)
 elif menu == "✏️ Editar / Eliminar" and st.session_state['autenticado']:
-    st.subheader("Gestión, Corrección y Depuración de Equipos")
+    render_banner("✏️", "Editar / Eliminar", "Corrección y depuración de equipos.")
     
     serie_edit = st.text_input("🔍 Ingrese la serie del equipo a editar o eliminar:").strip()
     
@@ -2146,7 +2298,7 @@ elif menu == "✏️ Editar / Eliminar" and st.session_state['autenticado']:
 
 # 10. HISTORIAL DE MOVIMIENTOS (SOLO ADMINISTRADORES)
 elif menu == "📜 Historial de Movimientos" and st.session_state['autenticado']:
-    st.subheader("Bitácora de Entradas, Salidas y Cambios de Ubicación")
+    render_banner("📜", "Historial de Movimientos", "Bitácora de entradas, salidas y cambios de ubicación.")
     df_h = cargar_historial()
     if df_h.empty:
         st.info("ℹ️ Aún no hay movimientos registrados en la bitácora.")
@@ -2157,7 +2309,7 @@ elif menu == "📜 Historial de Movimientos" and st.session_state['autenticado']
 
 # 11. EXPORTAR A EXCEL (SOLO ADMINISTRADORES)
 elif menu == "💾 Exportar a Excel" and st.session_state['autenticado']:
-    st.subheader("Exportar e Importar Base de Datos Completa")
+    render_banner("💾", "Exportar a Excel", "Exportar e importar la base de datos completa.")
     
     sub_pestana = st.radio("Selecciona una opción:", ["📥 Exportar a Excel", "📂 Importar Base de Datos Completa"], horizontal=True)
     st.markdown("---")
