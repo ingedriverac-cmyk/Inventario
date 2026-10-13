@@ -268,6 +268,7 @@ st.markdown("""
     [data-baseweb="select"] div, [data-baseweb="select"] span, [data-baseweb="tag"] span,
     ul[role="listbox"] li { text-transform: uppercase; }
     [data-testid="stMetricValue"] { text-transform: uppercase; }
+    [data-testid="stSidebar"] .stTextInput input { text-transform: none !important; }
 
     /* Contenedores */
     [data-testid="stExpander"] { background: #FFFFFF; border: 1px solid var(--borde); border-radius: 8px; }
@@ -700,6 +701,8 @@ def _preparar_db(url):
         con.execute(text('CREATE INDEX IF NOT EXISTS ix_solicitudes_serie ON solicitudes ("Serie")'))
         con.execute(text('CREATE INDEX IF NOT EXISTS ix_levantamientos_serie ON levantamientos ("Serie")'))
         con.execute(text('CREATE INDEX IF NOT EXISTS ix_historial_serie ON historial ("Serie")'))
+        con.execute(text("CREATE TABLE IF NOT EXISTS imagenes_modelos (clave TEXT PRIMARY KEY, nombre TEXT, "
+                         "contenido BYTEA, actualizado TIMESTAMP DEFAULT now())"))
     return eng
 
 def _motor():
@@ -760,7 +763,36 @@ def db_tabla(nombre):
 def db_resumen():
     from sqlalchemy import text
     with _motor().connect() as con:
-        return {t: con.execute(text(f"SELECT count(*) FROM {t}")).scalar() for t in _tablas_db()}
+        res = {t: con.execute(text(f"SELECT count(*) FROM {t}")).scalar() for t in _tablas_db()}
+        res["imagenes_modelos"] = con.execute(text("SELECT count(*) FROM imagenes_modelos")).scalar()
+        return res
+
+def guardar_imagen_db(modelo, jpeg_bytes):
+    """Guarda (o reemplaza) la imagen de un modelo de forma permanente en la base de datos."""
+    import psycopg2
+    with _Transaccion("imagenes_modelos") as cur:
+        cur.execute(
+            "INSERT INTO imagenes_modelos (clave, nombre, contenido, actualizado) VALUES (%s, %s, %s, now()) "
+            "ON CONFLICT (clave) DO UPDATE SET nombre = EXCLUDED.nombre, contenido = EXCLUDED.contenido, actualizado = now()",
+            (_clave_modelo(modelo), _nombre_archivo_modelo(modelo), psycopg2.Binary(jpeg_bytes)))
+    _invalidar_tabla("imagenes_modelos")
+
+@st.cache_resource(show_spinner=False)
+def _restaurar_imagenes(version):
+    """Copia a la carpeta img_equipos las imágenes guardadas en la base de datos que falten en el servidor.
+    Se ejecuta al iniciar la app (Streamlit Cloud borra los archivos del servidor al reiniciarse)."""
+    from sqlalchemy import text
+    os.makedirs(IMG_DIR, exist_ok=True)
+    with _motor().connect() as con:
+        nombres = [r[0] for r in con.execute(text("SELECT nombre FROM imagenes_modelos")).fetchall()]
+        faltan = [n for n in nombres if not os.path.exists(os.path.join(IMG_DIR, n))]
+        for i in range(0, len(faltan), 20):
+            for nombre, contenido in con.execute(
+                    text("SELECT nombre, contenido FROM imagenes_modelos WHERE nombre = ANY(:n)"),
+                    {"n": faltan[i:i + 20]}).fetchall():
+                with open(os.path.join(IMG_DIR, nombre), "wb") as f:
+                    f.write(bytes(contenido))
+    return len(faltan)
 
 class _Transaccion:
     """Transacción con bloqueo por tabla: dos usuarios guardando a la vez se ponen en fila."""
@@ -970,12 +1002,20 @@ def _clave_modelo(texto):
 
 def indice_imagenes():
     """Devuelve {clave_modelo: ruta} leyendo img_equipos/ (ignora mayúsculas y extensión)."""
+    if db_activa():
+        try:
+            _restaurar_imagenes(_versiones_tablas().get("imagenes_modelos", 0))
+        except Exception:
+            pass
     indice = {}
     if os.path.isdir(IMG_DIR):
         for nombre in sorted(os.listdir(IMG_DIR)):
             base, ext = os.path.splitext(nombre)
             if ext.lower() in EXTENSIONES_IMG:
-                indice[_clave_modelo(base)] = os.path.join(IMG_DIR, nombre)
+                ruta = os.path.join(IMG_DIR, nombre)
+                k = _clave_modelo(base)
+                if k not in indice or os.path.getmtime(ruta) >= os.path.getmtime(indice[k]):
+                    indice[k] = ruta
     return indice
 
 def _nombre_archivo_modelo(modelo):
@@ -996,6 +1036,11 @@ def guardar_imagen_local(jpeg_bytes, modelo):
     os.makedirs(IMG_DIR, exist_ok=True)
     with open(os.path.join(IMG_DIR, _nombre_archivo_modelo(modelo)), "wb") as f:
         f.write(jpeg_bytes)
+    if db_activa():
+        try:
+            guardar_imagen_db(modelo, jpeg_bytes)
+        except Exception as e:
+            raise RuntimeError(f"No se pudo guardar la imagen en la base de datos: {type(e).__name__}")
 
 @st.cache_data(show_spinner=False)
 def _miniatura_b64(ruta, mtime):
@@ -1763,7 +1808,10 @@ elif menu == "Catálogo de Equipos":
                 st.write(f"{len(reconocidos)} coinciden con un modelo del catálogo.")
                 if sin_match:
                     st.warning("Sin modelo coincidente (revisa el nombre): " + ", ".join(sin_match))
-                st.info("Lo que se sube aquí es temporal en Streamlit Cloud (se pierde al reiniciar). Para que sea permanente, copia las imágenes a la carpeta img_equipos/ del repositorio.")
+                if db_activa():
+                    st.info("Las imágenes que subas aquí se guardan de forma permanente en la base de datos.")
+                else:
+                    st.info("Lo que se sube aquí es temporal en Streamlit Cloud (se pierde al reiniciar). Para que sea permanente, copia las imágenes a la carpeta img_equipos/ del repositorio.")
                 if reconocidos and st.button(":material/save: Guardar imágenes"):
                     try:
                         with st.spinner("Procesando imágenes..."):
@@ -2653,7 +2701,7 @@ elif menu == "Exportar a Excel" and st.session_state['autenticado']:
         try:
             _res_db = db_resumen()
             st.success("Base de datos conectada (PostgreSQL). Registros guardados: " +
-                       " | ".join(f"{k.capitalize()}: {v:,}" for k, v in _res_db.items()))
+                       " | ".join(f"{ {'imagenes_modelos': 'Imágenes'}.get(k, k.capitalize()) }: {v:,}" for k, v in _res_db.items()))
         except Exception as e_db:
             st.error(f"No se pudo consultar la base de datos: {type(e_db).__name__}")
     else:
