@@ -25,7 +25,7 @@ from PIL import Image
 # Configuración de la página y diseño estético
 st.set_page_config(
     page_title="Control de Inventario - Bepensa / Coca-Cola",
-    page_icon="❄️",
+    page_icon=":material/ac_unit:",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -227,6 +227,19 @@ st.markdown("""
     .page-hero p { color: #FFF4E5 !important; margin: 0; font-size: 1rem; text-shadow: 0 1px 2px rgba(0,0,0,.12); }
     .page-hero .ph-date { position: relative; z-index: 1; background: rgba(255,255,255,.22); color: #FFFFFF;
         font-size: .85rem; font-weight: 600; padding: 6px 14px; border-radius: 999px; white-space: nowrap; }
+    .page-hero .ph-left { position: relative; z-index: 1; display: flex; align-items: center; gap: 16px; }
+    .page-hero .ph-ic { width: 46px; height: 46px; border-radius: 12px; background: rgba(255,255,255,.22);
+        display: flex; align-items: center; justify-content: center; color: #FFFFFF; flex: none; }
+    .page-hero .ph-date { display: inline-flex; align-items: center; gap: 7px; }
+    .sp-tile .k { display: flex; align-items: center; gap: 6px; }
+    .sp-tile .k svg { width: 15px; height: 15px; flex: none; color: #6B7280; }
+    .sp-noimg svg { width: 36px; height: 36px; display: block; margin: 0 auto 8px auto; color: #9CA3AF; }
+    [data-testid="stDialog"] [data-testid="stImage"], [role="dialog"] [data-testid="stImage"] { display: flex; justify-content: center; }
+    [data-testid="stDialog"] [data-testid="stFullScreenFrame"], [role="dialog"] [data-testid="stFullScreenFrame"] { width: 100%; display: flex; justify-content: center; }
+    [data-testid="stDialog"] [data-testid="stImage"], [role="dialog"] [data-testid="stImage"] { width: 100%; }
+    [data-testid="stDialog"] [data-testid="stImageContainer"], [role="dialog"] [data-testid="stImageContainer"] { width: auto !important; max-width: 100%; }
+    [data-testid="stDialog"] [data-testid="stImage"] img, [role="dialog"] [data-testid="stImage"] img { max-height: 52vh; width: auto !important;
+        max-width: 100%; object-fit: contain; border-radius: 10px; }
     .sp-count { color: var(--texto-sec); font-size: .9rem; margin: 4px 0 14px 0; }
     .sp-count b { color: var(--azul); }
     .sp-card { background: #FFFFFF; border: 1px solid var(--borde); border-radius: 14px; overflow: hidden;
@@ -248,6 +261,13 @@ st.markdown("""
     .sp-tile.full { grid-column: 1 / -1; }
     .sp-tile .k { font-size: .68rem; font-weight: 600; color: var(--texto-sec); text-transform: uppercase; letter-spacing: .04em; }
     .sp-tile .v { font-size: .98rem; font-weight: 700; color: var(--texto); margin-top: 1px; }
+
+    /* ===== Datos en MAYÚSCULAS (solo visual; títulos y descripciones se quedan igual) ===== */
+    .stTextInput input:not([type="password"]), .stTextArea textarea { text-transform: uppercase; }
+    .stTextInput input::placeholder, .stTextArea textarea::placeholder { text-transform: none; }
+    [data-baseweb="select"] div, [data-baseweb="select"] span, [data-baseweb="tag"] span,
+    ul[role="listbox"] li { text-transform: uppercase; }
+    [data-testid="stMetricValue"] { text-transform: uppercase; }
 
     /* Contenedores */
     [data-testid="stExpander"] { background: #FFFFFF; border: 1px solid var(--borde); border-radius: 8px; }
@@ -292,14 +312,88 @@ def render_kpi(etiqueta, valor, apoyo="", color="#003B5C"):
     )
 
 
+_ICONOS_SVG = {
+    "equipos": '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+    "estadia": '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+    "calendario": '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
+    "especificaciones": '<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
+    "inventario": '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
+    "solicitudes": '<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
+    "levantamientos": '<path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2"/><path d="M15 18H9"/><path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.624l-3.48-4.35A1 1 0 0 0 17.52 8H14"/><circle cx="17" cy="18" r="2"/><circle cx="7" cy="18" r="2"/>',
+    "entrada": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/>',
+    "salida": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/>',
+    "editar": '<path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"/><path d="m15 5 4 4"/>',
+    "historial": '<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>',
+    "exportar": '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/>',
+    "puerta": '<path d="M5 21V4a1 1 0 0 1 1-1h12a1 1 0 0 1 1 1v17"/><path d="M3 21h18"/><circle cx="15" cy="12" r=".6" fill="currentColor"/>',
+    "paquete": '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
+    "regla": '<path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/>',
+    "etiqueta": '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>',
+    "rayo": '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+    "imagen": '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+    "alerta": '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+}
+
+def svg_icono(nombre, px=16, trazo=1.75):
+    """Ícono de línea fina (SVG integrado) que toma el color del texto que lo rodea."""
+    return (f'<svg xmlns="http://www.w3.org/2000/svg" width="{px}" height="{px}" viewBox="0 0 24 24" fill="none" '
+            f'stroke="currentColor" stroke-width="{trazo}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+            f'{_ICONOS_SVG[nombre]}</svg>')
+
 def render_banner(icono, titulo, subtitulo=""):
     """Banner naranja de encabezado de cada apartado, con la fecha de la información a la derecha."""
     sub = f"<p>{subtitulo}</p>" if subtitulo else ""
     st.markdown(
-        f'<div class="page-hero"><div class="ph-txt"><h2>{icono} {titulo}</h2>{sub}</div>'
-        f'<div class="ph-date">📅 Información al {datetime.now().strftime("%d/%m/%Y")}</div></div>',
+        f'<div class="page-hero"><div class="ph-left"><div class="ph-ic">{svg_icono(icono, 24)}</div>'
+        f'<div class="ph-txt"><h2>{titulo}</h2>{sub}</div></div>'
+        f'<div class="ph-date">{svg_icono("calendario", 14)}Información al {datetime.now().strftime("%d/%m/%Y")}</div></div>',
         unsafe_allow_html=True
     )
+
+
+try:
+    from pandas.io.formats.style import Styler as _Styler
+except Exception:  # sin jinja2 no hay Styler
+    _Styler = None
+
+def _mayus_valor(v):
+    return v.upper() if isinstance(v, str) else v
+
+def mayus(obj):
+    """Devuelve la tabla (DataFrame o Styler) con sus textos en MAYÚSCULAS, solo para mostrarla.
+    No modifica los datos guardados ni los encabezados de columna."""
+    try:
+        if _Styler is not None and isinstance(obj, _Styler):
+            cols = [c for c in obj.data.columns
+                    if obj.data[c].dtype == object or pd.api.types.is_string_dtype(obj.data[c])]
+            return obj.format(_mayus_valor, subset=cols) if cols else obj
+        if isinstance(obj, pd.DataFrame):
+            d = obj.copy()
+            for c in d.columns:
+                if d[c].dtype == object or pd.api.types.is_string_dtype(d[c]):
+                    d[c] = d[c].map(_mayus_valor)
+            return d
+    except Exception:
+        pass
+    return obj
+
+LIMITE_FILAS_CON_COLOR = 2000
+
+def mostrar_tabla(data, *args, **kwargs):
+    # Pintar de colores miles de filas hace lento el navegador: en tablas grandes se muestra sin colores
+    if _Styler is not None and isinstance(data, _Styler) and len(data.data) > LIMITE_FILAS_CON_COLOR:
+        data = data.data
+        st.caption(f"Tabla grande ({len(data):,} filas): se muestra sin colores para que cargue más rápido. Usa los filtros para ver menos filas con colores.")
+    return st.dataframe(mayus(data), *args, **kwargs)
+
+def _fig_mayus(fig, atributos=("x", "y", "labels")):
+    """Pone en MAYÚSCULAS las etiquetas de datos de una gráfica (categorías, modelos, ubicaciones)."""
+    for tr in fig.data:
+        for a in atributos:
+            vals = getattr(tr, a, None)
+            if vals is not None and len(vals) and all(isinstance(v, str) for v in vals):
+                setattr(tr, a, [v.upper() for v in vals])
+    return fig
 
 
 def porcentaje_texto(parte, total, sufijo="del total"):
@@ -343,7 +437,7 @@ def grafica_estadia(df, eje, titulo, umbral=UMBRAL_ALERTA_DIAS):
     maximo = max(float(d['Promedio de Días'].max()), float(umbral))
     fig.update_xaxes(range=[0, maximo * 1.2], showgrid=True, gridcolor="#E5E7EB", zeroline=False, title=None)
     fig.update_yaxes(title=None, automargin=True)
-    return _estilo_grafica(fig, titulo, max(300, 46 * len(d) + 120))
+    return _estilo_grafica(_fig_mayus(fig, ('y',)), titulo, max(300, 46 * len(d) + 120))
 
 
 def mostrar_grafica_estadia(df, eje, titulo):
@@ -371,7 +465,7 @@ def grafica_barras_conteo(df, columna, titulo, mapa_color=None, top=None):
     fig.update_xaxes(showgrid=True, gridcolor="#E5E7EB", zeroline=False, title=None,
                      range=[0, max(int(c.max()), 1) * 1.18] if len(c) else None)
     fig.update_yaxes(title=None, automargin=True)
-    return _estilo_grafica(fig, titulo, max(300, 44 * len(c) + 110))
+    return _estilo_grafica(_fig_mayus(fig, ('y',)), titulo, max(300, 44 * len(c) + 110))
 
 
 def grafica_dona(df, columna, titulo, mapa_color=None):
@@ -381,6 +475,7 @@ def grafica_dona(df, columna, titulo, mapa_color=None):
                  color=columna, color_discrete_map=mapa_color or {})
     fig.update_traces(textinfo="percent", sort=False,
                       hovertemplate="<b>%{label}</b><br>%{value} equipos (%{percent})<extra></extra>")
+    _fig_mayus(fig, ('labels',))
     _estilo_grafica(fig, titulo, 340)
     fig.update_layout(showlegend=True, legend=dict(orientation="v", y=0.5, x=1.0))
     fig.add_annotation(text=f"<b>{int(conteo['Cantidad'].sum()):,}</b><br>equipos", showarrow=False,
@@ -497,14 +592,6 @@ OPCIONES_CANALES_SOL = [
     "Tradicional", "Moderno", "AP20L", "PostMix", "Vending", "HoReCa", "Cedis", "Uso Interno", "Eventos Especiales", "Otro"
 ]
 
-ICONOS_CANALES = {
-    "Tradicional": "🛒",
-    "Moderno": "🏬",
-    "AP20L": "📦",
-    "PostMix": "🥤",
-    "Vending": "🤖",
-    "HoReCa": "🏨"
-}
 
 TIPOS_EQUIPO = [
     "Enfriador",
@@ -572,48 +659,262 @@ def limpiar_y_mapear_columnas(df, esquema_objetivo):
             df_L[col] = ""
     return df_L[esquema_objetivo]
 
-def cargar_datos():
+# =====================================================================
+# BASE DE DATOS (PostgreSQL en Neon)
+# Si en Secrets existe DATABASE_URL, todos los datos viven en la base de datos.
+# Si no existe, la app sigue funcionando con los archivos de siempre.
+# =====================================================================
+DATABASE_URL = _leer_secreto("DATABASE_URL", "")
+COLUMNAS_HISTORIAL = ["Fecha_Hora", "Usuario", "Serie", "Modelo", "Tipo_Movimiento", "Detalles"]
+
+def db_activa():
+    return bool(str(DATABASE_URL).strip())
+
+def _tablas_db():
+    return {"inventario": ESQUEMA_COLUMNAS, "solicitudes": COLUMNAS_SOLICITUDES,
+            "levantamientos": COLUMNAS_LEVANTAMIENTOS, "historial": COLUMNAS_HISTORIAL,
+            "especificaciones": COLUMNAS_ESPECIFICACIONES}
+
+@st.cache_resource(show_spinner=False)
+def _motor_db(url):
+    from sqlalchemy import create_engine
+    u = str(url).strip()
+    for pref in ("postgresql://", "postgres://"):
+        if u.startswith(pref):
+            u = "postgresql+psycopg2://" + u[len(pref):]
+            break
+    return create_engine(u, pool_pre_ping=True, pool_size=4, max_overflow=4, pool_recycle=240,
+                         connect_args={"connect_timeout": 20})
+
+@st.cache_resource(show_spinner=False)
+def _preparar_db(url):
+    """Crea las tablas e índices la primera vez (no toca datos existentes)."""
+    from sqlalchemy import text
+    eng = _motor_db(url)
+    with eng.begin() as con:
+        con.execute(text("SELECT pg_advisory_xact_lock(7001)"))
+        for nombre, cols in _tablas_db().items():
+            defs = ", ".join(f'"{c}" TEXT' for c in cols)
+            con.execute(text(f"CREATE TABLE IF NOT EXISTS {nombre} (id BIGSERIAL PRIMARY KEY, {defs})"))
+        con.execute(text('CREATE UNIQUE INDEX IF NOT EXISTS ux_inventario_serie ON inventario ("Serie")'))
+        con.execute(text('CREATE INDEX IF NOT EXISTS ix_solicitudes_serie ON solicitudes ("Serie")'))
+        con.execute(text('CREATE INDEX IF NOT EXISTS ix_levantamientos_serie ON levantamientos ("Serie")'))
+        con.execute(text('CREATE INDEX IF NOT EXISTS ix_historial_serie ON historial ("Serie")'))
+    return eng
+
+def _motor():
+    return _preparar_db(DATABASE_URL)
+
+def _error_db(e):
+    st.error("No se pudo conectar con la base de datos. Revisa DATABASE_URL en Secrets o intenta de nuevo en unos segundos.")
+    st.caption(f"Detalle técnico: {type(e).__name__}: {str(e).splitlines()[0][:180] if str(e) else ''}")
+    st.stop()
+
+@st.cache_resource(show_spinner=False)
+def _versiones_tablas():
+    return {}
+
+def _invalidar_tabla(nombre):
+    v = _versiones_tablas()
+    v[nombre] = v.get(nombre, 0) + 1
+
+def _valor_db(v):
+    if v is None:
+        return None
+    try:
+        if pd.isna(v):
+            return None
+    except (TypeError, ValueError):
+        pass
+    t = str(v)
+    return t if t != "" else None
+
+def _filas_norm(df, columnas):
+    if df is None or len(df) == 0:
+        return []
+    d = df.reindex(columns=columnas)
+    return [tuple(_valor_db(v) for v in fila) for fila in d.itertuples(index=False, name=None)]
+
+def _filas_a_df(filas, columnas):
+    if not filas:
+        return pd.DataFrame(columns=columnas)
+    df = pd.DataFrame([list(f) for f in filas], columns=columnas, dtype=object)
+    faltantes = df.isna()
+    return df.astype(str).mask(faltantes, float("nan"))
+
+@st.cache_data(ttl=120, max_entries=40, show_spinner=False)
+def _tabla_cacheada(nombre, version, columnas):
+    from sqlalchemy import text
+    cols = ", ".join(f'"{c}"' for c in columnas)
+    with _motor().connect() as con:
+        filas = con.execute(text(f"SELECT {cols} FROM {nombre} ORDER BY id")).fetchall()
+    return _filas_a_df(filas, list(columnas))
+
+def db_tabla(nombre):
+    """Lee una tabla (con caché; se renueva sola al guardar cualquier cambio)."""
+    try:
+        return _tabla_cacheada(nombre, _versiones_tablas().get(nombre, 0), tuple(_tablas_db()[nombre]))
+    except Exception as e:
+        _error_db(e)
+
+def db_resumen():
+    from sqlalchemy import text
+    with _motor().connect() as con:
+        return {t: con.execute(text(f"SELECT count(*) FROM {t}")).scalar() for t in _tablas_db()}
+
+class _Transaccion:
+    """Transacción con bloqueo por tabla: dos usuarios guardando a la vez se ponen en fila."""
+    def __init__(self, nombre):
+        self.nombre = nombre
+    def __enter__(self):
+        from sqlalchemy import text
+        self._cm = _motor().begin()
+        con = self._cm.__enter__()
+        con.execute(text("SELECT pg_advisory_xact_lock(hashtext(:n))"), {"n": self.nombre})
+        self.cur = con.connection.cursor()
+        return self.cur
+    def __exit__(self, tipo, valor, tb):
+        try:
+            self.cur.close()
+        finally:
+            return self._cm.__exit__(tipo, valor, tb)
+
+def _insertar_filas(cur, nombre, columnas, filas):
+    if not filas:
+        return
+    from psycopg2.extras import execute_values
+    cols = ", ".join(f'"{c}"' for c in columnas)
+    execute_values(cur, f"INSERT INTO {nombre} ({cols}) VALUES %s", filas, page_size=1000)
+
+def _actualizar_filas(cur, nombre, columnas, pares):
+    if not pares:
+        return
+    from psycopg2.extras import execute_values
+    sets = ", ".join(f'"{c}" = v."{c}"' for c in columnas)
+    alias = ", ".join(["id"] + [f'"{c}"' for c in columnas])
+    execute_values(cur, f"UPDATE {nombre} AS t SET {sets} FROM (VALUES %s) AS v({alias}) WHERE t.id = v.id",
+                   [(i,) + f for i, f in pares], page_size=500)
+
+def _borrar_ids(cur, nombre, ids):
+    if ids:
+        cur.execute(f"DELETE FROM {nombre} WHERE id = ANY(%s)", (list(ids),))
+
+def _leer_para_sync(cur, nombre, columnas):
+    cols = ", ".join(f'"{c}"' for c in columnas)
+    cur.execute(f"SELECT id, {cols} FROM {nombre} ORDER BY id")
+    return cur.fetchall()
+
+def _sincronizar_por_clave(nombre, df, columnas, clave):
+    """Guarda solo lo que cambió, identificando cada fila por su clave (p. ej. la Serie)."""
+    ic = columnas.index(clave)
+    nuevas = {}
+    for fila in _filas_norm(df, columnas):
+        if fila[ic] is not None:
+            nuevas[fila[ic]] = fila
+    with _Transaccion(nombre) as cur:
+        actuales = {r[1 + ic]: (r[0], tuple(r[1:])) for r in _leer_para_sync(cur, nombre, columnas)}
+        borrar = [i for k, (i, _) in actuales.items() if k not in nuevas]
+        actualizar = [(actuales[k][0], f) for k, f in nuevas.items() if k in actuales and actuales[k][1] != f]
+        insertar = [f for k, f in nuevas.items() if k not in actuales]
+        _borrar_ids(cur, nombre, borrar)
+        _actualizar_filas(cur, nombre, columnas, actualizar)
+        _insertar_filas(cur, nombre, columnas, insertar)
+    _invalidar_tabla(nombre)
+
+def _sincronizar_por_posicion(nombre, df, columnas):
+    """
+    Para tablas sin clave única (solicitudes, levantamientos...). Compara la tabla actual con la nueva
+    y aplica solo la diferencia: filas agregadas al final, filas borradas o filas editadas.
+    Si el cambio es más complejo, reemplaza la tabla completa dentro de una sola transacción.
+    """
+    nuevas = _filas_norm(df, columnas)
+    with _Transaccion(nombre) as cur:
+        filas_db = _leer_para_sync(cur, nombre, columnas)
+        ids = [r[0] for r in filas_db]
+        viejas = [tuple(r[1:]) for r in filas_db]
+        n, m = len(viejas), len(nuevas)
+        lim = min(n, m)
+        p = 0
+        while p < lim and viejas[p] == nuevas[p]:
+            p += 1
+        s_ = 0
+        while s_ < lim - p and viejas[n - 1 - s_] == nuevas[m - 1 - s_]:
+            s_ += 1
+        lo, ln = n - p - s_, m - p - s_
+        if lo == 0 and ln == 0:
+            pass
+        elif ln == 0:
+            _borrar_ids(cur, nombre, ids[p:n - s_])
+        elif lo == 0 and s_ == 0:
+            _insertar_filas(cur, nombre, columnas, nuevas[p:])
+        elif lo == ln:
+            pares = [(ids[p + k], nuevas[p + k]) for k in range(lo) if viejas[p + k] != nuevas[p + k]]
+            _actualizar_filas(cur, nombre, columnas, pares)
+        else:
+            _borrar_ids(cur, nombre, ids)
+            _insertar_filas(cur, nombre, columnas, nuevas)
+    _invalidar_tabla(nombre)
+
+def _guardar_db(nombre, df, columnas, clave=None):
+    try:
+        if clave:
+            _sincronizar_por_clave(nombre, df, columnas, clave)
+        else:
+            _sincronizar_por_posicion(nombre, df, columnas)
+        return True
+    except Exception as e:
+        st.error(f"No se pudo guardar en la base de datos: {type(e).__name__}: {str(e).splitlines()[0][:200] if str(e) else ''}")
+        return False
+
+def _insertar_en_db(nombre, columnas, filas):
+    with _Transaccion(nombre) as cur:
+        _insertar_filas(cur, nombre, columnas, filas)
+    _invalidar_tabla(nombre)
+
+def _leer_inventario_archivos():
+    """Modo sin base de datos: Google Sheets y, si falla, el archivo CSV local."""
     try:
         response = requests.get(WEB_APP_URL, timeout=10)
         if response.status_code == 200:
             data = response.json()
             if data:
-                df = pd.DataFrame(data, dtype=str)
-            else:
-                df = pd.DataFrame(columns=ESQUEMA_COLUMNAS)
-        else:
-            df = pd.DataFrame(columns=ESQUEMA_COLUMNAS)
+                return pd.DataFrame(data, dtype=str)
+        return pd.DataFrame(columns=ESQUEMA_COLUMNAS)
     except Exception:
         if os.path.exists(INVENTARIO_FILE):
             try:
-                df = pd.read_csv(INVENTARIO_FILE, dtype=str)
+                return pd.read_csv(INVENTARIO_FILE, dtype=str)
             except Exception:
-                df = pd.DataFrame(columns=ESQUEMA_COLUMNAS)
-        else:
-            df = pd.DataFrame(columns=ESQUEMA_COLUMNAS)
-        
+                pass
+        return pd.DataFrame(columns=ESQUEMA_COLUMNAS)
+
+def _fecha_estricta(val):
+    val_s = str(val).strip()
+    if not val_s or val_s.lower() in ('nan', 'nat'):
+        return datetime.now().strftime("%Y-%m-%d")
+    dt_parsed = pd.to_datetime(val_s, errors='coerce')
+    if not pd.isna(dt_parsed):
+        return dt_parsed.strftime("%Y-%m-%d")
+    return val_s[:10]
+
+def limpiar_fechas_movimiento(serie):
+    """Normaliza las fechas a AAAA-MM-DD (vacías = hoy). Versión vectorizada: miles de filas en milisegundos."""
+    f = serie.astype(str).str.strip()
+    vacio = f.str.lower().isin(["", "nan", "nat"])
+    try:
+        parsed = pd.to_datetime(f, errors="coerce", format="mixed")
+        res = parsed.dt.strftime("%Y-%m-%d").where(parsed.notna(), f.str[:10])
+        res = res.where(~vacio, datetime.now().strftime("%Y-%m-%d"))
+        return res.astype(str)
+    except Exception:
+        return serie.apply(_fecha_estricta).astype(str)
+
+def cargar_datos():
+    df = db_tabla("inventario") if db_activa() else _leer_inventario_archivos()
     df = limpiar_y_mapear_columnas(df, ESQUEMA_COLUMNAS)
-
-    def limpiar_fecha_estricta(val):
-        val_s = str(val).strip()
-        if not val_s or val_s.lower() == 'nan' or val_s.lower() == 'nat':
-            return datetime.now().strftime("%Y-%m-%d")
-        
-        dt_parsed = pd.to_datetime(val_s, errors='coerce')
-        if not pd.isna(dt_parsed):
-            return dt_parsed.strftime("%Y-%m-%d")
-            
-        if re.match(r'^\d{4}-\d{2}-\d{2}$', val_s):
-            return val_s
-            
-        return val_s[:10]
-
-    df["Ultimo_Movimiento"] = df["Ultimo_Movimiento"].apply(limpiar_fecha_estricta)
-    df["Ultimo_Movimiento"] = df["Ultimo_Movimiento"].astype(str)
-    
+    df["Ultimo_Movimiento"] = limpiar_fechas_movimiento(df["Ultimo_Movimiento"])
     if not df.empty and 'Serie' in df.columns:
         df = df.drop_duplicates(subset=['Serie'], keep='last').reset_index(drop=True)
-        
     return df
 
 COLUMNAS_ESPECIFICACIONES = ['Modelo', 'Tipo', 'Marca', 'Puertas', 'Capacidad (Litros)',
@@ -631,6 +932,10 @@ def normalizar_especificaciones(df):
     return df[COLUMNAS_ESPECIFICACIONES].fillna("")
 
 def cargar_especificaciones():
+    if db_activa():
+        df_db = db_tabla("especificaciones")
+        if not df_db.empty:
+            return normalizar_especificaciones(df_db)
     if os.path.exists(ESPECIFICACIONES_FILE):
         try:
             return normalizar_especificaciones(pd.read_csv(ESPECIFICACIONES_FILE, dtype=str))
@@ -645,11 +950,13 @@ def cargar_especificaciones():
     ]))
 
 def guardar_especificaciones(df_specs):
+    if db_activa():
+        return _guardar_db("especificaciones", normalizar_especificaciones(df_specs), COLUMNAS_ESPECIFICACIONES)
     try:
         df_specs.to_csv(ESPECIFICACIONES_FILE, index=False)
         return True
     except PermissionError:
-        st.error(f"⚠️ Error de permiso: El archivo '{ESPECIFICACIONES_FILE}' está abierto en Excel.")
+        st.error(f"Error de permiso: El archivo '{ESPECIFICACIONES_FILE}' está abierto en Excel.")
         return False
 
 # --- IMÁGENES DE EQUIPOS (una por modelo, carpeta img_equipos/) ---
@@ -701,18 +1008,18 @@ def _miniatura_b64(ruta, mtime):
 
 def _esc(valor):
     texto = str(valor).strip()
-    return _html.escape(texto) if texto and texto.lower() != "nan" else "—"
+    return _html.escape(texto.upper()) if texto and texto.lower() != "nan" else "—"
 
 def _tiles_html(row):
     cap = str(row.get("Capacidad (Litros)", ""))
     unidad = " L" if re.fullmatch(r"\s*\d+([.,]\d+)?\s*", cap) else ""
     return (
         '<div class="sp-tiles">'
-        f'<div class="sp-tile"><div class="k">🚪 Puertas</div><div class="v">{_esc(row.get("Puertas",""))}</div></div>'
-        f'<div class="sp-tile"><div class="k">📦 Capacidad</div><div class="v">{_esc(cap)}{unidad}</div></div>'
-        f'<div class="sp-tile full"><div class="k">📏 Dimensiones (Al x An x Pr)</div><div class="v">{_esc(row.get("Dimensiones (Al x An x Pr)",""))}</div></div>'
-        f'<div class="sp-tile"><div class="k">🏷️ Marca</div><div class="v">{_esc(row.get("Marca",""))}</div></div>'
-        f'<div class="sp-tile"><div class="k">⚡ Consumo de Energía</div><div class="v">{_esc(row.get("Consumo de Energía",""))}</div></div>'
+        f'<div class="sp-tile"><div class="k">{svg_icono("puerta")}Puertas</div><div class="v">{_esc(row.get("Puertas",""))}</div></div>'
+        f'<div class="sp-tile"><div class="k">{svg_icono("paquete")}Capacidad</div><div class="v">{_esc(cap)}{unidad}</div></div>'
+        f'<div class="sp-tile full"><div class="k">{svg_icono("regla")}Dimensiones (Al x An x Pr)</div><div class="v">{_esc(row.get("Dimensiones (Al x An x Pr)",""))}</div></div>'
+        f'<div class="sp-tile"><div class="k">{svg_icono("etiqueta")}Marca</div><div class="v">{_esc(row.get("Marca",""))}</div></div>'
+        f'<div class="sp-tile"><div class="k">{svg_icono("rayo")}Consumo de Energía</div><div class="v">{_esc(row.get("Consumo de Energía",""))}</div></div>'
         '</div>'
     )
 
@@ -722,9 +1029,9 @@ def tarjeta_equipo_html(row, ruta_img):
             b64 = _miniatura_b64(ruta_img, os.path.getmtime(ruta_img))
             zona_img = f'<img src="data:image/jpeg;base64,{b64}" alt="{_esc(row.get("Modelo",""))}">'
         except Exception:
-            zona_img = '<div class="sp-noimg"><span class="ic">⚠️</span>No se pudo abrir la imagen</div>'
+            zona_img = f'<div class="sp-noimg">{svg_icono("alerta")}No se pudo abrir la imagen</div>'
     else:
-        zona_img = '<div class="sp-noimg"><span class="ic">📷</span>Imagen no disponible</div>'
+        zona_img = f'<div class="sp-noimg">{svg_icono("imagen")}Imagen no disponible</div>'
     return (
         '<div class="sp-card">'
         f'<div class="sp-img">{zona_img}</div>'
@@ -745,16 +1052,16 @@ def _contenido_ampliado(row, ruta):
         img.thumbnail((1400, 1400))
         mostrar_imagen(img)
     except Exception as e_img:
-        st.info(f"🖼️ No se pudo abrir la imagen: {e_img}")
+        st.info(f"No se pudo abrir la imagen: {e_img}")
     st.markdown(_tiles_html(row), unsafe_allow_html=True)
 
 # st.dialog (Streamlit reciente) o st.experimental_dialog (versiones anteriores)
 _dialog_deco = getattr(st, "dialog", None) or getattr(st, "experimental_dialog", None)
 if _dialog_deco:
     try:
-        _ventana_ampliada = _dialog_deco("🔍 Vista ampliada", width="large")(_contenido_ampliado)
+        _ventana_ampliada = _dialog_deco("Vista ampliada", width="large")(_contenido_ampliado)
     except TypeError:
-        _ventana_ampliada = _dialog_deco("🔍 Vista ampliada")(_contenido_ampliado)
+        _ventana_ampliada = _dialog_deco("Vista ampliada")(_contenido_ampliado)
 else:
     _ventana_ampliada = None
 
@@ -777,7 +1084,9 @@ def mostrar_imagen(img, caption=None):
     st.image(img, caption=caption)
 
 def cargar_historial():
-    if os.path.exists(HISTORIAL_FILE):
+    if db_activa():
+        df_h = db_tabla("historial")
+    elif os.path.exists(HISTORIAL_FILE):
         try:
             df_h = pd.read_csv(HISTORIAL_FILE, dtype=str)
         except Exception:
@@ -788,29 +1097,17 @@ def cargar_historial():
     if "Usuario" not in df_h.columns:
         df_h["Usuario"] = "Sistema / Desconocido"
         
-    rutas = []
-    motivos = []
-    for idx, row in df_h.iterrows():
-        detalles = str(row.get('Detalles', ''))
-        match_ruta = re.search(r'Ruta:\s*([^\|]+)', detalles)
-        if match_ruta:
-            rutas.append(match_ruta.group(1).strip())
-        else:
-            rutas.append("")
-            
-        match_motivo = re.search(r'Motivo:\s*(.+)$', detalles)
-        if match_motivo:
-            motivos.append(match_motivo.group(1).strip())
-        else:
-            motivos.append("")
-            
-    df_h['Ruta'] = rutas
-    df_h['Motivo'] = motivos
-    
+    if "Detalles" not in df_h.columns:
+        df_h["Detalles"] = ""
+    det = df_h["Detalles"].fillna("").astype(str)
+    df_h["Ruta"] = det.str.extract(r"Ruta:\s*([^\|]+)", expand=False).fillna("").str.strip()
+    df_h["Motivo"] = det.str.extract(r"Motivo:\s*(.+)$", expand=False).fillna("").str.strip()
     return df_h
 
 def cargar_levantamientos():
-    if os.path.exists(LEVANTAMIENTOS_FILE):
+    if db_activa():
+        df_lev = db_tabla("levantamientos")
+    elif os.path.exists(LEVANTAMIENTOS_FILE):
         try:
             df_lev = pd.read_csv(LEVANTAMIENTOS_FILE, dtype=str)
         except Exception:
@@ -822,7 +1119,9 @@ def cargar_levantamientos():
     return df_lev
 
 def cargar_solicitudes():
-    if os.path.exists(SOLICITUDES_FILE):
+    if db_activa():
+        df_sol = db_tabla("solicitudes")
+    elif os.path.exists(SOLICITUDES_FILE):
         try:
             df_sol = pd.read_csv(SOLICITUDES_FILE, dtype=str)
         except Exception:
@@ -836,42 +1135,74 @@ def cargar_solicitudes():
 def guardar_datos(df):
     if not df.empty and 'Serie' in df.columns:
         df = df.drop_duplicates(subset=['Serie'], keep='last').reset_index(drop=True)
+    if db_activa():
+        _guardar_db("inventario", df, ESQUEMA_COLUMNAS, "Serie")
+        return
     try:
         df.to_csv(INVENTARIO_FILE, index=False)
     except PermissionError:
-        st.error(f"⚠️ Error de permiso: El archivo '{INVENTARIO_FILE}' está abierto en Excel u otro programa. Ciérralo para guardar.")
+        st.error(f"Error de permiso: El archivo '{INVENTARIO_FILE}' está abierto en Excel u otro programa. Ciérralo para guardar.")
         return
     try:
         records = df.to_dict(orient="records")
         requests.post(WEB_APP_URL, json=records, timeout=10)
     except Exception as e:
-        st.error(f"⚠️ Error al sincronizar con Google Sheets: {e}")
+        st.error(f"Error al sincronizar con Google Sheets: {e}")
+
+def guardar_levantamientos(df_lev):
+    if db_activa():
+        return _guardar_db("levantamientos", df_lev, COLUMNAS_LEVANTAMIENTOS)
+    try:
+        df_lev.to_csv(LEVANTAMIENTOS_FILE, index=False)
+        return True
+    except PermissionError:
+        st.error(f"Error: No se pudo guardar porque el archivo '{LEVANTAMIENTOS_FILE}' está abierto en Excel. Ciérralo para guardar.")
+        return False
 
 def guardar_solicitudes_seguro(df_sol):
+    if db_activa():
+        return _guardar_db("solicitudes", df_sol, COLUMNAS_SOLICITUDES)
     try:
         df_sol.to_csv(SOLICITUDES_FILE, index=False)
         return True
     except PermissionError:
-        st.error(f"⚠️ Error: No se pudo guardar porque el archivo '{SOLICITUDES_FILE}' está abierto en Excel. Por favor, ciérralo e inténtalo de nuevo.")
+        st.error(f"Error: No se pudo guardar porque el archivo '{SOLICITUDES_FILE}' está abierto en Excel. Por favor, ciérralo e inténtalo de nuevo.")
         return False
 
-def registrar_historial(serie, modelo, tipo_movimiento, detalles):
-    usuario_actual = st.session_state.get('usuario_actual', 'Sistema')
+def registrar_historial_lote(movimientos):
+    """movimientos: lista de (serie, modelo, tipo_movimiento, detalles). Se guardan todos de una sola vez."""
+    if not movimientos:
+        return
+    usuario_actual = str(st.session_state.get('usuario_actual', 'Sistema'))
+    ahora = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    filas = [(ahora, usuario_actual, str(se), str(mo), tm, de) for se, mo, tm, de in movimientos]
+    if db_activa():
+        try:
+            _insertar_en_db("historial", COLUMNAS_HISTORIAL, [tuple(_valor_db(v) for v in f) for f in filas])
+        except Exception as e:
+            st.error(f"No se pudo registrar el historial: {type(e).__name__}")
+        return
     df_h = cargar_historial()
-    nuevo_mov = pd.DataFrame([{
-        "Fecha_Hora": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        "Usuario": str(usuario_actual),
-        "Serie": str(serie),
-        "Modelo": str(modelo),
-        "Tipo_Movimiento": tipo_movimiento,
-        "Detalles": detalles
-    }])
-    df_h = pd.concat([df_h, nuevo_mov], ignore_index=True)
-    columnas_guardar = ["Fecha_Hora", "Usuario", "Serie", "Modelo", "Tipo_Movimiento", "Detalles"]
+    nuevos = pd.DataFrame(filas, columns=COLUMNAS_HISTORIAL)
+    df_h = pd.concat([df_h, nuevos], ignore_index=True)
     try:
-        df_h[columnas_guardar].to_csv(HISTORIAL_FILE, index=False)
+        df_h[COLUMNAS_HISTORIAL].to_csv(HISTORIAL_FILE, index=False)
     except PermissionError:
         pass
+
+def registrar_historial(serie, modelo, tipo_movimiento, detalles):
+    registrar_historial_lote([(serie, modelo, tipo_movimiento, detalles)])
+
+def guardar_historial(df_h):
+    """Reemplaza el historial completo (solo para importaciones)."""
+    if db_activa():
+        return _guardar_db("historial", df_h, COLUMNAS_HISTORIAL)
+    try:
+        df_h.reindex(columns=COLUMNAS_HISTORIAL).to_csv(HISTORIAL_FILE, index=False)
+        return True
+    except PermissionError:
+        st.error(f"Error: No se pudo guardar porque el archivo '{HISTORIAL_FILE}' está abierto en Excel.")
+        return False
 
 def calcular_dias_sin_movimiento(df):
     if df.empty:
@@ -936,18 +1267,18 @@ if st.session_state['autenticado']:
     menu = st.sidebar.radio(
         "Menú de Navegación",
         [
-            "📊 Inventario General",
-            "📦 Equipos Disponibles",
-            "📈 Estadía",
-            "📋 Solicitudes",
-            "📝 Levantamientos",
-            "📅 Solicitudes Diarias",
-            "📐 Catálogo de Equipos",
-            "📥 Registrar Entrada",
-            "📤 Registrar Salida",
-            "✏️ Editar / Eliminar",
-            "📜 Historial de Movimientos",
-            "💾 Exportar a Excel"
+            "Inventario General",
+            "Equipos Disponibles",
+            "Estadía",
+            "Solicitudes",
+            "Levantamientos",
+            "Solicitudes Diarias",
+            "Catálogo de Equipos",
+            "Registrar Entrada",
+            "Registrar Salida",
+            "Editar / Eliminar",
+            "Historial de Movimientos",
+            "Exportar a Excel"
         ],
         format_func=_etiqueta_menu,
         key="nav_admin",
@@ -966,8 +1297,8 @@ elif st.session_state['es_chofer']:
     menu = st.sidebar.radio(
         "Menú de Chofer",
         [
-            "📅 Solicitudes Diarias",
-            "📐 Catálogo de Equipos"
+            "Solicitudes Diarias",
+            "Catálogo de Equipos"
         ],
         format_func=_etiqueta_menu,
         key="nav_chofer",
@@ -985,10 +1316,10 @@ else:
     menu = st.sidebar.radio(
         "Menú de Navegación",
         [
-            "📦 Equipos Disponibles",
-            "📈 Estadía",
-            "📅 Solicitudes Diarias",
-            "📐 Catálogo de Equipos"
+            "Equipos Disponibles",
+            "Estadía",
+            "Solicitudes Diarias",
+            "Catálogo de Equipos"
         ],
         format_func=_etiqueta_menu,
         key="nav_publico",
@@ -1004,22 +1335,22 @@ else:
     
     if tipo_acceso == "Administrativo":
         with st.sidebar.form("form_login_admin"):
-            user_input = st.text_input("👤 Usuario Admin:").strip()
-            pass_input = st.text_input("🔑 Contraseña Admin:", type="password").strip()
+            user_input = st.text_input("Usuario Admin:").strip()
+            pass_input = st.text_input("Contraseña Admin:", type="password").strip()
             btn_login = st.form_submit_button("Iniciar Sesión Admin")
             
             if btn_login:
                 if _credencial_valida(USUARIOS_AUTORIZADOS, user_input, pass_input):
                     st.session_state['autenticado'] = True
                     st.session_state['usuario_actual'] = user_input
-                    st.success("✅ ¡Acceso administrativo concedido!")
+                    st.success("¡Acceso administrativo concedido!")
                     st.rerun()
                 else:
-                    st.error("❌ Usuario o contraseña incorrectos.")
+                    st.error("Usuario o contraseña incorrectos.")
     else:
         with st.sidebar.form("form_login_chofer"):
-            chofer_input = st.text_input("🚚 Usuario Chofer:").strip()
-            pass_chofer = st.text_input("🔑 Contraseña Chofer:", type="password").strip()
+            chofer_input = st.text_input("Usuario Chofer:").strip()
+            pass_chofer = st.text_input("Contraseña Chofer:", type="password").strip()
             btn_login_ch = st.form_submit_button("Iniciar Sesión Chofer")
             
             if btn_login_ch:
@@ -1027,10 +1358,10 @@ else:
                     st.session_state['es_chofer'] = True
                     st.session_state['nombre_chofer'] = chofer_input
                     st.session_state['usuario_actual'] = f"Chofer ({chofer_input})"
-                    st.success(f"✅ ¡Bienvenido, {chofer_input}!")
+                    st.success(f"¡Bienvenido, {chofer_input}!")
                     st.rerun()
                 else:
-                    st.error("❌ Usuario o contraseña de chofer incorrectos.")
+                    st.error("Usuario o contraseña de chofer incorrectos.")
 
 # Pie de página fijo al fondo de la barra lateral (Copyright)
 st.sidebar.markdown("<div style='flex-grow: 1;'></div>", unsafe_allow_html=True)
@@ -1046,14 +1377,14 @@ st.sidebar.markdown(
 )
 
 # 1. EQUIPOS DISPONIBLES (PÚBLICO Y PRIMERA OPCIÓN PARA GENERALES)
-if menu == "📦 Equipos Disponibles":
-    render_banner("📦", "Equipos Disponibles", "Equipos listos para distribución.")
+if menu == "Equipos Disponibles":
+    render_banner("equipos", "Equipos Disponibles", "Equipos listos para distribución.")
     
     canales_validos_kpi = [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
     
     opciones_disp_filtro = canales_validos_kpi
 
-    canal_disp_seleccionado = st.selectbox("🎯 Seleccione el Canal a visualizar:", opciones_disp_filtro)
+    canal_disp_seleccionado = st.selectbox("Seleccione el Canal a visualizar:", opciones_disp_filtro)
     st.markdown("---")
 
     if not df_inv.empty:
@@ -1080,7 +1411,7 @@ if menu == "📦 Equipos Disponibles":
                 
                 modelos_disp = ["Todos"] + sorted(df_c_disp['Modelo'].dropna().unique().tolist())
                 with f_col1:
-                    sel_modelo = st.selectbox(f"🧊 Filtrar Modelo ({c_d}):", modelos_disp, key=f"mod_{c_d}")
+                    sel_modelo = st.selectbox(f"Filtrar Modelo ({c_d}):", modelos_disp, key=f"mod_{c_d}")
                 
                 df_f1 = df_c_disp.copy()
                 if sel_modelo != "Todos":
@@ -1088,7 +1419,7 @@ if menu == "📦 Equipos Disponibles":
                 
                 imagenes_disp = ["Todos"] + sorted(df_f1['Imagen'].dropna().unique().tolist())
                 with f_col2:
-                    sel_imagen = st.selectbox(f"🖼️ Filtrar Imagen ({c_d}):", imagenes_disp, key=f"img_{c_d}")
+                    sel_imagen = st.selectbox(f"Filtrar Imagen ({c_d}):", imagenes_disp, key=f"img_{c_d}")
                 
                 df_f2 = df_f1.copy()
                 if sel_imagen != "Todos":
@@ -1096,7 +1427,7 @@ if menu == "📦 Equipos Disponibles":
                 
                 estatus_disp = ["Todos"] + sorted(df_f2['Estatus'].dropna().unique().tolist())
                 with f_col3:
-                    sel_estatus = st.selectbox(f"⚡ Filtrar Estatus ({c_d}):", estatus_disp, key=f"est_{c_d}")
+                    sel_estatus = st.selectbox(f"Filtrar Estatus ({c_d}):", estatus_disp, key=f"est_{c_d}")
                 
                 df_tabla_filtrada = df_f2.copy()
                 if sel_estatus != "Todos":
@@ -1132,33 +1463,38 @@ if menu == "📦 Equipos Disponibles":
             df_tabla_filtrada = dataframes_canales_filtrados.get(c_d, pd.DataFrame())
             if not df_tabla_filtrada.empty:
                 st.plotly_chart(grafica_barras_conteo(df_tabla_filtrada, 'Modelo', f"Equipos disponibles por modelo en {c_d}", top=12), use_container_width=True)
-                st.dataframe(df_tabla_filtrada.groupby(['Tipo', 'Modelo', 'Imagen', 'Estatus']).size().reset_index(name='Cantidad Disponible'), use_container_width=True, hide_index=True)
+                mostrar_tabla(df_tabla_filtrada.groupby(['Tipo', 'Modelo', 'Imagen', 'Estatus']).size().reset_index(name='Cantidad Disponible'), use_container_width=True, hide_index=True)
                 
                 # Desplegable exacto de series solo visible para administradores
                 if st.session_state.get('autenticado', False):
-                    with st.expander(f"🔍 Ver el listado exacto de Series de Equipos - Canal {c_d}"):
+                    with st.expander(f":material/search: Ver el listado exacto de Series de Equipos - Canal {c_d}"):
                         df_det_disp = df_tabla_filtrada[['Serie', 'Tipo', 'Modelo', 'Imagen', 'Ubicación', 'Estatus', 'Ultimo_Movimiento']].copy()
                         df_det_disp = df_det_disp.rename(columns={'Ultimo_Movimiento': 'Último Movimiento'})
                         df_det_disp_estilizado = df_det_disp.style.map(colorear_ubicaciones, subset=['Ubicación'])
-                        st.dataframe(df_det_disp_estilizado, use_container_width=True, hide_index=True)
+                        mostrar_tabla(df_det_disp_estilizado, use_container_width=True, hide_index=True)
             else:
-                st.info(f"ℹ️ No hay equipos disponibles que coincidan con los filtros seleccionados para {c_d}.")
+                st.info(f"No hay equipos disponibles que coincidan con los filtros seleccionados para {c_d}.")
     else:
-        st.info("ℹ️ No hay equipos disponibles en el inventario que cumplan con los criterios actuales.")
+        st.info("No hay equipos disponibles en el inventario que cumplan con los criterios actuales.")
 
 # 2. ESTADÍA (PÚBLICO)
-elif menu == "📈 Estadía":
+elif menu == "Estadía":
     if not df_inv.empty:
         st.markdown("### Mapa de saturación por ubicación")
         st.caption("Haz clic en un bloque para ver el detalle por canal, modelo e imagen.")
+        # Los valores vacíos se agrupan como "Sin dato" (un campo en blanco haría fallar el mapa)
+        df_tm = df_inv.copy()
+        for _c_tm in ['Ubicación', 'Canal', 'Modelo', 'Imagen']:
+            df_tm[_c_tm] = df_tm[_c_tm].fillna("").astype(str).str.strip().replace({"": "Sin dato", "nan": "Sin dato", "None": "Sin dato"})
         fig_treemap = px.treemap(
-            df_inv,
+            df_tm,
             path=['Ubicación', 'Canal', 'Modelo', 'Imagen'],
             color='Ubicación',
             color_discrete_map={**COLOR_UBICACION, "(?)": "#1965C1"},
             maxdepth=2
         )
         fig_treemap.update_traces(textinfo="label+value", root_color="#ECE5E1")
+        _fig_mayus(fig_treemap, ("labels",))
         fig_treemap.update_layout(
             margin=dict(t=20, l=0, r=0, b=0), height=460,
             paper_bgcolor="#ECE5E1", font=dict(family=FUENTE_GRAFICAS, size=13)
@@ -1166,11 +1502,11 @@ elif menu == "📈 Estadía":
         st.plotly_chart(fig_treemap, use_container_width=True)
         st.markdown("<br>", unsafe_allow_html=True)
 
-    render_banner("📈", "Estadía y Saturación", "Promedio de días sin movimiento y saturación de inventario. Las barras en <b>rojo</b> superan los <b>40 días</b>; las <b>ámbar</b> se acercan al límite.")
+    render_banner("estadia", "Estadía y Saturación", "Promedio de días sin movimiento y saturación de inventario. Las barras en <b>rojo</b> superan los <b>40 días</b>; las <b>ámbar</b> se acercan al límite.")
     st.markdown("---")
     
     opciones_estadia_filtro = [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
-    canal_estadia_seleccionado = st.selectbox("🎯 Seleccione el Canal a visualizar:", opciones_estadia_filtro)
+    canal_estadia_seleccionado = st.selectbox("Seleccione el Canal a visualizar:", opciones_estadia_filtro)
     st.markdown("---")
     
     df_con_dias = calcular_dias_sin_movimiento(df_inv)
@@ -1212,7 +1548,7 @@ elif menu == "📈 Estadía":
                 df_c_tabla = df_prom.copy()
                 df_c_tabla['Estado de Alerta'] = df_c_tabla['Promedio de Días'].apply(lambda x: "Alerta: supera los 40 días" if x > 40 else "Normal")
                 df_c_tabla['Promedio de Días'] = df_c_tabla['Promedio de Días'].round(1)
-                st.dataframe(df_c_tabla, use_container_width=True, hide_index=True, column_config=config_col_estadia(df_c_tabla))
+                mostrar_tabla(df_c_tabla, use_container_width=True, hide_index=True, column_config=config_col_estadia(df_c_tabla))
 
             elif st.session_state[key_btn_modelo]:
                 df_modelo_grafica = df_canal.groupby('Modelo')['Días sin movimiento'].mean().reset_index()
@@ -1232,32 +1568,32 @@ elif menu == "📈 Estadía":
                 df_m_tabla = df_modelo_imagen.copy()
                 df_m_tabla['Estado de Alerta'] = df_m_tabla['Promedio de Días'].apply(lambda x: "Alerta: supera los 40 días" if x > 40 else "Normal")
                 df_m_tabla['Promedio de Días'] = df_m_tabla['Promedio de Días'].round(1)
-                st.dataframe(df_m_tabla, use_container_width=True, hide_index=True, column_config=config_col_estadia(df_m_tabla))
+                mostrar_tabla(df_m_tabla, use_container_width=True, hide_index=True, column_config=config_col_estadia(df_m_tabla))
 
             if st.session_state.get('autenticado', False):
-                with st.expander(f"🔍 Ver el listado exacto de Series de Equipos - Canal {c_val}"):
+                with st.expander(f":material/search: Ver el listado exacto de Series de Equipos - Canal {c_val}"):
                     df_detalle_series = df_canal[['Serie', 'Tipo', 'Modelo', 'Imagen', 'Ubicación', 'Estatus', 'Días sin movimiento', 'Ultimo_Movimiento']].copy()
                     df_detalle_series['Días sin movimiento'] = pd.to_numeric(df_detalle_series['Días sin movimiento'], errors='coerce')
                     df_detalle_series = df_detalle_series.sort_values(by='Días sin movimiento', ascending=False)
                     df_detalle_series = df_detalle_series.rename(columns={'Ultimo_Movimiento': 'Último Movimiento'})
                     
                     df_series_estilizado = df_detalle_series.style.map(colorear_ubicaciones, subset=['Ubicación']).map(colorear_dias, subset=['Días sin movimiento'])
-                    st.dataframe(df_series_estilizado, use_container_width=True, hide_index=True)
+                    mostrar_tabla(df_series_estilizado, use_container_width=True, hide_index=True)
 
         else:
-            st.info(f"ℹ️ No hay equipos registrados para el Canal {c_val}.")
+            st.info(f"No hay equipos registrados para el Canal {c_val}.")
     else:
-        st.info("ℹ No hay datos suficientes en el inventario.")
+        st.info("No hay datos suficientes en el inventario.")
     
 # 3. SOLICITUDES DIARIAS (ADMINISTRADORES Y CHOFERES CON FILTRO Y EDICIÓN RÁPIDA)
-elif menu == "📅 Solicitudes Diarias":
-    render_banner("📅", "Solicitudes Diarias", "Seguimiento de solicitudes por fecha.")
+elif menu == "Solicitudes Diarias":
+    render_banner("calendario", "Solicitudes Diarias", "Seguimiento de solicitudes por fecha.")
     
     if st.session_state['es_chofer']:
         chofer_activo = st.session_state['nombre_chofer']
-        st.info(f"🚚 **Panel de Chofer ({chofer_activo}):** Se muestran exclusivamente las solicitudes asignadas a su nombre. Puede seleccionar una solicitud para actualizar su estatus y motivo.")
+        st.info(f"**Panel de Chofer ({chofer_activo}):** Se muestran exclusivamente las solicitudes asignadas a su nombre. Puede seleccionar una solicitud para actualizar su estatus y motivo.")
     elif st.session_state['autenticado']:
-        st.info(f"🔓 **Panel de Administrador:** Puede visualizar cualquier solicitud del día y actualizar su estatus o motivo directamente.")
+        st.info(f"**Panel de Administrador:** Puede visualizar cualquier solicitud del día y actualizar su estatus o motivo directamente.")
     
     st.markdown("---")
     
@@ -1285,21 +1621,21 @@ elif menu == "📅 Solicitudes Diarias":
 
         col_f1, col_f2, col_f3 = st.columns(3)
         with col_f1:
-            fecha_consulta = st.date_input("📅 Seleccione la Fecha:", value=date.today(), key="input_fecha_sol_diarias")
+            fecha_consulta = st.date_input("Seleccione la Fecha:", value=date.today(), key="input_fecha_sol_diarias")
         
         fecha_consulta_str = fecha_consulta.strftime("%Y-%m-%d")
         df_filtradas_dia = df_base_consulta[df_base_consulta['Fecha_Entregado_Limpia'] == fecha_consulta_str].copy()
         
         canales_disponibles = ["Todos"] + sorted(df_filtradas_dia['Canal'].dropna().unique().tolist()) if not df_filtradas_dia.empty else ["Todos"]
         with col_f2:
-            filtro_canal_dia = st.selectbox("🏬 Filtrar por Canal:", canales_disponibles, key="filtro_canal_sol_diarias")
+            filtro_canal_dia = st.selectbox("Filtrar por Canal:", canales_disponibles, key="filtro_canal_sol_diarias")
         
         if filtro_canal_dia != "Todos":
             df_filtradas_dia = df_filtradas_dia[df_filtradas_dia['Canal'] == filtro_canal_dia]
             
         jefes_disponibles = ["Todos"] + sorted(df_filtradas_dia['Jefe_de_Venta'].dropna().unique().tolist()) if not df_filtradas_dia.empty else ["Todos"]
         with col_f3:
-            filtro_jefe_dia = st.selectbox("👤 Filtrar por Jefe de Venta:", jefes_disponibles, key="filtro_jefe_sol_diarias")
+            filtro_jefe_dia = st.selectbox("Filtrar por Jefe de Venta:", jefes_disponibles, key="filtro_jefe_sol_diarias")
             
         if filtro_jefe_dia != "Todos":
             df_filtradas_dia = df_filtradas_dia[df_filtradas_dia['Jefe_de_Venta'] == filtro_jefe_dia]
@@ -1333,7 +1669,7 @@ elif menu == "📅 Solicitudes Diarias":
                     ruta_txt = f" | Ruta: {r['Ruta']}" if not st.session_state['es_chofer'] else ""
                     return f"CUC: {r['CUC']} - Cliente: {r['Cliente']} (Modelo: {r['Modelo']}{ruta_txt} | Estatus: {r['Status']})"
                 
-                idx_sel_user = st.selectbox("📌 Seleccione la solicitud que desea actualizar:", indices_dia, format_func=format_opcion_usuario, key="sel_solicitud_diaria_act")
+                idx_sel_user = st.selectbox("Seleccione la solicitud que desea actualizar:", indices_dia, format_func=format_opcion_usuario, key="sel_solicitud_diaria_act")
                 
                 if idx_sel_user < len(df_sol_diarias):
                     row_user = df_sol_diarias.loc[idx_sel_user]
@@ -1347,11 +1683,11 @@ elif menu == "📅 Solicitudes Diarias":
                         st_actual = row_user['Status']
                         idx_def = status_permitidos_u.index(st_actual) if st_actual in status_permitidos_u else 0
                         
-                        nuevo_estatus_user = st.selectbox("⚡ Cambiar Estatus:", status_permitidos_u, index=idx_def, key=f"new_st_u_{idx_sel_user}")
-                        observacion_user = st.text_input("📝 Motivo / Comentarios:", value=str(row_user.get('Observaciones', '')), key=f"obs_u_{idx_sel_user}").strip()
+                        nuevo_estatus_user = st.selectbox("Cambiar Estatus:", status_permitidos_u, index=idx_def, key=f"new_st_u_{idx_sel_user}")
+                        observacion_user = st.text_input("Motivo / Comentarios:", value=str(row_user.get('Observaciones', '')), key=f"obs_u_{idx_sel_user}").strip()
                         
                         st.markdown("<br>", unsafe_allow_html=True)
-                        btn_guardar_user = st.form_submit_button("💾 Guardar y Actualizar Estatus")
+                        btn_guardar_user = st.form_submit_button(":material/save: Guardar y Actualizar Estatus")
                         
                         if btn_guardar_user:
                             df_sol_diarias.loc[idx_sel_user, 'Status'] = nuevo_estatus_user
@@ -1372,77 +1708,77 @@ elif menu == "📅 Solicitudes Diarias":
                                         usr_tipo_log = st.session_state['usuario_actual']
                                         registrar_historial(serie_usr, modelo_usr, f"SOLICITUD {nuevo_estatus_user.upper()} ({usr_tipo_log.upper()})", f"Usuario: {usr_tipo_log} | Cliente: {cliente_usr} | CUC: {cuc_usr} | Actualizado en Solicitudes Diarias")
                                 
-                                st.success("✅ ¡Estatus y motivo actualizados con éxito!")
+                                st.success("¡Estatus y motivo actualizados con éxito!")
                                 time.sleep(1.5)
                                 st.rerun()
                             else:
-                                st.error("❌ Error al guardar el cambio en el archivo de solicitudes.")
+                                st.error("Error al guardar el cambio en el archivo de solicitudes.")
                 
                 st.markdown("---")
 
             # Mostrar la tabla general informativa del día
             df_tabla_diaria = df_filtradas_dia[['Proyecto', 'CUC', 'Cliente', 'Modelo', 'Serie', 'Canal', 'Jefe_de_Venta', 'Supervisor', 'Ruta', 'Status', 'Observaciones']].copy()
             df_tabla_diaria = df_tabla_diaria.rename(columns={'Jefe_de_Venta': 'Jefe de Venta', 'Observaciones': 'Motivo / Comentarios'})
-            st.dataframe(df_tabla_diaria.style.map(colorear_status, subset=['Status']), use_container_width=True, hide_index=True)
-            st.success(f"✅ Se encontraron {len(df_tabla_diaria)} solicitudes registradas bajo los criterios seleccionados.")
+            mostrar_tabla(df_tabla_diaria.style.map(colorear_status, subset=['Status']), use_container_width=True, hide_index=True)
+            st.success(f"Se encontraron {len(df_tabla_diaria)} solicitudes registradas bajo los criterios seleccionados.")
         else:
             if st.session_state['es_chofer']:
-                st.info(f"ℹ️ No hay solicitudes asignadas a su nombre ('{st.session_state['nombre_chofer']}') para el día {fecha_consulta_str}.")
+                st.info(f"No hay solicitudes asignadas a su nombre ('{st.session_state['nombre_chofer']}') para el día {fecha_consulta_str}.")
             else:
-                st.info(f"ℹ️ No hay solicitudes registradas que coincidan con los filtros seleccionados para el día {fecha_consulta_str}.")
+                st.info(f"No hay solicitudes registradas que coincidan con los filtros seleccionados para el día {fecha_consulta_str}.")
     else:
-        st.info("ℹ El archivo de solicitudes se encuentra vacío.")
+        st.info("El archivo de solicitudes se encuentra vacío.")
 
 # --- APARTADO: ESPECIFICACIONES DE EQUIPOS (MEJORADO CON FILTRO POR TIPO Y MODELO) ---
-elif menu == "📐 Catálogo de Equipos":
-    render_banner("📐", "Especificaciones", "Consulta marca, dimensiones, capacidad, puertas y consumo de energía de cada modelo de enfriador y equipo de frío.")
+elif menu == "Catálogo de Equipos":
+    render_banner("especificaciones", "Especificaciones", "Consulta marca, dimensiones, capacidad, puertas y consumo de energía de cada modelo de enfriador y equipo de frío.")
     
     # CARGA EXCLUSIVA DE EXCEL DE ESPECIFICACIONES PARA ADMINISTRADORES
     if st.session_state.get('autenticado', False):
-        with st.expander("🛠️ [Administrador] Actualizar o Subir Tabla de Especificaciones via Excel", expanded=False):
+        with st.expander(":material/build: [Administrador] Actualizar o Subir Tabla de Especificaciones via Excel", expanded=False):
             st.markdown("Sube un archivo Excel con las columnas: `Modelo`, `Tipo`, `Marca`, `Puertas`, `Capacidad (Litros)`, `Dimensiones (Al x An x Pr)`, `Consumo de Energía`.")
-            archivo_specs = st.file_uploader("📂 Archivo Excel de Especificaciones", type=["xlsx", "xls"], key="up_specs")
+            archivo_specs = st.file_uploader("Archivo Excel de Especificaciones", type=["xlsx", "xls"], key="up_specs")
             if archivo_specs is not None:
                 try:
                     df_nuevo_s = pd.read_excel(archivo_specs, dtype=str).fillna("")
-                    if st.button("🚀 Guardar y Actualizar Especificaciones"):
+                    if st.button(":material/send: Guardar y Actualizar Especificaciones"):
                         if guardar_especificaciones(normalizar_especificaciones(df_nuevo_s)):
-                            st.success("🎉 ¡Especificaciones actualizadas correctamente desde el archivo Excel!")
+                            st.success("¡Especificaciones actualizadas correctamente desde el archivo Excel!")
                             time.sleep(1.5)
                             st.rerun()
                 except Exception as e:
-                    st.error(f"⚠️ Error al leer el archivo: {e}")
+                    st.error(f"Error al leer el archivo: {e}")
 
-        with st.expander("🖼️ [Administrador] Cargar imágenes de modelos", expanded=False):
+        with st.expander(":material/image: [Administrador] Cargar imágenes de modelos", expanded=False):
             st.markdown("Sube varias imágenes a la vez. **El nombre de cada archivo debe ser el modelo** (ej. `V17.jpg`). No importan mayúsculas ni la extensión.")
             _df_todos = cargar_especificaciones()
             _modelos_csv = _df_todos['Modelo'].dropna().astype(str).str.strip().tolist() if 'Modelo' in _df_todos.columns else []
             _mapa_modelos = {_clave_modelo(m): m for m in _modelos_csv}
-            archivos_img = st.file_uploader("📂 Imágenes (JPG / PNG / WEBP)", type=["jpg", "jpeg", "png", "webp"],
+            archivos_img = st.file_uploader("Imágenes (JPG / PNG / WEBP)", type=["jpg", "jpeg", "png", "webp"],
                                             accept_multiple_files=True, key="up_imgs_modelos")
             if archivos_img:
                 reconocidos = [(a, _mapa_modelos[_clave_modelo(os.path.splitext(a.name)[0])]) for a in archivos_img
                                if _clave_modelo(os.path.splitext(a.name)[0]) in _mapa_modelos]
                 sin_match = [a.name for a in archivos_img if _clave_modelo(os.path.splitext(a.name)[0]) not in _mapa_modelos]
-                st.write(f"✅ {len(reconocidos)} coinciden con un modelo del catálogo.")
+                st.write(f"{len(reconocidos)} coinciden con un modelo del catálogo.")
                 if sin_match:
                     st.warning("Sin modelo coincidente (revisa el nombre): " + ", ".join(sin_match))
-                st.info("ℹ️ Lo que se sube aquí es temporal en Streamlit Cloud (se pierde al reiniciar). Para que sea permanente, copia las imágenes a la carpeta img_equipos/ del repositorio.")
-                if reconocidos and st.button("💾 Guardar imágenes"):
+                st.info("Lo que se sube aquí es temporal en Streamlit Cloud (se pierde al reiniciar). Para que sea permanente, copia las imágenes a la carpeta img_equipos/ del repositorio.")
+                if reconocidos and st.button(":material/save: Guardar imágenes"):
                     try:
                         with st.spinner("Procesando imágenes..."):
                             for archivo, modelo in reconocidos:
                                 guardar_imagen_local(procesar_imagen_jpeg(archivo), modelo)
-                        st.success(f"🎉 {len(reconocidos)} imagen(es) guardada(s) de forma temporal.")
+                        st.success(f"{len(reconocidos)} imagen(es) guardada(s) de forma temporal.")
                         time.sleep(1.2)
                         st.rerun()
                     except RuntimeError as e_g:
-                        st.error(f"⚠️ {e_g}")
+                        st.error(f"{e_g}")
                     except OSError as e_g:
-                        st.error(f"⚠️ No se pudo guardar: {e_g}")
+                        st.error(f"No se pudo guardar: {e_g}")
             _idx_img = indice_imagenes()
             _faltan = [m for m in _modelos_csv if _clave_modelo(m) not in _idx_img]
-            st.caption(f"📊 {len(_modelos_csv) - len(_faltan)} de {len(_modelos_csv)} modelos con imagen.")
+            st.caption(f"{len(_modelos_csv) - len(_faltan)} de {len(_modelos_csv)} modelos con imagen.")
             if _faltan:
                 st.markdown("**Modelos sin imagen:** " + ", ".join(_faltan))
 
@@ -1469,12 +1805,12 @@ elif menu == "📐 Catálogo de Equipos":
     # Filtros
     f1, f2, f3 = st.columns([2, 1.3, 1.5])
     with f1:
-        busqueda_spec = st.text_input("🔎 Buscar modelo", placeholder="Ej. V17").strip()
+        busqueda_spec = st.text_input("Buscar modelo", placeholder="Ej. V17").strip()
     with f2:
         tipos_disponibles = ["Todos"] + sorted([t for t in df_specs['Tipo'].dropna().unique().tolist() if str(t).strip()])
-        filtro_tipo_spec = st.selectbox("📌 Tipo de equipo", tipos_disponibles)
+        filtro_tipo_spec = st.selectbox("Tipo de equipo", tipos_disponibles)
     with f3:
-        orden_spec = st.selectbox("↕️ Ordenar por", ["Modelo (A-Z)", "Capacidad (mayor a menor)", "Capacidad (menor a mayor)"])
+        orden_spec = st.selectbox("Ordenar por", ["Modelo (A-Z)", "Capacidad (mayor a menor)", "Capacidad (menor a mayor)"])
 
     if busqueda_spec:
         df_specs = df_specs[df_specs['Modelo'].str.contains(busqueda_spec, case=False, na=False)]
@@ -1487,17 +1823,17 @@ elif menu == "📐 Catálogo de Equipos":
     else:
         df_specs = df_specs.sort_values('Modelo', key=lambda c: c.str.lower())
 
-    vista_spec = st.radio("Vista", ["🗂️ Tarjetas", "📋 Tabla comparativa"], horizontal=True, label_visibility="collapsed")
+    vista_spec = st.radio("Vista", ["Tarjetas", "Tabla comparativa"], horizontal=True, label_visibility="collapsed")
     st.markdown(f'<div class="sp-count">Mostrando <b>{len(df_specs)}</b> de <b>{_total}</b> modelos</div>', unsafe_allow_html=True)
 
     if df_specs.empty:
-        st.warning("⚠️ No se encontraron equipos con los filtros seleccionados.")
-    elif vista_spec.startswith("📋"):
+        st.warning("No se encontraron equipos con los filtros seleccionados.")
+    elif vista_spec.startswith("Tabla"):
         _cols_tabla = COLUMNAS_ESPECIFICACIONES
         _df_tabla = df_specs[_cols_tabla].copy()
-        _df_tabla.insert(1, 'Imagen', df_specs['_con_img'].map({True: "✅", False: "—"}))
-        st.dataframe(_df_tabla, use_container_width=True, hide_index=True)
-        st.download_button("⬇️ Descargar tabla (CSV)", _df_tabla.to_csv(index=False).encode("utf-8-sig"),
+        _df_tabla.insert(1, 'Imagen', df_specs['_con_img'].map({True: "Sí", False: "—"}))
+        mostrar_tabla(_df_tabla, use_container_width=True, hide_index=True)
+        st.download_button(":material/download: Descargar tabla (CSV)", _df_tabla.to_csv(index=False).encode("utf-8-sig"),
                            file_name="especificaciones_equipos.csv", mime="text/csv")
     else:
         POR_PAGINA = 9
@@ -1515,32 +1851,32 @@ elif menu == "📐 Catálogo de Equipos":
                     st.markdown(tarjeta_equipo_html(fila, _ruta_f), unsafe_allow_html=True)
                     _kb = f"amp_{pagina}_{_clave_modelo(fila['Modelo'])}"
                     if _ruta_f:
-                        if _boton_ancho("🔍 Ampliar imagen", key=_kb):
+                        if _boton_ancho(":material/zoom_in: Ampliar imagen", key=_kb):
                             if _ventana_ampliada:
                                 _ventana_ampliada(fila.to_dict(), _ruta_f)
                             else:
                                 _contenido_ampliado(fila.to_dict(), _ruta_f)
                     else:
-                        _boton_ancho("📷 Sin imagen", key=_kb, disabled=True)
+                        _boton_ancho(":material/image_not_supported: Sin imagen", key=_kb, disabled=True)
                     st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
 # 4. INVENTARIO GENERAL Y BUSCADOR (SOLO ADMINISTRADORES)
-elif menu == "📊 Inventario General" and st.session_state['autenticado']:
-    render_banner("📊", "Inventario General", "Inventario actual de equipos.")
+elif menu == "Inventario General" and st.session_state['autenticado']:
+    render_banner("inventario", "Inventario General", "Inventario actual de equipos.")
     
     df_con_dias = calcular_dias_sin_movimiento(df_inv)
     
-    with st.expander("🔍 Filtros Avanzados y Búsqueda Rápida", expanded=False):
+    with st.expander(":material/search: Filtros Avanzados y Búsqueda Rápida", expanded=False):
         f_col1, f_col2, f_col3 = st.columns(3)
         with f_col1:
-            busqueda = st.text_input("🔍 Buscar Serie o Modelo:").strip()
-            filtro_tipo = st.selectbox("📌 Filtrar por Tipo:", ["Todos"] + TIPOS_EQUIPO)
+            busqueda = st.text_input("Buscar Serie o Modelo:").strip()
+            filtro_tipo = st.selectbox("Filtrar por Tipo:", ["Todos"] + TIPOS_EQUIPO)
         with f_col2:
-            filtro_imagen = st.selectbox("🖼 Filtrar por Imagen:", ["Todos"] + OPCIONES_IMAGEN)
-            filtro_canal = st.selectbox("🏬 Filtrar por Canal:", ["Todos"] + [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales"]])
+            filtro_imagen = st.selectbox("Filtrar por Imagen:", ["Todos"] + OPCIONES_IMAGEN)
+            filtro_canal = st.selectbox("Filtrar por Canal:", ["Todos"] + [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales"]])
         with f_col3:
-            filtro_ubicacion = st.selectbox("📍 Filtrar por Ubicación:", ["Todos"] + UBICACIONES)
-            filtro_estatus = st.selectbox("⚡ Filtrar por Estatus:", ["Todos"] + ESTATUS)
+            filtro_ubicacion = st.selectbox("Filtrar por Ubicación:", ["Todos"] + UBICACIONES)
+            filtro_estatus = st.selectbox("Filtrar por Estatus:", ["Todos"] + ESTATUS)
 
     df_filtrado = df_con_dias.copy()
 
@@ -1621,21 +1957,21 @@ elif menu == "📊 Inventario General" and st.session_state['autenticado']:
         df_estilizado = df_mostrar.style.map(colorear_ubicaciones, subset=['Ubicación'])
         if 'Días sin movimiento' in df_filtrado.columns:
             df_estilizado = df_estilizado.map(colorear_dias, subset=['Días sin movimiento'])
-        st.dataframe(df_estilizado, use_container_width=True, hide_index=True)
+        mostrar_tabla(df_estilizado, use_container_width=True, hide_index=True)
     else:
-        st.dataframe(df_filtrado, use_container_width=True, hide_index=True)
+        mostrar_tabla(df_filtrado, use_container_width=True, hide_index=True)
 
 # 5. SOLICITUDES (SOLO ADMINISTRADORES)
-elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
-    render_banner("📋", "Solicitudes", "Registro de solicitudes y entregas de equipos.")
+elif menu == "Solicitudes" and st.session_state['autenticado']:
+    render_banner("solicitudes", "Solicitudes", "Registro de solicitudes y entregas de equipos.")
     
     modo_solicitud = st.radio(
         "Selecciona una acción:", 
         [
-            "➕ Registrar Nueva Solicitud", 
-            "🔍 Actualizar o Eliminar Solicitudes",
-            "📊 Historial de Solicitudes OK",
-            "📂 Importar Archivo Excel de Solicitudes"
+            "Registrar Nueva Solicitud", 
+            "Actualizar o Eliminar Solicitudes",
+            "Historial de Solicitudes OK",
+            "Importar Archivo Excel de Solicitudes"
         ], 
         horizontal=True
     )
@@ -1643,11 +1979,11 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
     
     df_sol = cargar_solicitudes()
     
-    if modo_solicitud == "➕ Registrar Nueva Solicitud":
+    if modo_solicitud == "Registrar Nueva Solicitud":
         col_m1, _ = st.columns([2, 2])
         with col_m1:
             movimiento = st.selectbox(
-                "🔄 Movimiento:", 
+                "Movimiento:", 
                 OPCIONES_MOVIMIENTO_SOL, 
                 key="widget_movimiento", 
                 on_change=actualizar_estatus_formulario
@@ -1663,46 +1999,46 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
                 idx_st_default = 0
                 if st.session_state['form_status'] in status_permitidos_nuevos:
                     idx_st_default = status_permitidos_nuevos.index(st.session_state['form_status'])
-                status_sol = st.selectbox("⚡ Status:", status_permitidos_nuevos, index=idx_st_default, key="widget_status")
+                status_sol = st.selectbox("Status:", status_permitidos_nuevos, index=idx_st_default, key="widget_status")
                 
                 incluir_fecha_entregado = st.checkbox("¿Asignar Fecha de Realizado ahora?", value=False)
-                fecha_entregado = st.date_input("📅 Fecha de Realizado", value=date.today())
-                fecha_recibido = st.date_input("📅 Fecha de Recibido", value=date.today())
-                proyecto = st.selectbox("📁 Proyecto:", OPCIONES_PROYECTOS)
-                cuc = st.text_input("🔢 CUC:").strip()
+                fecha_entregado = st.date_input("Fecha de Realizado", value=date.today())
+                fecha_recibido = st.date_input("Fecha de Recibido", value=date.today())
+                proyecto = st.selectbox("Proyecto:", OPCIONES_PROYECTOS)
+                cuc = st.text_input("CUC:").strip()
 
             with col_s2:
-                cliente_sol = st.text_input("🏢 Nombre de Cliente:").strip()
-                jefe_sol = st.text_input("👤 Jefe de Venta:").strip()
-                supervisor = st.text_input("👔 Supervisor (Opcional):").strip()
-                equipo_tipo = st.selectbox("📌 Equipo:", TIPOS_EQUIPO)
-                modelo_sol = st.text_input("🧊 Modelo:").strip()
+                cliente_sol = st.text_input("Nombre de Cliente:").strip()
+                jefe_sol = st.text_input("Jefe de Venta:").strip()
+                supervisor = st.text_input("Supervisor (Opcional):").strip()
+                equipo_tipo = st.selectbox("Equipo:", TIPOS_EQUIPO)
+                modelo_sol = st.text_input("Modelo:").strip()
 
             with col_s3:
-                serie_sol = st.text_input("🏷 Número de Serie (Opcional):").strip()
-                canal_sol = st.selectbox("🏬 Canal:", OPCIONES_CANALES_SOL)
-                ruta_sol = st.text_input("🚚 Ruta (Opcional):").strip()
-                motivo_sol = st.text_input("📝 Motivo:").strip()
+                serie_sol = st.text_input("Número de Serie (Opcional):").strip()
+                canal_sol = st.selectbox("Canal:", OPCIONES_CANALES_SOL)
+                ruta_sol = st.text_input("Ruta (Opcional):").strip()
+                motivo_sol = st.text_input("Motivo:").strip()
 
-            observaciones = st.text_area("💬 Observaciones (Obligatorio si Canal es 'Otro'):").strip()
+            observaciones = st.text_area("Observaciones (Obligatorio si Canal es 'Otro'):").strip()
             
-            submit_sol = st.form_submit_button("💾 Guardar Solicitud")
+            submit_sol = st.form_submit_button(":material/save: Guardar Solicitud")
             
             if submit_sol:
                 movimiento_final = st.session_state['form_movimiento']
                 status_validos_actuales = obtener_status_validos(movimiento_final)
                 
                 if status_sol not in status_validos_actuales:
-                    st.error(f"❌ ADVERTENCIA: Los datos son incorrectos. Para el movimiento '{movimiento_final}' NO está permitido el estatus '{status_sol}'. Opciones válidas: {', '.join(status_validos_actuales)}. Corríjalo para continuar.")
+                    st.error(f"ADVERTENCIA: Los datos son incorrectos. Para el movimiento '{movimiento_final}' NO está permitido el estatus '{status_sol}'. Opciones válidas: {', '.join(status_validos_actuales)}. Corríjalo para continuar.")
                     st.stop()
                 elif canal_sol == "Otro" and not observaciones:
-                    st.error("⚠️ El campo Observaciones es obligatorio cuando el Canal es 'Otro'.")
+                    st.error("El campo Observaciones es obligatorio cuando el Canal es 'Otro'.")
                     st.stop()
                 elif not cuc or not modelo_sol or not cliente_sol:
-                    st.error("⚠️ Por favor, ingresa al menos el CUC, el Modelo y el Cliente.")
+                    st.error("Por favor, ingresa al menos el CUC, el Modelo y el Cliente.")
                     st.stop()
                 elif status_sol.lower() in ["entregado", "realizado", "transferido", "levantado"] and not incluir_fecha_entregado:
-                    st.error(f"❌ No se guardaron los cambios: Seleccionó el estatus '{status_sol}' pero no activó ni asignó la Fecha de Realizado. La solicitud no puede avanzar de estatus sin su respectiva fecha.")
+                    st.error(f"No se guardaron los cambios: Seleccionó el estatus '{status_sol}' pero no activó ni asignó la Fecha de Realizado. La solicitud no puede avanzar de estatus sin su respectiva fecha.")
                     st.stop()
                 else:
                     fecha_e_str = fecha_entregado.strftime("%Y-%m-%d") if incluir_fecha_entregado else ""
@@ -1724,18 +2060,18 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
                                 df_inv = df_inv[df_inv['Serie'] != serie_sol].reset_index(drop=True)
                                 guardar_datos(df_inv)
                                 registrar_historial(serie_sol, modelo_sol, f"SOLICITUD {status_sol.upper()}", f"Cliente: {cliente_sol} | CUC: {cuc} | Eliminado automáticamente del Inventario General por estatus OK")
-                                st.success(f"✅ ¡Solicitud guardada! La serie {serie_sol} ha sido eliminada automáticamente del Inventario General debido al estatus '{status_sol}'.")
+                                st.success(f"¡Solicitud guardada! La serie {serie_sol} ha sido eliminada automáticamente del Inventario General debido al estatus '{status_sol}'.")
                             else:
-                                st.success("✅ ¡Solicitud guardada correctamente!")
+                                st.success("¡Solicitud guardada correctamente!")
                         else:
-                            st.success("✅ ¡Solicitud guardada correctamente (sin afectar el Inventario General)!")
+                            st.success("¡Solicitud guardada correctamente (sin afectar el Inventario General)!")
 
-    elif modo_solicitud == "🔍 Actualizar o Eliminar Solicitudes":
+    elif modo_solicitud == "Actualizar o Eliminar Solicitudes":
         st.markdown("#### Buscar Solicitud en el Sistema")
         
         with st.form("form_buscar_canal"):
-            b_canal = st.selectbox("🏬 Filtrar por Canal:", ["Todos"] + OPCIONES_CANALES_SOL)
-            b_cuc_busqueda = st.text_input("🔢 O busque por CUC exacto (Opcional):").strip()
+            b_canal = st.selectbox("Filtrar por Canal:", ["Todos"] + OPCIONES_CANALES_SOL)
+            b_cuc_busqueda = st.text_input("O busque por CUC exacto (Opcional):").strip()
             btn_buscar = st.form_submit_button("Buscar Solicitud")
             
         if btn_buscar:
@@ -1752,15 +2088,15 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
             df_pend_busq = st.session_state['df_pend_busq_resultado']
             
             if df_pend_busq.empty:
-                st.warning("⚠️ No se encontraron solicitudes con los criterios seleccionados.")
+                st.warning("No se encontraron solicitudes con los criterios seleccionados.")
             else:
                 total_pendientes = len(df_pend_busq[df_pend_busq['Status'].str.strip().str.lower() == 'pendiente'])
-                st.success(f"✅ Se encontraron {total_pendientes} solicitudes pendientes.")
+                st.success(f"Se encontraron {total_pendientes} solicitudes pendientes.")
                 
                 st.markdown("##### Listado de Solicitudes Encontradas:")
                 df_mostrar_pend = df_pend_busq[['CUC', 'Cliente', 'Modelo', 'Serie', 'Canal', 'Jefe_de_Venta', 'Status']].copy()
                 df_mostrar_pend = df_mostrar_pend.rename(columns={'Jefe_de_Venta': 'Jefe de Venta'})
-                st.dataframe(df_mostrar_pend, use_container_width=True, hide_index=True)
+                mostrar_tabla(df_mostrar_pend, use_container_width=True, hide_index=True)
                 
                 st.markdown("<br>", unsafe_allow_html=True)
                 
@@ -1773,7 +2109,7 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
                     return f"CUC: {r['CUC']} - Cliente: {r['Cliente']} (Modelo: {r['Modelo']}{serie_txt}{status_txt})"
 
                 idx_seleccionado = st.selectbox(
-                    "📌 Seleccione la solicitud que desea actualizar, cambiar a pendiente/cancelar o eliminar individualmente:", 
+                    "Seleccione la solicitud que desea actualizar, cambiar a pendiente/cancelar o eliminar individualmente:", 
                     opciones_indices, 
                     format_func=format_opcion
                 )
@@ -1782,7 +2118,7 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
                     row_sel = df_sol.loc[idx_seleccionado]
                     
                     st.markdown("---")
-                    st.markdown(f"**Editando Solicitud de:** 🏢 `{row_sel['Cliente']}` | **CUC:** `{row_sel['CUC']}` | **Estatus Actual:** `{row_sel['Status']}`")
+                    st.markdown(f"**Editando Solicitud de:** `{row_sel['Cliente']}` | **CUC:** `{row_sel['CUC']}` | **Estatus Actual:** `{row_sel['Status']}`")
                     
                     key_sesion_mov = f"edit_mov_{idx_seleccionado}"
                     key_sesion_stat = f"edit_stat_{idx_seleccionado}"
@@ -1803,7 +2139,7 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
                     col_sel_m1, _ = st.columns([2, 2])
                     with col_sel_m1:
                         movimiento_edit = st.selectbox(
-                            "🔄 Movimiento:", 
+                            "Movimiento:", 
                             OPCIONES_MOVIMIENTO_SOL, 
                             index=OPCIONES_MOVIMIENTO_SOL.index(st.session_state[key_sesion_mov]) if st.session_state[key_sesion_mov] in OPCIONES_MOVIMIENTO_SOL else 0,
                             key=key_sesion_mov,
@@ -1836,55 +2172,55 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
                                 
                             idx_status_default = status_permitidos_edit.index(st.session_state[key_sesion_stat]) if st.session_state[key_sesion_stat] in status_permitidos_edit else 0
 
-                            status_edit = st.selectbox("⚡ Status:", status_permitidos_edit, index=idx_status_default, key=key_sesion_stat)
+                            status_edit = st.selectbox("Status:", status_permitidos_edit, index=idx_status_default, key=key_sesion_stat)
                             
                             incluir_fecha_entregado_edit = st.checkbox("¿Asignar Fecha de Realizado ahora?", value=has_entregado_orig, key=f"chk_ent_{idx_seleccionado}")
-                            f_entregado_edit = st.date_input("📅 Fecha de Realizado", value=dt_ent, key=f"f_ent_{idx_seleccionado}")
+                            f_entregado_edit = st.date_input("Fecha de Realizado", value=dt_ent, key=f"f_ent_{idx_seleccionado}")
                             
                             idx_proy = OPCIONES_PROYECTOS.index(row_sel['Proyecto']) if row_sel['Proyecto'] in OPCIONES_PROYECTOS else 0
-                            proyecto_edit = st.selectbox("📁 Proyecto:", OPCIONES_PROYECTOS, index=idx_proy, key=f"proy_{idx_seleccionado}")
+                            proyecto_edit = st.selectbox("Proyecto:", OPCIONES_PROYECTOS, index=idx_proy, key=f"proy_{idx_seleccionado}")
                             
-                            cuc_edit = st.text_input("🔢 CUC:", value=str(row_sel.get('CUC', '')), key=f"cuc_{idx_seleccionado}").strip()
+                            cuc_edit = st.text_input("CUC:", value=str(row_sel.get('CUC', '')), key=f"cuc_{idx_seleccionado}").strip()
 
                         with col_ed2:
-                            cliente_edit = st.text_input("🏢 Nombre de Cliente:", value=str(row_sel.get('Cliente', '')), key=f"cli_{idx_seleccionado}").strip()
-                            jefe_edit = st.text_input("👤 Jefe de Venta:", value=str(row_sel.get('Jefe_de_Venta', '')), key=f"jefe_{idx_seleccionado}").strip()
-                            supervisor_edit = st.text_input("👔 Supervisor:", value=str(row_sel.get('Supervisor', '')), key=f"sup_{idx_seleccionado}").strip()
+                            cliente_edit = st.text_input("Nombre de Cliente:", value=str(row_sel.get('Cliente', '')), key=f"cli_{idx_seleccionado}").strip()
+                            jefe_edit = st.text_input("Jefe de Venta:", value=str(row_sel.get('Jefe_de_Venta', '')), key=f"jefe_{idx_seleccionado}").strip()
+                            supervisor_edit = st.text_input("Supervisor:", value=str(row_sel.get('Supervisor', '')), key=f"sup_{idx_seleccionado}").strip()
                             
                             idx_eq = TIPOS_EQUIPO.index(row_sel['Equipo']) if row_sel['Equipo'] in TIPOS_EQUIPO else 0
-                            equipo_edit = st.selectbox("📌 Equipo:", TIPOS_EQUIPO, index=idx_eq, key=f"eq_{idx_seleccionado}")
+                            equipo_edit = st.selectbox("Equipo:", TIPOS_EQUIPO, index=idx_eq, key=f"eq_{idx_seleccionado}")
                             
-                            modelo_edit = st.text_input("🧊 Modelo:", value=str(row_sel.get('Modelo', '')), key=f"mod_{idx_seleccionado}").strip()
+                            modelo_edit = st.text_input("Modelo:", value=str(row_sel.get('Modelo', '')), key=f"mod_{idx_seleccionado}").strip()
 
                         with col_ed3:
-                            serie_edit = st.text_input("🏷️ Número de Serie:", value=str(row_sel.get('Serie', '')), key=f"ser_{idx_seleccionado}").strip()
+                            serie_edit = st.text_input("Número de Serie:", value=str(row_sel.get('Serie', '')), key=f"ser_{idx_seleccionado}").strip()
                             
                             idx_canal = OPCIONES_CANALES_SOL.index(row_sel['Canal']) if row_sel['Canal'] in OPCIONES_CANALES_SOL else 0
-                            canal_edit = st.selectbox("🏬 Canal:", OPCIONES_CANALES_SOL, index=idx_canal, key=f"can_{idx_seleccionado}")
+                            canal_edit = st.selectbox("Canal:", OPCIONES_CANALES_SOL, index=idx_canal, key=f"can_{idx_seleccionado}")
                             
-                            ruta_edit = st.text_input("🚚 Ruta:", value=str(row_sel.get('Ruta', '')), key=f"rut_{idx_seleccionado}").strip()
-                            motivo_edit = st.text_input("📝 Motivo:", value=str(row_sel.get('Motivo', '')), key=f"mot_{idx_seleccionado}").strip()
+                            ruta_edit = st.text_input("Ruta:", value=str(row_sel.get('Ruta', '')), key=f"rut_{idx_seleccionado}").strip()
+                            motivo_edit = st.text_input("Motivo:", value=str(row_sel.get('Motivo', '')), key=f"mot_{idx_seleccionado}").strip()
 
-                        observaciones_edit = st.text_area("💬 Observaciones:", value=str(row_sel.get('Observaciones', '')), key=f"obs_{idx_seleccionado}").strip()
+                        observaciones_edit = st.text_area("Observaciones:", value=str(row_sel.get('Observaciones', '')), key=f"obs_{idx_seleccionado}").strip()
                         
                         st.markdown("<br>", unsafe_allow_html=True)
                         col_btn1, col_btn2 = st.columns(2)
                         with col_btn1:
-                            btn_actualizar = st.form_submit_button("💾 Guardar Cambios en la Solicitud")
+                            btn_actualizar = st.form_submit_button(":material/save: Guardar Cambios en la Solicitud")
                         with col_btn2:
-                            btn_eliminar_individual = st.form_submit_button("🗑 Eliminar esta Solicitud")
+                            btn_eliminar_individual = st.form_submit_button(":material/delete: Eliminar esta Solicitud")
                         
                         if btn_actualizar:
                             status_validos_verificacion = obtener_status_validos(movimiento_edit)
                             
                             if status_edit not in status_validos_verificacion:
-                                st.error(f"❌ ADVERTENCIA: Los datos son incorrectos. Para el movimiento '{movimiento_edit}' NO está permitido el estatus '{status_edit}'. Opciones válidas: {', '.join(status_validos_verificacion)}. Corríjalo para continuar.")
+                                st.error(f"ADVERTENCIA: Los datos son incorrectos. Para el movimiento '{movimiento_edit}' NO está permitido el estatus '{status_edit}'. Opciones válidas: {', '.join(status_validos_verificacion)}. Corríjalo para continuar.")
                             elif canal_edit == "Otro" and not observaciones_edit:
-                                st.error("⚠️ El campo Observaciones es obligatorio cuando el Canal es 'Otro'.")
+                                st.error("El campo Observaciones es obligatorio cuando el Canal es 'Otro'.")
                             elif not cuc_edit or not modelo_edit or not cliente_edit:
-                                st.error("⚠️ Por favor, ingresa al menos el CUC, el Modelo y el Cliente.")
+                                st.error("Por favor, ingresa al menos el CUC, el Modelo y el Cliente.")
                             elif status_edit.lower() in ["entregado", "realizado", "transferido", "levantado"] and not incluir_fecha_entregado_edit:
-                                st.error(f"❌ No se guardaron los cambios: Seleccionó el estatus '{status_edit}' pero no activó ni asignó la Fecha de Realizado.")
+                                st.error(f"No se guardaron los cambios: Seleccionó el estatus '{status_edit}' pero no activó ni asignó la Fecha de Realizado.")
                             else:
                                 f_rec_str = str(row_sel.get('Fecha_Recibido', ''))
                                 f_ent_str = f_entregado_edit.strftime("%Y-%m-%d") if incluir_fecha_entregado_edit else ""
@@ -1914,31 +2250,31 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
                                             guardar_datos(df_inv)
                                             registrar_historial(serie_edit, modelo_edit, f"SOLICITUD {status_edit.upper()}", f"Cliente: {cliente_edit} | CUC: {cuc_edit} | Eliminado por actualización a estatus OK")
                                     
-                                    st.success("🎉 ¡Cambios guardados con éxito! La solicitud ha sido actualizada y sincronizada correctamente en el sistema.")
+                                    st.success("¡Cambios guardados con éxito! La solicitud ha sido actualizada y sincronizada correctamente en el sistema.")
                                     if 'df_pend_busq_resultado' in st.session_state:
                                         del st.session_state['df_pend_busq_resultado']
                                     time.sleep(2.5)
                                     st.rerun()
                                 else:
-                                    st.error("❌ Error: No se pudieron guardar los cambios en la solicitud.")
+                                    st.error("Error: No se pudieron guardar los cambios en la solicitud.")
 
                         if btn_eliminar_individual:
                             cliente_borrado = row_sel['Cliente']
                             cuc_borrado = row_sel['CUC']
                             df_sol = df_sol.drop(idx_seleccionado).reset_index(drop=True)
                             if guardar_solicitudes_seguro(df_sol):
-                                st.success(f"🗑 ¡Solicitud eliminada con éxito! El registro del cliente '{cliente_borrado}' (CUC: {cuc_borrado}) fue dado de baja definitivamente del sistema.")
+                                st.success(f"¡Solicitud eliminada con éxito! El registro del cliente '{cliente_borrado}' (CUC: {cuc_borrado}) fue dado de baja definitivamente del sistema.")
                                 if 'df_pend_busq_resultado' in st.session_state:
                                     del st.session_state['df_pend_busq_resultado']
                                 time.sleep(2.5)
                                 st.rerun()
                             else:
-                                st.error("❌ Error: No se pudo eliminar la solicitud.")
+                                st.error("Error: No se pudo eliminar la solicitud.")
 
-    elif modo_solicitud == "📊 Historial de Solicitudes OK":
+    elif modo_solicitud == "Historial de Solicitudes OK":
         st.markdown("#### Historial de Solicitudes (Entregadas, Transferidas, Realizadas o Levantadas)")
         
-        filtro_cuc_ok = st.text_input("🔍 Filtrar por CUC:").strip()
+        filtro_cuc_ok = st.text_input("Filtrar por CUC:").strip()
         st.markdown("---")
 
         if not df_sol.empty:
@@ -1969,19 +2305,19 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
                 })
                 
                 if not df_mostrar_gen.empty:
-                    st.dataframe(df_mostrar_gen, use_container_width=True, hide_index=True)
+                    mostrar_tabla(df_mostrar_gen, use_container_width=True, hide_index=True)
                 else:
-                    st.warning("⚠️ No se encontraron solicitudes que coincidan con el CUC buscado.")
+                    st.warning("No se encontraron solicitudes que coincidan con el CUC buscado.")
             else:
-                st.info("ℹ️ No hay solicitudes con estatus Entregado, Transferido, Realizado o Levantado registradas todavía.")
+                st.info("No hay solicitudes con estatus Entregado, Transferido, Realizado o Levantado registradas todavía.")
         else:
-            st.info("ℹ El archivo de solicitudes está vacío.")
+            st.info("El archivo de solicitudes está vacío.")
 
-    elif modo_solicitud == "📂 Importar Archivo Excel de Solicitudes":
+    elif modo_solicitud == "Importar Archivo Excel de Solicitudes":
         st.markdown("#### Subir y Sincronizar Archivo Excel (.xlsx) de Solicitudes")
         st.markdown("Selecciona o arrastra tu archivo Excel actualizado con las solicitudes.")
         
-        archivo_subido = st.file_uploader("📂 Sube tu archivo Excel de solicitudes", type=["xlsx", "xls"])
+        archivo_subido = st.file_uploader("Sube tu archivo Excel de solicitudes", type=["xlsx", "xls"])
         
         if archivo_subido is not None:
             try:
@@ -1989,54 +2325,54 @@ elif menu == "📋 Solicitudes" and st.session_state['autenticado']:
                 df_importado = df_importado.fillna("")
                 df_importado = limpiar_y_mapear_columnas(df_importado, COLUMNAS_SOLICITUDES)
                 
-                if st.button("🚀 Confirmar e Importar Datos"):
+                if st.button(":material/send: Confirmar e Importar Datos"):
                     if guardar_solicitudes_seguro(df_importado):
-                        st.success(f"🎉 ¡Se han importado exitosamente {len(df_importado)} registros desde tu archivo Excel!")
-                        st.dataframe(df_importado.head(10), use_container_width=True)
+                        st.success(f"¡Se han importado exitosamente {len(df_importado)} registros desde tu archivo Excel!")
+                        mostrar_tabla(df_importado.head(10), use_container_width=True)
             except Exception as e:
-                st.error(f"⚠ Error al leer el archivo Excel: {e}")
+                st.error(f"Error al leer el archivo Excel: {e}")
 
 # 6. LEVANTAMIENTOS (SOLO ADMINISTRADORES)
-elif menu == "📝 Levantamientos" and st.session_state['autenticado']:
-    render_banner("📝", "Levantamientos", "Gestión de equipos recolectados.")
+elif menu == "Levantamientos" and st.session_state['autenticado']:
+    render_banner("levantamientos", "Levantamientos", "Gestión de equipos recolectados.")
     
     modo_levantamiento = st.radio(
         "Selecciona una acción:", 
         [
-            "➕ Registrar Levantamiento", 
-            "📊 Equipos Levantados"
+            "Registrar Levantamiento", 
+            "Equipos Levantados"
         ], 
         horizontal=True
     )
     st.markdown("---")
     
-    if modo_levantamiento == "➕ Registrar Levantamiento":
+    if modo_levantamiento == "Registrar Levantamiento":
         st.markdown("Registra los equipos levantados. Se agregarán automáticamente al Inventario General.")
         
         with st.form("form_levantamiento", clear_on_submit=True):
             col_l1, col_l2 = st.columns(2)
             with col_l1:
-                fecha_lev = st.date_input("📅 Fecha de Levantamiento", value=date.today())
-                cuc_lev = st.text_input("🔢 CUC:").strip()
-                cliente = st.text_input("🏢 Cliente / Negocio:").strip()
-                modelo = st.text_input("🧊 Modelo del Equipo:").strip()
-                serie = st.text_input("🏷️ Número de Serie:").strip()
-                tipo = st.selectbox("📌 Tipo de Equipo:", TIPOS_EQUIPO)
-                imagen = st.selectbox("🖼️ Imagen / Marca:", OPCIONES_IMAGEN)
+                fecha_lev = st.date_input("Fecha de Levantamiento", value=date.today())
+                cuc_lev = st.text_input("CUC:").strip()
+                cliente = st.text_input("Cliente / Negocio:").strip()
+                modelo = st.text_input("Modelo del Equipo:").strip()
+                serie = st.text_input("Número de Serie:").strip()
+                tipo = st.selectbox("Tipo de Equipo:", TIPOS_EQUIPO)
+                imagen = st.selectbox("Imagen / Marca:", OPCIONES_IMAGEN)
             with col_l2:
-                canal = st.selectbox("🏬 Canal:", [c for c in OPCIONES_CANALES_SOL if c != "Otro"])
-                status_lev = st.selectbox("⚡ Estatus del Equipo:", ESTATUS)
-                motivo = st.text_input("📝 Motivo del Levantamiento:").strip()
-                ubicacion = st.selectbox("📍 Ubicación Inicial (ej. En taller):", UBICACIONES, index=3)
-                ruta = st.text_input("🚚 Ruta:").strip()
-                jefe_venta = st.text_input("👤 Jefe de Venta:").strip()
-                solicitado = st.selectbox("📨 Solicitado vía:", ["Whatsapp", "Correo", "Solicitud"])
+                canal = st.selectbox("Canal:", [c for c in OPCIONES_CANALES_SOL if c != "Otro"])
+                status_lev = st.selectbox("Estatus del Equipo:", ESTATUS)
+                motivo = st.text_input("Motivo del Levantamiento:").strip()
+                ubicacion = st.selectbox("Ubicación Inicial (ej. En taller):", UBICACIONES, index=3)
+                ruta = st.text_input("Ruta:").strip()
+                jefe_venta = st.text_input("Jefe de Venta:").strip()
+                solicitado = st.selectbox("Solicitado vía:", ["Whatsapp", "Correo", "Solicitud"])
                 
             submit_lev = st.form_submit_button("Guardar Levantamiento e Ingresar al Sistema")
             
             if submit_lev:
                 if not serie or not modelo or not cliente or not cuc_lev:
-                    st.error("⚠️ Por favor, completa el CUC, la Serie, el Modelo y el Cliente.")
+                    st.error("Por favor, completa el CUC, la Serie, el Modelo y el Cliente.")
                 else:
                     fecha_str = fecha_lev.strftime("%Y-%m-%d")
                     
@@ -2048,14 +2384,11 @@ elif menu == "📝 Levantamientos" and st.session_state['autenticado']:
                         "Ruta": ruta, "Jefe_de_Venta": jefe_venta, "Solicitado": solicitado
                     }])
                     df_lev = pd.concat([df_lev, nuevo_lev], ignore_index=True)
-                    try:
-                        df_lev.to_csv(LEVANTAMIENTOS_FILE, index=False)
-                    except PermissionError:
-                        st.error("⚠️ Error: El archivo 'levantamientos.csv' está abierto en Excel. Ciérralo para guardar.")
+                    guardar_levantamientos(df_lev)
                     
                     serie_limpia = str(serie).strip()
                     if not df_inv.empty and serie_limpia in df_inv['Serie'].values:
-                        st.warning(f"🚨 ALERTA: La serie '{serie_limpia}' ya se encuentra registrada en el Inventario General. Los datos no se duplicaron.")
+                        st.warning(f"ALERTA: La serie '{serie_limpia}' ya se encuentra registrada en el Inventario General. Los datos no se duplicaron.")
                     else:
                         nueva_inv = pd.DataFrame([{
                             "Serie": serie_limpia, "Modelo": modelo, "Tipo": tipo, "Imagen": imagen,
@@ -2064,12 +2397,12 @@ elif menu == "📝 Levantamientos" and st.session_state['autenticado']:
                         df_inv = pd.concat([df_inv, nueva_inv], ignore_index=True)
                         guardar_datos(df_inv)
                         registrar_historial(serie_limpia, modelo, "LEVANTAMIENTO", f"Cliente: {cliente} | CUC: {cuc_lev} | Agregado automáticamente al Inventario General")
-                        st.success(f"✅ ¡Levantamiento registrado y serie {serie_limpia} agregada automáticamente al Inventario General!")
+                        st.success(f"¡Levantamiento registrado y serie {serie_limpia} agregada automáticamente al Inventario General!")
 
-    elif modo_levantamiento == "📊 Equipos Levantados":
+    elif modo_levantamiento == "Equipos Levantados":
         st.markdown("#### Historial de Equipos Levantados")
         
-        filtro_cuc_lev = st.text_input("🔍 Filtrar por CUC:").strip()
+        filtro_cuc_lev = st.text_input("Filtrar por CUC:").strip()
         st.markdown("---")
 
         df_lev_historial = cargar_levantamientos()
@@ -2078,54 +2411,54 @@ elif menu == "📝 Levantamientos" and st.session_state['autenticado']:
                 df_lev_historial = df_lev_historial[df_lev_historial['CUC'].str.contains(filtro_cuc_lev, case=False, na=False)]
             
             total_lev = len(df_lev_historial)
-            st.success(f"✅ Se encontraron {total_lev} registros de equipos levantados.")
+            st.success(f"Se encontraron {total_lev} registros de equipos levantados.")
             
             df_mostrar_lev = df_lev_historial[['Fecha', 'CUC', 'Cliente', 'Modelo', 'Serie', 'Canal', 'Status', 'Ubicación', 'Ruta', 'Jefe_de_Venta']].copy()
             df_mostrar_lev = df_mostrar_lev.rename(columns={'Jefe_de_Venta': 'Jefe de Venta'})
             
             if not df_mostrar_lev.empty:
-                st.dataframe(df_mostrar_lev, use_container_width=True, hide_index=True)
+                mostrar_tabla(df_mostrar_lev, use_container_width=True, hide_index=True)
             else:
-                st.warning("⚠️ No se encontraron equipos levantados que coincidan con el CUC buscado.")
+                st.warning("No se encontraron equipos levantados que coincidan con el CUC buscado.")
         else:
-            st.info("ℹ Aún no hay equipos levantados registrados en el sistema.")
+            st.info("Aún no hay equipos levantados registrados en el sistema.")
 
 # 7. REGISTRAR ENTRADA (SOLO ADMINISTRADORES)
-elif menu == "📥 Registrar Entrada" and st.session_state['autenticado']:
-    render_banner("📥", "Registrar Entrada", "Entrada de equipos al inventario.")
+elif menu == "Registrar Entrada" and st.session_state['autenticado']:
+    render_banner("entrada", "Registrar Entrada", "Entrada de equipos al inventario.")
     
     modo_entrada = st.radio(
         "Selecciona el método de entrada:",
         [
-            "➕ Entrada Individual",
-            "📂 Carga Masiva (Excel)"
+            "Entrada Individual",
+            "Carga Masiva (Excel)"
         ],
         horizontal=True
     )
     st.markdown("---")
     
-    if modo_entrada == "➕ Entrada Individual":
+    if modo_entrada == "Entrada Individual":
         with st.form("form_entrada", clear_on_submit=True):
-            serie = st.text_input("🏷️ Número de Serie:").strip()
-            modelo = st.text_input("🧊 Modelo del Equipo:").strip()
-            tipo = st.selectbox("📌 Tipo de Equipo:", TIPOS_EQUIPO)
-            imagen = st.selectbox("🖼️ Imagen / Marca:", OPCIONES_IMAGEN)
-            canal = st.selectbox("🏬 Canal:", [c for c in OPCIONES_CANALES_SOL if c != "Otro"])
-            ubicacion = st.selectbox("📍 Ubicación inicial", UBICACIONES)
-            estatus = st.selectbox("⚡ Estatus inicial", ESTATUS)
-            fecha_entrada = st.date_input("📅 Fecha de entrada / Último movimiento", value=date.today())
+            serie = st.text_input("Número de Serie:").strip()
+            modelo = st.text_input("Modelo del Equipo:").strip()
+            tipo = st.selectbox("Tipo de Equipo:", TIPOS_EQUIPO)
+            imagen = st.selectbox("Imagen / Marca:", OPCIONES_IMAGEN)
+            canal = st.selectbox("Canal:", [c for c in OPCIONES_CANALES_SOL if c != "Otro"])
+            ubicacion = st.selectbox("Ubicación inicial", UBICACIONES)
+            estatus = st.selectbox("Estatus inicial", ESTATUS)
+            fecha_entrada = st.date_input("Fecha de entrada / Último movimiento", value=date.today())
             
             submit = st.form_submit_button("Registrar Entrada en Sistema")
             
             if submit:
                 if not serie or not modelo:
-                    st.error("⚠️ Por favor, completa la serie y el modelo.")
+                    st.error("Por favor, completa la serie y el modelo.")
                 else:
                     fecha_str = fecha_entrada.strftime("%Y-%m-%d")
                     serie_limpia = str(serie).strip()
                     
                     if not df_inv.empty and serie_limpia in df_inv['Serie'].values:
-                        st.warning(f"🚨 ALERTA: La serie '{serie_limpia}' ya se encuentra registrada en el Inventario General. No se permiten series duplicadas.")
+                        st.warning(f"ALERTA: La serie '{serie_limpia}' ya se encuentra registrada en el Inventario General. No se permiten series duplicadas.")
                     else:
                         nueva_fila = pd.DataFrame([{
                             "Serie": serie_limpia,
@@ -2140,11 +2473,11 @@ elif menu == "📥 Registrar Entrada" and st.session_state['autenticado']:
                         df_inv = pd.concat([df_inv, nueva_fila], ignore_index=True)
                         guardar_datos(df_inv)
                         registrar_historial(serie_limpia, modelo, "ENTRADA", f"Tipo: {tipo} | Canal: {canal} | Ubicación: {ubicacion} | Estatus: {estatus}")
-                        st.success(f"✅ ¡Entrada registrada correctamente! La serie {serie_limpia} se agregó al Inventario General.")
+                        st.success(f"¡Entrada registrada correctamente! La serie {serie_limpia} se agregó al Inventario General.")
 
-    elif modo_entrada == "📂 Carga Masiva (Excel)":
+    elif modo_entrada == "Carga Masiva (Excel)":
         st.markdown("Sube un archivo Excel (.xlsx o .xls) con múltiples equipos para darles entrada de forma masiva.")
-        archivo_entrada_masiva = st.file_uploader("📂 Selecciona tu archivo Excel de entradas", type=["xlsx", "xls"], key="uploader_entrada_masiva")
+        archivo_entrada_masiva = st.file_uploader("Selecciona tu archivo Excel de entradas", type=["xlsx", "xls"], key="uploader_entrada_masiva")
         
         if archivo_entrada_masiva is not None:
             try:
@@ -2152,52 +2485,58 @@ elif menu == "📥 Registrar Entrada" and st.session_state['autenticado']:
                 df_subido_masivo = limpiar_y_mapear_columnas(df_subido_masivo, ESQUEMA_COLUMNAS)
                 
                 st.markdown("##### Vista previa de los datos a cargar:")
-                st.dataframe(df_subido_masivo.head(5), use_container_width=True)
+                mostrar_tabla(df_subido_masivo.head(5), use_container_width=True)
                 
-                if st.button("🚀 Confirmar e Importar Entradas Masivas"):
+                if st.button(":material/send: Confirmar e Importar Entradas Masivas"):
                     count_nuevos = 0
                     alertas_duplicadas = 0
+                    series_existentes = set(df_inv['Serie'].astype(str)) if not df_inv.empty else set()
+                    filas_nuevas = []
+                    movimientos_hist = []
                     for _, row in df_subido_masivo.iterrows():
                         s_val = str(row.get('Serie', '')).strip()
                         m_val = str(row.get('Modelo', '')).strip()
                         if s_val and m_val:
-                            if not df_inv.empty and s_val in df_inv['Serie'].values:
+                            if s_val in series_existentes:
                                 alertas_duplicadas += 1
                                 continue
-                                
+
                             t_val = str(row.get('Tipo', 'Enfriador'))
                             i_val = str(row.get('Imagen', 'Sin Imagen'))
                             c_val = str(row.get('Canal', 'Tradicional'))
                             u_val = str(row.get('Ubicación', 'En almacén de Comodatos'))
                             e_val = str(row.get('Estatus', 'Nuevo'))
                             f_val = str(row.get('Ultimo_Movimiento', datetime.now().strftime("%Y-%m-%d")))
-                            
-                            nueva_f = pd.DataFrame([{
+
+                            filas_nuevas.append({
                                 "Serie": s_val, "Modelo": m_val, "Tipo": t_val, "Imagen": i_val,
                                 "Canal": c_val, "Ubicación": u_val, "Estatus": e_val, "Ultimo_Movimiento": f_val
-                            }])
-                            df_inv = pd.concat([df_inv, nueva_f], ignore_index=True)
+                            })
+                            series_existentes.add(s_val)
                             count_nuevos += 1
-                            registrar_historial(s_val, m_val, "ENTRADA MASIVA", f"Carga masiva. Ubicación: {u_val} | Estatus: {e_val}")
-                    
+                            movimientos_hist.append((s_val, m_val, "ENTRADA MASIVA", f"Carga masiva. Ubicación: {u_val} | Estatus: {e_val}"))
+
+                    if filas_nuevas:
+                        df_inv = pd.concat([df_inv, pd.DataFrame(filas_nuevas)], ignore_index=True)
+                        registrar_historial_lote(movimientos_hist)
                     guardar_datos(df_inv)
-                    st.toast("Operación completada", icon="✅")
-                    st.success(f"🎉 ¡Se procesaron e importaron exitosamente {count_nuevos} equipos al inventario general!")
+                    st.toast("Operación completada")
+                    st.success(f"¡Se procesaron e importaron exitosamente {count_nuevos} equipos al inventario general!")
                     if alertas_duplicadas > 0:
-                        st.warning(f"⚠️ Se omitieron {alertas_duplicadas} registros por tener series que ya existían en el Inventario General (evitando duplicados).")
+                        st.warning(f"Se omitieron {alertas_duplicadas} registros por tener series que ya existían en el Inventario General (evitando duplicados).")
             except Exception as e:
-                st.error(f"⚠️ Ocurrió un error al procesar el archivo Excel: {e}")
+                st.error(f"Ocurrió un error al procesar el archivo Excel: {e}")
 
 # 8. REGISTRAR SALIDA (SOLO ADMINISTRADORES)
-elif menu == "📤 Registrar Salida" and st.session_state['autenticado']:
-    render_banner("📤", "Registrar Salida", "Salida de equipos del inventario.")
+elif menu == "Registrar Salida" and st.session_state['autenticado']:
+    render_banner("salida", "Registrar Salida", "Salida de equipos del inventario.")
     
     serie_buscar = st.text_input("Escriba la serie del equipo para dar salida:").strip()
     
     if serie_buscar:
         equipo = df_inv[df_inv['Serie'] == serie_buscar]
         if equipo.empty:
-            st.warning("⚠️ No se encontró ningún equipo con esa serie en el inventario.")
+            st.warning("No se encontró ningún equipo con esa serie en el inventario.")
         else:
             modelo_actual_eq = str(equipo.iloc[0]['Modelo'])
             tipo_actual_eq = str(equipo.iloc[0]['Tipo']) if 'Tipo' in equipo.columns else 'Enfriador'
@@ -2206,12 +2545,12 @@ elif menu == "📤 Registrar Salida" and st.session_state['autenticado']:
             ubicacion_actual_eq = str(equipo.iloc[0]['Ubicación'])
             estatus_actual_eq = str(equipo.iloc[0]['Estatus'])
             
-            st.info(f"📌 Equipo encontrado -> Tipo: **{tipo_actual_eq}** | Modelo: **{modelo_actual_eq}** | Imagen: **{imagen_actual_eq}** | Canal: **{canal_actual_eq}** | Ubicación: **{ubicacion_actual_eq}** | Estatus: **{estatus_actual_eq}**")
+            st.info(f"Equipo encontrado -> Tipo: **{tipo_actual_eq}** | Modelo: **{modelo_actual_eq}** | Imagen: **{imagen_actual_eq}** | Canal: **{canal_actual_eq}** | Ubicación: **{ubicacion_actual_eq}** | Estatus: **{estatus_actual_eq}**")
             
             with st.form("form_salida"):
-                fecha_salida = st.date_input("📅 Fecha de salida", value=date.today())
-                ruta_salida = st.text_input("🚚 Ruta:")
-                motivo_salida = st.text_input("📝 Motivo de la salida / Destino:")
+                fecha_salida = st.date_input("Fecha de salida", value=date.today())
+                ruta_salida = st.text_input("Ruta:")
+                motivo_salida = st.text_input("Motivo de la salida / Destino:")
                 
                 btn_confirmar_salida = st.form_submit_button("Confirmar salida")
                 
@@ -2228,39 +2567,39 @@ elif menu == "📤 Registrar Salida" and st.session_state['autenticado']:
                     
                     df_inv = df_inv.drop(idx).reset_index(drop=True)
                     guardar_datos(df_inv)
-                    st.success(f"✅ ¡Salida confirmada! El equipo con serie {serie_buscar} ha sido eliminado del inventario general.")
+                    st.success(f"¡Salida confirmada! El equipo con serie {serie_buscar} ha sido eliminado del inventario general.")
 
 # 9. EDITAR / ELIMINAR EQUIPO (SOLO ADMINISTRADORES)
-elif menu == "✏️ Editar / Eliminar" and st.session_state['autenticado']:
-    render_banner("✏️", "Editar / Eliminar", "Corrección y depuración de equipos.")
+elif menu == "Editar / Eliminar" and st.session_state['autenticado']:
+    render_banner("editar", "Editar / Eliminar", "Corrección y depuración de equipos.")
     
-    serie_edit = st.text_input("🔍 Ingrese la serie del equipo a editar o eliminar:").strip()
+    serie_edit = st.text_input("Ingrese la serie del equipo a editar o eliminar:").strip()
     
     if serie_edit:
         equipo = df_inv[df_inv['Serie'] == serie_edit]
         if equipo.empty:
-            st.warning("⚠️ No se encontró el equipo en la base de datos.")
+            st.warning("No se encontró el equipo en la base de datos.")
         else:
             idx = df_inv[df_inv['Serie'] == serie_edit].index[0]
             
             with st.form("form_editar"):
-                mod_modelo = st.text_input("🧊 Modelo", value=str(df_inv.loc[idx, 'Modelo']))
+                mod_modelo = st.text_input("Modelo", value=str(df_inv.loc[idx, 'Modelo']))
                 
                 tipo_actual = str(df_inv.loc[idx, 'Tipo']) if 'Tipo' in df_inv.columns else 'Enfriador'
                 idx_tipo = TIPOS_EQUIPO.index(tipo_actual) if tipo_actual in TIPOS_EQUIPO else 0
-                mod_tipo = st.selectbox("📌 Tipo de Equipo", TIPOS_EQUIPO, index=idx_tipo)
+                mod_tipo = st.selectbox("Tipo de Equipo", TIPOS_EQUIPO, index=idx_tipo)
                 
                 imagen_actual = str(df_inv.loc[idx, 'Imagen']) if 'Imagen' in df_inv.columns else 'Sin Imagen'
                 idx_imagen = OPCIONES_IMAGEN.index(imagen_actual) if imagen_actual in OPCIONES_IMAGEN else 0
-                mod_imagen = st.selectbox("🖼️ Imagen / Marca", OPCIONES_IMAGEN, index=idx_imagen)
+                mod_imagen = st.selectbox("Imagen / Marca", OPCIONES_IMAGEN, index=idx_imagen)
                 
                 canales_inv_opc = [c for c in OPCIONES_CANALES_SOL if c != "Otro"]
                 canal_actual = str(df_inv.loc[idx, 'Canal'])
                 idx_canal = canales_inv_opc.index(canal_actual) if canal_actual in canales_inv_opc else 0
-                mod_canal = st.selectbox("🏬 Canal", canales_inv_opc, index=idx_canal)
+                mod_canal = st.selectbox("Canal", canales_inv_opc, index=idx_canal)
                 
-                mod_ubicacion = st.selectbox("📍 Ubicación", UBICACIONES, index=UBICACIONES.index(df_inv.loc[idx, 'Ubicación']) if df_inv.loc[idx, 'Ubicación'] in UBICACIONES else 0)
-                mod_estatus = st.selectbox("⚡ Estatus", ESTATUS, index=ESTATUS.index(df_inv.loc[idx, 'Estatus']) if df_inv.loc[idx, 'Estatus'] in ESTATUS else 0)
+                mod_ubicacion = st.selectbox("Ubicación", UBICACIONES, index=UBICACIONES.index(df_inv.loc[idx, 'Ubicación']) if df_inv.loc[idx, 'Ubicación'] in UBICACIONES else 0)
+                mod_estatus = st.selectbox("Estatus", ESTATUS, index=ESTATUS.index(df_inv.loc[idx, 'Estatus']) if df_inv.loc[idx, 'Estatus'] in ESTATUS else 0)
                 
                 fecha_actual_reg = str(df_inv.loc[idx, 'Ultimo_Movimiento'])[:10]
                 try:
@@ -2268,13 +2607,13 @@ elif menu == "✏️ Editar / Eliminar" and st.session_state['autenticado']:
                 except ValueError:
                     dt_default = date.today()
                 
-                mod_fecha = st.date_input("📅 Fecha de Último Movimiento", value=dt_default)
+                mod_fecha = st.date_input("Fecha de Último Movimiento", value=dt_default)
                 
                 col1, col2 = st.columns(2)
                 with col1:
-                    btn_guardar = st.form_submit_button("💾 Guardar Cambios")
+                    btn_guardar = st.form_submit_button(":material/save: Guardar Cambios")
                 with col2:
-                    btn_eliminar = st.form_submit_button("🗑 Eliminar Equipo")
+                    btn_eliminar = st.form_submit_button(":material/delete: Eliminar Equipo")
                 
                 if btn_guardar:
                     df_inv.loc[idx, 'Modelo'] = mod_modelo
@@ -2287,36 +2626,45 @@ elif menu == "✏️ Editar / Eliminar" and st.session_state['autenticado']:
                         
                     guardar_datos(df_inv)
                     registrar_historial(serie_edit, mod_modelo, "EDICIÓN", f"Datos modificados. Tipo: {mod_tipo} | Imagen: {mod_imagen} | Canal: {mod_canal} | Fecha Movimiento: {mod_fecha.strftime('%Y-%m-%d')}")
-                    st.success("✅ ¡Datos actualizados con éxito!")
+                    st.success("¡Datos actualizados con éxito!")
                 
                 if btn_eliminar:
                     modelo_eliminado = df_inv.loc[idx, 'Modelo']
                     df_inv = df_inv.drop(idx).reset_index(drop=True)
                     guardar_datos(df_inv)
                     registrar_historial(serie_edit, modelo_eliminado, "ELIMINACIÓN", "Equipo eliminado del inventario.")
-                    st.success("🗑️ ¡Equipo eliminado permanentemente del sistema!")
+                    st.success("¡Equipo eliminado permanentemente del sistema!")
 
 # 10. HISTORIAL DE MOVIMIENTOS (SOLO ADMINISTRADORES)
-elif menu == "📜 Historial de Movimientos" and st.session_state['autenticado']:
-    render_banner("📜", "Historial de Movimientos", "Bitácora de entradas, salidas y cambios de ubicación.")
+elif menu == "Historial de Movimientos" and st.session_state['autenticado']:
+    render_banner("historial", "Historial de Movimientos", "Bitácora de entradas, salidas y cambios de ubicación.")
     df_h = cargar_historial()
     if df_h.empty:
-        st.info("ℹ️ Aún no hay movimientos registrados en la bitácora.")
+        st.info("Aún no hay movimientos registrados en la bitácora.")
     else:
         columnas_ordenadas = ["Fecha_Hora", "Usuario", "Serie", "Modelo", "Tipo_Movimiento", "Ruta", "Motivo", "Detalles"]
         df_h = df_h[[col for col in columnas_ordenadas if col in df_h.columns]]
-        st.dataframe(df_h.sort_values(by="Fecha_Hora", ascending=False), use_container_width=True, hide_index=True)
+        mostrar_tabla(df_h.sort_values(by="Fecha_Hora", ascending=False), use_container_width=True, hide_index=True)
 
 # 11. EXPORTAR A EXCEL (SOLO ADMINISTRADORES)
-elif menu == "💾 Exportar a Excel" and st.session_state['autenticado']:
-    render_banner("💾", "Exportar a Excel", "Exportar e importar la base de datos completa.")
+elif menu == "Exportar a Excel" and st.session_state['autenticado']:
+    render_banner("exportar", "Exportar a Excel", "Exportar e importar la base de datos completa.")
+    if db_activa():
+        try:
+            _res_db = db_resumen()
+            st.success("Base de datos conectada (PostgreSQL). Registros guardados: " +
+                       " | ".join(f"{k.capitalize()}: {v:,}" for k, v in _res_db.items()))
+        except Exception as e_db:
+            st.error(f"No se pudo consultar la base de datos: {type(e_db).__name__}")
+    else:
+        st.warning("Base de datos no configurada: la app está usando archivos temporales. Agrega DATABASE_URL en Secrets para que los datos queden guardados de forma permanente.")
     
-    sub_pestana = st.radio("Selecciona una opción:", ["📥 Exportar a Excel", "📂 Importar Base de Datos Completa"], horizontal=True)
+    sub_pestana = st.radio("Selecciona una opción:", ["Exportar a Excel", "Importar Base de Datos Completa"], horizontal=True)
     st.markdown("---")
     
-    if sub_pestana == "📥 Exportar a Excel":
+    if sub_pestana == "Exportar a Excel":
         st.markdown("Genera un archivo completo con el inventario actual, levantamientos, solicitudes y la bitácora de movimientos en pestañas separadas.")
-        if st.button("📥 Generar Archivo Excel"):
+        if st.button(":material/download: Generar Archivo Excel"):
             output_file = "Reporte_Inventario_Capacidades_Bepensa.xlsx"
             df_export = calcular_dias_sin_movimiento(df_inv)
             
@@ -2339,17 +2687,17 @@ elif menu == "💾 Exportar a Excel" and st.session_state['autenticado']:
                 
             with open(output_file, "rb") as f:
                 st.download_button(
-                    label="📥 Click Aquí para Descargar el Archivo",
+                    label=":material/download: Click Aquí para Descargar el Archivo",
                     data=f,
                     file_name=output_file,
                     mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                 )
-            st.success("✅ ¡Archivo Excel generado correctamente con todas las pestañas!")
+            st.success("¡Archivo Excel generado correctamente con todas las pestañas!")
             
-    elif sub_pestana == "📂 Importar Base de Datos Completa":
+    elif sub_pestana == "Importar Base de Datos Completa":
         st.markdown("Sube tu archivo Excel y **selecciona manualmente qué pestaña de tu archivo corresponde a cada apartado** de la aplicación.")
         
-        archivo_completo = st.file_uploader("📂 Selecciona tu archivo Excel con múltiples pestañas", type=["xlsx", "xls"])
+        archivo_completo = st.file_uploader("Selecciona tu archivo Excel con múltiples pestañas", type=["xlsx", "xls"])
         
         if archivo_completo is not None:
             try:
@@ -2361,13 +2709,14 @@ elif menu == "💾 Exportar a Excel" and st.session_state['autenticado']:
                 
                 opciones_hojas_vacio = ["(No importar esta sección)"] + nombres_hojas
                 
-                hoja_inventario = st.selectbox("🏢 Selecciona la pestaña de tu Excel que corresponde al **Inventario Actual**:", opciones_hojas_vacio)
-                hoja_levantamientos = st.selectbox("📝 Selecciona la pestaña de tu Excel que corresponde a **Levantamientos**:", opciones_hojas_vacio)
-                hoja_solicitudes = st.selectbox("📋 Selecciona la pestaña de tu Excel que corresponde a **Solicitudes**:", opciones_hojas_vacio)
+                hoja_inventario = st.selectbox("Selecciona la pestaña de tu Excel que corresponde al **Inventario Actual**:", opciones_hojas_vacio)
+                hoja_levantamientos = st.selectbox("Selecciona la pestaña de tu Excel que corresponde a **Levantamientos**:", opciones_hojas_vacio)
+                hoja_solicitudes = st.selectbox("Selecciona la pestaña de tu Excel que corresponde a **Solicitudes**:", opciones_hojas_vacio)
+                hoja_historial = st.selectbox("Selecciona la pestaña de tu Excel que corresponde al **Historial de Movimientos**:", opciones_hojas_vacio)
                 
                 st.markdown("<br>", unsafe_allow_html=True)
                 
-                if st.button("🚀 Ejecutar Importación Seleccionada"):
+                if st.button(":material/send: Ejecutar Importación Seleccionada"):
                     import_count = 0
                     
                     if hoja_inventario != "(No importar esta sección)":
@@ -2375,28 +2724,35 @@ elif menu == "💾 Exportar a Excel" and st.session_state['autenticado']:
                         df_temp = limpiar_y_mapear_columnas(df_temp, ESQUEMA_COLUMNAS)
                         guardar_datos(df_temp)
                         import_count += 1
-                        st.success(f"✅ Inventario Actualizado: {len(df_temp)} registros importados desde la pestaña '{hoja_inventario}'.")
+                        st.success(f"Inventario Actualizado: {len(df_temp)} registros importados desde la pestaña '{hoja_inventario}'.")
                         
                     if hoja_levantamientos != "(No importar esta sección)":
                         df_temp = pd.read_excel(xls, sheet_name=hoja_levantamientos, dtype=str).fillna("")
                         df_temp = limpiar_y_mapear_columnas(df_temp, COLUMNAS_LEVANTAMIENTOS)
-                        df_temp.to_csv(LEVANTAMIENTOS_FILE, index=False)
+                        guardar_levantamientos(df_temp)
                         import_count += 1
-                        st.success(f"✅ Levantamientos Actualizados: {len(df_temp)} registros importados desde la pestaña '{hoja_levantamientos}'.")
+                        st.success(f"Levantamientos Actualizados: {len(df_temp)} registros importados desde la pestaña '{hoja_levantamientos}'.")
                         
                     if hoja_solicitudes != "(No importar esta sección)":
                         df_temp = pd.read_excel(xls, sheet_name=hoja_solicitudes, dtype=str).fillna("")
-                        df_temp = limpiar_y_mapear_columnas(df_temp, COLUMNAS_LEVANTAMIENTOS)
+                        df_temp = limpiar_y_mapear_columnas(df_temp, COLUMNAS_SOLICITUDES)
                         guardar_solicitudes_seguro(df_temp)
                         import_count += 1
-                        st.success(f"✅ Solicitudes Actualizadas: {len(df_temp)} registros importados desde la pestaña '{hoja_solicitudes}'.")
+                        st.success(f"Solicitudes Actualizadas: {len(df_temp)} registros importados desde la pestaña '{hoja_solicitudes}'.")
+
+                    if hoja_historial != "(No importar esta sección)":
+                        df_temp = pd.read_excel(xls, sheet_name=hoja_historial, dtype=str).fillna("")
+                        df_temp = limpiar_y_mapear_columnas(df_temp, COLUMNAS_HISTORIAL)
+                        guardar_historial(df_temp)
+                        import_count += 1
+                        st.success(f"Historial Actualizado: {len(df_temp)} registros importados desde la pestaña '{hoja_historial}'.")
                         
                     if import_count > 0:
-                        st.toast("Operación completada", icon="✅")
-                        st.success("🎉 ¡Todas las pestañas seleccionadas se han importado y reflejado correctamente en el sistema!")
+                        st.toast("Operación completada")
+                        st.success("¡Todas las pestañas seleccionadas se han importado y reflejado correctamente en el sistema!")
                         time.sleep(3)
                         st.rerun()
                     else:
-                        st.warning("⚠️ Debes seleccionar al menos una pestaña para importar.")
+                        st.warning("Debes seleccionar al menos una pestaña para importar.")
             except Exception as e:
-                st.error(f"⚠️ Error al leer el archivo Excel: {e}")
+                st.error(f"Error al leer el archivo Excel: {e}")
