@@ -10,7 +10,7 @@ import streamlit.components.v1 as components
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import os
 import requests
 import json
@@ -1249,6 +1249,49 @@ def guardar_historial(df_h):
         st.error(f"Error: No se pudo guardar porque el archivo '{HISTORIAL_FILE}' está abierto en Excel.")
         return False
 
+def mascara_serie(df, serie):
+    """Coincidencia de series sin distinguir mayúsculas/minúsculas ni espacios en los extremos."""
+    return df['Serie'].astype(str).str.strip().str.upper() == str(serie).strip().upper()
+
+def serie_en_inventario(df, serie):
+    return (not df.empty) and bool(mascara_serie(df, serie).any())
+
+def quitar_serie(df, serie):
+    return df[~mascara_serie(df, serie)].reset_index(drop=True)
+
+def _fechas_a_datetime(serie):
+    t = serie.astype(str).str.strip().str[:10]
+    f = pd.to_datetime(t, errors="coerce", format="%Y-%m-%d")
+    pend = f.isna() & t.ne("") & ~t.str.lower().isin(["nan", "nat", "none"])
+    if pend.any():
+        try:
+            f.loc[pend] = pd.to_datetime(t[pend], errors="coerce", dayfirst=True, format="mixed")
+        except Exception:
+            pass
+    return f
+
+def filtro_fecha_solicitudes(prefijo):
+    """Selector de filtro por fecha para solicitudes. Devuelve (columna, desde, hasta); columna=None si no se filtra."""
+    c1, c2 = st.columns([1, 1])
+    with c1:
+        campo = st.selectbox("Filtrar por fecha de:", ["Sin filtro de fecha", "Fecha Recibido", "Fecha Entrega"], key=f"{prefijo}_fecha_campo")
+    with c2:
+        rango = st.date_input("Rango de fechas (desde - hasta)", value=(date.today() - timedelta(days=30), date.today()), key=f"{prefijo}_fecha_rango")
+    if isinstance(rango, (tuple, list)):
+        desde = rango[0] if len(rango) > 0 else None
+        hasta = rango[1] if len(rango) > 1 else desde
+    else:
+        desde = hasta = rango
+    columna = {"Fecha Recibido": "Fecha_Recibido", "Fecha Entrega": "Fecha_Entregado"}.get(campo)
+    return columna, desde, hasta
+
+def aplicar_filtro_fecha(df, columna, desde, hasta):
+    if not columna or desde is None or columna not in df.columns:
+        return df
+    f = _fechas_a_datetime(df[columna])
+    return df[(f >= pd.Timestamp(desde)) & (f <= pd.Timestamp(hasta))]
+
+
 def calcular_dias_sin_movimiento(df):
     if df.empty:
         return df
@@ -1338,12 +1381,11 @@ if st.session_state['autenticado']:
 
 elif st.session_state['es_chofer']:
     st.sidebar.markdown(f'<div class="session-chip"><span class="dot"></span>Chofer en ruta: <b>{st.session_state["nombre_chofer"]}</b></div>', unsafe_allow_html=True)
-    # Menú exclusivo para Choferes (Solicitudes Diarias + Especificaciones)
+    # Menú exclusivo para Choferes (solo Solicitudes Diarias)
     menu = st.sidebar.radio(
         "Menú de Chofer",
         [
-            "Solicitudes Diarias",
-            "Catálogo de Equipos"
+            "Solicitudes Diarias"
         ],
         format_func=_etiqueta_menu,
         key="nav_chofer",
@@ -1433,9 +1475,10 @@ if menu == "Equipos Disponibles":
     st.markdown("---")
 
     if not df_inv.empty:
+        # Disponible = en almacén o patios Y con estatus Nuevo o Reparado (los "Para Reparar" no están disponibles hasta que el taller los repare)
         condicion_disponibles = (
-            (df_inv['Ubicación'].isin(["En almacén de Comodatos", "En almacén de Publicidad"])) |
-            ((df_inv['Ubicación'] == "En patios") & (df_inv['Estatus'].isin(["Nuevo", "Reparado"])))
+            df_inv['Ubicación'].isin(["En almacén de Comodatos", "En almacén de Publicidad", "En patios"]) &
+            df_inv['Estatus'].astype(str).str.strip().str.lower().isin(["nuevo", "reparado"])
         )
         df_disp_global = df_inv[condicion_disponibles & (df_inv['Canal'] != "Cedis")].copy()
     else:
@@ -1747,8 +1790,8 @@ elif menu == "Solicitudes Diarias":
                                 
                                 status_ok_eliminar = ["entregado", "realizado", "transferido"]
                                 if nuevo_estatus_user.strip().lower() in status_ok_eliminar and serie_usr:
-                                    if not df_inv.empty and serie_usr in df_inv['Serie'].values:
-                                        df_inv = df_inv[df_inv['Serie'] != serie_usr].reset_index(drop=True)
+                                    if not df_inv.empty and serie_en_inventario(df_inv, serie_usr):
+                                        df_inv = quitar_serie(df_inv, serie_usr)
                                         guardar_datos(df_inv)
                                         usr_tipo_log = st.session_state['usuario_actual']
                                         registrar_historial(serie_usr, modelo_usr, f"SOLICITUD {nuevo_estatus_user.upper()} ({usr_tipo_log.upper()})", f"Usuario: {usr_tipo_log} | Cliente: {cliente_usr} | CUC: {cuc_usr} | Actualizado en Solicitudes Diarias")
@@ -1762,7 +1805,7 @@ elif menu == "Solicitudes Diarias":
                 st.markdown("---")
 
             # Mostrar la tabla general informativa del día
-            df_tabla_diaria = df_filtradas_dia[['Proyecto', 'CUC', 'Cliente', 'Modelo', 'Serie', 'Canal', 'Jefe_de_Venta', 'Supervisor', 'Ruta', 'Status', 'Observaciones']].copy()
+            df_tabla_diaria = df_filtradas_dia[['Proyecto', 'CUC', 'Cliente', 'Modelo', 'Serie', 'Canal', 'Jefe_de_Venta', 'Supervisor', 'Ruta', 'Movimiento', 'Status', 'Observaciones']].copy()
             df_tabla_diaria = df_tabla_diaria.rename(columns={'Jefe_de_Venta': 'Jefe de Venta', 'Observaciones': 'Motivo / Comentarios'})
             mostrar_tabla(df_tabla_diaria.style.map(colorear_status, subset=['Status']), use_container_width=True, hide_index=True)
             st.success(f"Se encontraron {len(df_tabla_diaria)} solicitudes registradas bajo los criterios seleccionados.")
@@ -2028,7 +2071,9 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
     df_sol = cargar_solicitudes()
     
     if modo_solicitud == "Registrar Nueva Solicitud":
-        col_m1, _ = st.columns([2, 2])
+        col_p1, col_m1, _ = st.columns([2, 2, 2])
+        with col_p1:
+            proyecto = st.selectbox("Proyecto:", OPCIONES_PROYECTOS, key="widget_proyecto_nuevo")
         with col_m1:
             movimiento = st.selectbox(
                 "Movimiento:", 
@@ -2049,10 +2094,9 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                     idx_st_default = status_permitidos_nuevos.index(st.session_state['form_status'])
                 status_sol = st.selectbox("Status:", status_permitidos_nuevos, index=idx_st_default, key="widget_status")
                 
-                incluir_fecha_entregado = st.checkbox("¿Asignar Fecha de Realizado ahora?", value=False)
-                fecha_entregado = st.date_input("Fecha de Realizado", value=date.today())
+                incluir_fecha_entregado = st.checkbox("¿Asignar Fecha Entrega ahora?", value=False)
+                fecha_entregado = st.date_input("Fecha Entrega", value=date.today())
                 fecha_recibido = st.date_input("Fecha de Recibido", value=date.today())
-                proyecto = st.selectbox("Proyecto:", OPCIONES_PROYECTOS)
                 cuc = st.text_input("CUC:").strip()
 
             with col_s2:
@@ -2086,7 +2130,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                     st.error("Por favor, ingresa al menos el CUC, el Modelo y el Cliente.")
                     st.stop()
                 elif status_sol.lower() in ["entregado", "realizado", "transferido", "levantado"] and not incluir_fecha_entregado:
-                    st.error(f"No se guardaron los cambios: Seleccionó el estatus '{status_sol}' pero no activó ni asignó la Fecha de Realizado. La solicitud no puede avanzar de estatus sin su respectiva fecha.")
+                    st.error(f"No se guardaron los cambios: Seleccionó el estatus '{status_sol}' pero no activó ni asignó la Fecha Entrega. La solicitud no puede avanzar de estatus sin su respectiva fecha.")
                     st.stop()
                 else:
                     fecha_e_str = fecha_entregado.strftime("%Y-%m-%d") if incluir_fecha_entregado else ""
@@ -2104,13 +2148,16 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                     if guardar_solicitudes_seguro(df_sol):
                         status_ok_eliminar = ["entregado", "realizado", "transferido"]
                         if status_sol.strip().lower() in status_ok_eliminar and serie_sol:
-                            if not df_inv.empty and serie_sol in df_inv['Serie'].values:
-                                df_inv = df_inv[df_inv['Serie'] != serie_sol].reset_index(drop=True)
+                            if not df_inv.empty and serie_en_inventario(df_inv, serie_sol):
+                                df_inv = quitar_serie(df_inv, serie_sol)
                                 guardar_datos(df_inv)
                                 registrar_historial(serie_sol, modelo_sol, f"SOLICITUD {status_sol.upper()}", f"Cliente: {cliente_sol} | CUC: {cuc} | Eliminado automáticamente del Inventario General por estatus OK")
                                 st.success(f"¡Solicitud guardada! La serie {serie_sol} ha sido eliminada automáticamente del Inventario General debido al estatus '{status_sol}'.")
                             else:
                                 st.success("¡Solicitud guardada correctamente!")
+                                st.warning(f"La serie {serie_sol} no está en el Inventario General; la solicitud se guardó sin afectar el inventario.")
+                                registrar_historial(serie_sol, modelo_sol, f"SOLICITUD {status_sol.upper()} (SIN INVENTARIO)",
+                                                    f"Movimiento: {movimiento_final} | Cliente: {cliente_sol} | CUC: {cuc} | La serie no estaba en el Inventario General; no se modificó el inventario")
                         else:
                             st.success("¡Solicitud guardada correctamente (sin afectar el Inventario General)!")
 
@@ -2120,6 +2167,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
         with st.form("form_buscar_canal"):
             b_canal = st.selectbox("Filtrar por Canal:", ["Todos"] + OPCIONES_CANALES_SOL)
             b_cuc_busqueda = st.text_input("O busque por CUC exacto (Opcional):").strip()
+            b_fecha_col, b_desde, b_hasta = filtro_fecha_solicitudes("sol_busq")
             btn_buscar = st.form_submit_button("Buscar Solicitud")
             
         if btn_buscar:
@@ -2129,6 +2177,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                 df_pend_busq = df_pend_busq[df_pend_busq['Canal'] == b_canal]
             if b_cuc_busqueda:
                 df_pend_busq = df_pend_busq[df_pend_busq['CUC'].str.contains(b_cuc_busqueda, case=False, na=False)]
+            df_pend_busq = aplicar_filtro_fecha(df_pend_busq, b_fecha_col, b_desde, b_hasta)
 
             st.session_state['df_pend_busq_resultado'] = df_pend_busq
 
@@ -2222,8 +2271,8 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
 
                             status_edit = st.selectbox("Status:", status_permitidos_edit, index=idx_status_default, key=key_sesion_stat)
                             
-                            incluir_fecha_entregado_edit = st.checkbox("¿Asignar Fecha de Realizado ahora?", value=has_entregado_orig, key=f"chk_ent_{idx_seleccionado}")
-                            f_entregado_edit = st.date_input("Fecha de Realizado", value=dt_ent, key=f"f_ent_{idx_seleccionado}")
+                            incluir_fecha_entregado_edit = st.checkbox("¿Asignar Fecha Entrega ahora?", value=has_entregado_orig, key=f"chk_ent_{idx_seleccionado}")
+                            f_entregado_edit = st.date_input("Fecha Entrega", value=dt_ent, key=f"f_ent_{idx_seleccionado}")
                             
                             idx_proy = OPCIONES_PROYECTOS.index(row_sel['Proyecto']) if row_sel['Proyecto'] in OPCIONES_PROYECTOS else 0
                             proyecto_edit = st.selectbox("Proyecto:", OPCIONES_PROYECTOS, index=idx_proy, key=f"proy_{idx_seleccionado}")
@@ -2268,7 +2317,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                             elif not cuc_edit or not modelo_edit or not cliente_edit:
                                 st.error("Por favor, ingresa al menos el CUC, el Modelo y el Cliente.")
                             elif status_edit.lower() in ["entregado", "realizado", "transferido", "levantado"] and not incluir_fecha_entregado_edit:
-                                st.error(f"No se guardaron los cambios: Seleccionó el estatus '{status_edit}' pero no activó ni asignó la Fecha de Realizado.")
+                                st.error(f"No se guardaron los cambios: Seleccionó el estatus '{status_edit}' pero no activó ni asignó la Fecha Entrega.")
                             else:
                                 f_rec_str = str(row_sel.get('Fecha_Recibido', ''))
                                 f_ent_str = f_entregado_edit.strftime("%Y-%m-%d") if incluir_fecha_entregado_edit else ""
@@ -2292,16 +2341,26 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                                 
                                 if guardar_solicitudes_seguro(df_sol):
                                     status_ok_eliminar = ["entregado", "realizado", "transferido"]
+                                    aviso_sin_inventario = False
                                     if status_edit.strip().lower() in status_ok_eliminar and serie_edit:
-                                        if not df_inv.empty and serie_edit in df_inv['Serie'].values:
-                                            df_inv = df_inv[df_inv['Serie'] != serie_edit].reset_index(drop=True)
+                                        if not df_inv.empty and serie_en_inventario(df_inv, serie_edit):
+                                            df_inv = quitar_serie(df_inv, serie_edit)
                                             guardar_datos(df_inv)
                                             registrar_historial(serie_edit, modelo_edit, f"SOLICITUD {status_edit.upper()}", f"Cliente: {cliente_edit} | CUC: {cuc_edit} | Eliminado por actualización a estatus OK")
                                     
+                                        else:
+                                            aviso_sin_inventario = True
+                                            st.warning(f"La serie {serie_edit} no está en el Inventario General; la solicitud se guardó sin afectar el inventario.")
+                                            estatus_previo = str(row_sel.get('Status', '')).strip().lower()
+                                            serie_previa = str(row_sel.get('Serie', '')).strip()
+                                            if estatus_previo not in status_ok_eliminar or serie_previa != serie_edit:
+                                                registrar_historial(serie_edit, modelo_edit, f"SOLICITUD {status_edit.upper()} (SIN INVENTARIO)",
+                                                                    f"Movimiento: {movimiento_edit} | Cliente: {cliente_edit} | CUC: {cuc_edit} | La serie no estaba en el Inventario General; no se modificó el inventario")
+
                                     st.success("¡Cambios guardados con éxito! La solicitud ha sido actualizada y sincronizada correctamente en el sistema.")
                                     if 'df_pend_busq_resultado' in st.session_state:
                                         del st.session_state['df_pend_busq_resultado']
-                                    time.sleep(2.5)
+                                    time.sleep(6 if aviso_sin_inventario else 2.5)
                                     st.rerun()
                                 else:
                                     st.error("Error: No se pudieron guardar los cambios en la solicitud.")
@@ -2323,6 +2382,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
         st.markdown("#### Historial de Solicitudes (Entregadas, Transferidas, Realizadas o Levantadas)")
         
         filtro_cuc_ok = st.text_input("Filtrar por CUC:").strip()
+        ok_fecha_col, ok_desde, ok_hasta = filtro_fecha_solicitudes("sol_ok")
         st.markdown("---")
 
         if not df_sol.empty:
@@ -2346,16 +2406,17 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                 if filtro_cuc_ok:
                     generadas_df = generadas_df[generadas_df['CUC'].str.contains(filtro_cuc_ok, case=False, na=False)]
 
+                generadas_df = aplicar_filtro_fecha(generadas_df, ok_fecha_col, ok_desde, ok_hasta)
                 df_mostrar_gen = generadas_df[['Fecha_Entregado', 'CUC', 'Cliente', 'Modelo', 'Serie', 'Canal', 'Jefe_de_Venta', 'Supervisor', 'Ruta', 'Status']].copy()
                 df_mostrar_gen = df_mostrar_gen.rename(columns={
-                    'Fecha_Entregado': 'Fecha Realizado',
+                    'Fecha_Entregado': 'Fecha Entrega',
                     'Jefe_de_Venta': 'Jefe de Venta'
                 })
                 
                 if not df_mostrar_gen.empty:
                     mostrar_tabla(df_mostrar_gen, use_container_width=True, hide_index=True)
                 else:
-                    st.warning("No se encontraron solicitudes que coincidan con el CUC buscado.")
+                    st.warning("No se encontraron solicitudes que coincidan con los filtros seleccionados.")
             else:
                 st.info("No hay solicitudes con estatus Entregado, Transferido, Realizado o Levantado registradas todavía.")
         else:
@@ -2406,12 +2467,12 @@ elif menu == "Levantamientos" and st.session_state['autenticado']:
                 modelo = st.text_input("Modelo del Equipo:").strip()
                 serie = st.text_input("Número de Serie:").strip()
                 tipo = st.selectbox("Tipo de Equipo:", TIPOS_EQUIPO)
-                imagen = st.selectbox("Imagen / Marca:", OPCIONES_IMAGEN)
+                imagen = st.selectbox("Imagen:", OPCIONES_IMAGEN)
             with col_l2:
                 canal = st.selectbox("Canal:", [c for c in OPCIONES_CANALES_SOL if c != "Otro"])
                 status_lev = st.selectbox("Estatus del Equipo:", ESTATUS)
                 motivo = st.text_input("Motivo del Levantamiento:").strip()
-                ubicacion = st.selectbox("Ubicación Inicial (ej. En taller):", UBICACIONES, index=3)
+                ubicacion = st.selectbox("Ubicación (ej. En patios):", UBICACIONES, index=3)
                 ruta = st.text_input("Ruta:").strip()
                 jefe_venta = st.text_input("Jefe de Venta:").strip()
                 solicitado = st.selectbox("Solicitado vía:", ["Whatsapp", "Correo", "Solicitud"])
@@ -2435,7 +2496,7 @@ elif menu == "Levantamientos" and st.session_state['autenticado']:
                     guardar_levantamientos(df_lev)
                     
                     serie_limpia = str(serie).strip()
-                    if not df_inv.empty and serie_limpia in df_inv['Serie'].values:
+                    if not df_inv.empty and serie_en_inventario(df_inv, serie_limpia):
                         st.warning(f"ALERTA: La serie '{serie_limpia}' ya se encuentra registrada en el Inventario General. Los datos no se duplicaron.")
                     else:
                         nueva_inv = pd.DataFrame([{
@@ -2505,7 +2566,7 @@ elif menu == "Registrar Entrada" and st.session_state['autenticado']:
                     fecha_str = fecha_entrada.strftime("%Y-%m-%d")
                     serie_limpia = str(serie).strip()
                     
-                    if not df_inv.empty and serie_limpia in df_inv['Serie'].values:
+                    if not df_inv.empty and serie_en_inventario(df_inv, serie_limpia):
                         st.warning(f"ALERTA: La serie '{serie_limpia}' ya se encuentra registrada en el Inventario General. No se permiten series duplicadas.")
                     else:
                         nueva_fila = pd.DataFrame([{
@@ -2538,14 +2599,14 @@ elif menu == "Registrar Entrada" and st.session_state['autenticado']:
                 if st.button(":material/send: Confirmar e Importar Entradas Masivas"):
                     count_nuevos = 0
                     alertas_duplicadas = 0
-                    series_existentes = set(df_inv['Serie'].astype(str)) if not df_inv.empty else set()
+                    series_existentes = set(df_inv['Serie'].astype(str).str.strip().str.upper()) if not df_inv.empty else set()
                     filas_nuevas = []
                     movimientos_hist = []
                     for _, row in df_subido_masivo.iterrows():
                         s_val = str(row.get('Serie', '')).strip()
                         m_val = str(row.get('Modelo', '')).strip()
                         if s_val and m_val:
-                            if s_val in series_existentes:
+                            if s_val.upper() in series_existentes:
                                 alertas_duplicadas += 1
                                 continue
 
@@ -2560,7 +2621,7 @@ elif menu == "Registrar Entrada" and st.session_state['autenticado']:
                                 "Serie": s_val, "Modelo": m_val, "Tipo": t_val, "Imagen": i_val,
                                 "Canal": c_val, "Ubicación": u_val, "Estatus": e_val, "Ultimo_Movimiento": f_val
                             })
-                            series_existentes.add(s_val)
+                            series_existentes.add(s_val.upper())
                             count_nuevos += 1
                             movimientos_hist.append((s_val, m_val, "ENTRADA MASIVA", f"Carga masiva. Ubicación: {u_val} | Estatus: {e_val}"))
 
@@ -2582,10 +2643,11 @@ elif menu == "Registrar Salida" and st.session_state['autenticado']:
     serie_buscar = st.text_input("Escriba la serie del equipo para dar salida:").strip()
     
     if serie_buscar:
-        equipo = df_inv[df_inv['Serie'] == serie_buscar]
+        equipo = df_inv[mascara_serie(df_inv, serie_buscar)]
         if equipo.empty:
             st.warning("No se encontró ningún equipo con esa serie en el inventario.")
         else:
+            serie_buscar = str(equipo.iloc[0]['Serie'])
             modelo_actual_eq = str(equipo.iloc[0]['Modelo'])
             tipo_actual_eq = str(equipo.iloc[0]['Tipo']) if 'Tipo' in equipo.columns else 'Enfriador'
             imagen_actual_eq = str(equipo.iloc[0]['Imagen']) if 'Imagen' in equipo.columns else 'Sin Imagen'
@@ -2603,7 +2665,7 @@ elif menu == "Registrar Salida" and st.session_state['autenticado']:
                 btn_confirmar_salida = st.form_submit_button("Confirmar salida")
                 
                 if btn_confirmar_salida:
-                    idx = df_inv[df_inv['Serie'] == serie_buscar].index[0]
+                    idx = df_inv[mascara_serie(df_inv, serie_buscar)].index[0]
                     fecha_str = fecha_salida.strftime("%Y-%m-%d")
                     
                     registrar_historial(
@@ -2624,11 +2686,12 @@ elif menu == "Editar / Eliminar" and st.session_state['autenticado']:
     serie_edit = st.text_input("Ingrese la serie del equipo a editar o eliminar:").strip()
     
     if serie_edit:
-        equipo = df_inv[df_inv['Serie'] == serie_edit]
+        equipo = df_inv[mascara_serie(df_inv, serie_edit)]
         if equipo.empty:
             st.warning("No se encontró el equipo en la base de datos.")
         else:
-            idx = df_inv[df_inv['Serie'] == serie_edit].index[0]
+            serie_edit = str(equipo.iloc[0]['Serie'])
+            idx = df_inv[mascara_serie(df_inv, serie_edit)].index[0]
             
             with st.form("form_editar"):
                 mod_modelo = st.text_input("Modelo", value=str(df_inv.loc[idx, 'Modelo']))
