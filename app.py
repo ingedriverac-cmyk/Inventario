@@ -1270,26 +1270,35 @@ def _fechas_a_datetime(serie):
             pass
     return f
 
-def filtro_fecha_solicitudes(prefijo):
-    """Selector de filtro por fecha para solicitudes. Devuelve (columna, desde, hasta); columna=None si no se filtra."""
+def filtro_solicitudes_status_fecha(prefijo, opciones_status):
+    """Filtros de solicitudes: Status (con 'Todos') y rango de fechas. Devuelve (status, desde, hasta);
+    desde/hasta son None si no se activa el rango de fechas."""
     c1, c2 = st.columns([1, 1])
     with c1:
-        campo = st.selectbox("Filtrar por fecha de:", ["Sin filtro de fecha", "Fecha Recibido", "Fecha Entrega"], key=f"{prefijo}_fecha_campo")
+        status_sel = st.selectbox("Filtrar por Status:", ["Todos"] + list(opciones_status), key=f"{prefijo}_status")
     with c2:
+        usar_rango = st.checkbox("Filtrar por rango de fechas", value=False, key=f"{prefijo}_usar_rango")
         rango = st.date_input("Rango de fechas (desde - hasta)", value=(date.today() - timedelta(days=30), date.today()), key=f"{prefijo}_fecha_rango")
-    if isinstance(rango, (tuple, list)):
-        desde = rango[0] if len(rango) > 0 else None
-        hasta = rango[1] if len(rango) > 1 else desde
-    else:
-        desde = hasta = rango
-    columna = {"Fecha Recibido": "Fecha_Recibido", "Fecha Entrega": "Fecha_Entregado"}.get(campo)
-    return columna, desde, hasta
+    desde = hasta = None
+    if usar_rango:
+        if isinstance(rango, (tuple, list)):
+            desde = rango[0] if len(rango) > 0 else None
+            hasta = rango[1] if len(rango) > 1 else desde
+        else:
+            desde = hasta = rango
+    return status_sel, desde, hasta
 
-def aplicar_filtro_fecha(df, columna, desde, hasta):
-    if not columna or desde is None or columna not in df.columns:
-        return df
-    f = _fechas_a_datetime(df[columna])
-    return df[(f >= pd.Timestamp(desde)) & (f <= pd.Timestamp(hasta))]
+def aplicar_filtros_solicitudes(df, status_sel, desde, hasta):
+    """Aplica el Status elegido y, si se activó, el rango de fechas. La fecha usada es la Fecha Entrega
+    cuando la solicitud ya la tiene y, si no, la Fecha Recibido (p. ej. las pendientes)."""
+    if status_sel and status_sel != "Todos" and 'Status' in df.columns:
+        df = df[df['Status'].astype(str).str.strip().str.lower() == status_sel.strip().lower()]
+    if desde is not None and hasta is not None:
+        f_ent = _fechas_a_datetime(df['Fecha_Entregado']) if 'Fecha_Entregado' in df.columns else pd.Series(pd.NaT, index=df.index)
+        f_rec = _fechas_a_datetime(df['Fecha_Recibido']) if 'Fecha_Recibido' in df.columns else pd.Series(pd.NaT, index=df.index)
+        f = f_ent.where(f_ent.notna(), f_rec)
+        df = df[(f >= pd.Timestamp(desde)) & (f <= pd.Timestamp(hasta))]
+    return df
 
 
 def calcular_dias_sin_movimiento(df):
@@ -2167,7 +2176,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
         with st.form("form_buscar_canal"):
             b_canal = st.selectbox("Filtrar por Canal:", ["Todos"] + OPCIONES_CANALES_SOL)
             b_cuc_busqueda = st.text_input("O busque por CUC exacto (Opcional):").strip()
-            b_fecha_col, b_desde, b_hasta = filtro_fecha_solicitudes("sol_busq")
+            b_status, b_desde, b_hasta = filtro_solicitudes_status_fecha("sol_busq", ["Pendiente", "Entregado", "Transferido", "Realizado", "Levantado", "Cancelado"])
             btn_buscar = st.form_submit_button("Buscar Solicitud")
             
         if btn_buscar:
@@ -2177,7 +2186,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                 df_pend_busq = df_pend_busq[df_pend_busq['Canal'] == b_canal]
             if b_cuc_busqueda:
                 df_pend_busq = df_pend_busq[df_pend_busq['CUC'].str.contains(b_cuc_busqueda, case=False, na=False)]
-            df_pend_busq = aplicar_filtro_fecha(df_pend_busq, b_fecha_col, b_desde, b_hasta)
+            df_pend_busq = aplicar_filtros_solicitudes(df_pend_busq, b_status, b_desde, b_hasta)
 
             st.session_state['df_pend_busq_resultado'] = df_pend_busq
 
@@ -2382,7 +2391,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
         st.markdown("#### Historial de Solicitudes (Entregadas, Transferidas, Realizadas o Levantadas)")
         
         filtro_cuc_ok = st.text_input("Filtrar por CUC:").strip()
-        ok_fecha_col, ok_desde, ok_hasta = filtro_fecha_solicitudes("sol_ok")
+        ok_status, ok_desde, ok_hasta = filtro_solicitudes_status_fecha("sol_ok", ["Entregado", "Transferido", "Realizado", "Levantado"])
         st.markdown("---")
 
         if not df_sol.empty:
@@ -2406,7 +2415,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                 if filtro_cuc_ok:
                     generadas_df = generadas_df[generadas_df['CUC'].str.contains(filtro_cuc_ok, case=False, na=False)]
 
-                generadas_df = aplicar_filtro_fecha(generadas_df, ok_fecha_col, ok_desde, ok_hasta)
+                generadas_df = aplicar_filtros_solicitudes(generadas_df, ok_status, ok_desde, ok_hasta)
                 df_mostrar_gen = generadas_df[['Fecha_Entregado', 'CUC', 'Cliente', 'Modelo', 'Serie', 'Canal', 'Jefe_de_Venta', 'Supervisor', 'Ruta', 'Status']].copy()
                 df_mostrar_gen = df_mostrar_gen.rename(columns={
                     'Fecha_Entregado': 'Fecha Entrega',
@@ -2702,7 +2711,7 @@ elif menu == "Editar / Eliminar" and st.session_state['autenticado']:
                 
                 imagen_actual = str(df_inv.loc[idx, 'Imagen']) if 'Imagen' in df_inv.columns else 'Sin Imagen'
                 idx_imagen = OPCIONES_IMAGEN.index(imagen_actual) if imagen_actual in OPCIONES_IMAGEN else 0
-                mod_imagen = st.selectbox("Imagen / Marca", OPCIONES_IMAGEN, index=idx_imagen)
+                mod_imagen = st.selectbox("Imagen", OPCIONES_IMAGEN, index=idx_imagen)
                 
                 canales_inv_opc = [c for c in OPCIONES_CANALES_SOL if c != "Otro"]
                 canal_actual = str(df_inv.loc[idx, 'Canal'])
