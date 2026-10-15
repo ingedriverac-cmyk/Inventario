@@ -1249,6 +1249,17 @@ def guardar_historial(df_h):
         st.error(f"Error: No se pudo guardar porque el archivo '{HISTORIAL_FILE}' está abierto en Excel.")
         return False
 
+def parsear_series(texto):
+    """Convierte un texto con varias series (una por línea o separadas por coma o punto y coma) en una lista
+    sin repetidas (sin distinguir mayúsculas), respetando el orden."""
+    vistos, resultado = set(), []
+    for parte in re.split(r"[\n,;]+", str(texto)):
+        p = parte.strip()
+        if p and p.upper() not in vistos:
+            vistos.add(p.upper())
+            resultado.append(p)
+    return resultado
+
 def mascara_serie(df, serie):
     """Coincidencia de series sin distinguir mayúsculas/minúsculas ni espacios en los extremos."""
     return df['Serie'].astype(str).str.strip().str.upper() == str(serie).strip().upper()
@@ -2080,7 +2091,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
     df_sol = cargar_solicitudes()
     
     if modo_solicitud == "Registrar Nueva Solicitud":
-        col_p1, col_m1, _ = st.columns([2, 2, 2])
+        col_p1, col_m1, col_v1 = st.columns([2, 2, 2])
         with col_p1:
             proyecto = st.selectbox("Proyecto:", OPCIONES_PROYECTOS, key="widget_proyecto_nuevo")
         with col_m1:
@@ -2090,6 +2101,9 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                 key="widget_movimiento", 
                 on_change=actualizar_estatus_formulario
             )
+        with col_v1:
+            st.markdown("<div style='height:1.9rem'></div>", unsafe_allow_html=True)
+            st.checkbox("Capturar varias series (una solicitud por serie)", key="widget_multi_series")
         
         st.markdown("---")
         
@@ -2116,7 +2130,10 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                 modelo_sol = st.text_input("Modelo:").strip()
 
             with col_s3:
-                serie_sol = st.text_input("Número de Serie (Opcional):").strip()
+                if st.session_state.get("widget_multi_series"):
+                    serie_sol = st.text_area("Series (una por línea o separadas por coma):", height=120)
+                else:
+                    serie_sol = st.text_input("Número de Serie (Opcional):").strip()
                 canal_sol = st.selectbox("Canal:", OPCIONES_CANALES_SOL)
                 ruta_sol = st.text_input("Ruta (Opcional):").strip()
                 motivo_sol = st.text_input("Motivo:").strip()
@@ -2126,6 +2143,10 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
             submit_sol = st.form_submit_button(":material/save: Guardar Solicitud")
             
             if submit_sol:
+                if st.session_state.get("widget_multi_series"):
+                    series_lista = parsear_series(serie_sol)
+                else:
+                    series_lista = [serie_sol] if serie_sol else [""]
                 movimiento_final = st.session_state['form_movimiento']
                 status_validos_actuales = obtener_status_validos(movimiento_final)
                 
@@ -2138,6 +2159,9 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                 elif not cuc or not modelo_sol or not cliente_sol:
                     st.error("Por favor, ingresa al menos el CUC, el Modelo y el Cliente.")
                     st.stop()
+                elif st.session_state.get("widget_multi_series") and not series_lista:
+                    st.error("Activaste 'Capturar varias series', pero no escribiste ninguna serie.")
+                    st.stop()
                 elif status_sol.lower() in ["entregado", "realizado", "transferido", "levantado"] and not incluir_fecha_entregado:
                     st.error(f"No se guardaron los cambios: Seleccionó el estatus '{status_sol}' pero no activó ni asignó la Fecha Entrega. La solicitud no puede avanzar de estatus sin su respectiva fecha.")
                     st.stop()
@@ -2145,30 +2169,51 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                     fecha_e_str = fecha_entregado.strftime("%Y-%m-%d") if incluir_fecha_entregado else ""
                     fecha_r_str = fecha_recibido.strftime("%Y-%m-%d")
                     
-                    nueva_sol = pd.DataFrame([{
+                    filas_nuevas = [{
                         "Fecha_Entregado": fecha_e_str, "Status": status_sol, "Fecha_Recibido": fecha_r_str,
                         "Proyecto": proyecto, "CUC": cuc, "Cliente": cliente_sol, "Jefe_de_Venta": jefe_sol,
                         "Supervisor": supervisor, "Movimiento": movimiento_final, "Equipo": equipo_tipo,
-                        "Modelo": modelo_sol, "Serie": serie_sol, "Canal": canal_sol, "Ruta": ruta_sol,
+                        "Modelo": modelo_sol, "Serie": ser, "Canal": canal_sol, "Ruta": ruta_sol,
                         "Motivo": motivo_sol, "Observaciones": observaciones
-                    }])
-                    df_sol = pd.concat([df_sol, nueva_sol], ignore_index=True)
+                    } for ser in series_lista]
+                    df_sol = pd.concat([df_sol, pd.DataFrame(filas_nuevas)], ignore_index=True)
                     
                     if guardar_solicitudes_seguro(df_sol):
                         status_ok_eliminar = ["entregado", "realizado", "transferido"]
-                        if status_sol.strip().lower() in status_ok_eliminar and serie_sol:
-                            if not df_inv.empty and serie_en_inventario(df_inv, serie_sol):
-                                df_inv = quitar_serie(df_inv, serie_sol)
+                        series_eliminadas, series_no_encontradas, mov_hist = [], [], []
+                        if status_sol.strip().lower() in status_ok_eliminar:
+                            for ser in series_lista:
+                                if not ser:
+                                    continue
+                                if serie_en_inventario(df_inv, ser):
+                                    df_inv = quitar_serie(df_inv, ser)
+                                    series_eliminadas.append(ser)
+                                    mov_hist.append((ser, modelo_sol, f"SOLICITUD {status_sol.upper()}", f"Cliente: {cliente_sol} | CUC: {cuc} | Eliminado automáticamente del Inventario General por estatus OK"))
+                                else:
+                                    series_no_encontradas.append(ser)
+                                    mov_hist.append((ser, modelo_sol, f"SOLICITUD {status_sol.upper()} (SIN INVENTARIO)",
+                                                     f"Movimiento: {movimiento_final} | Cliente: {cliente_sol} | CUC: {cuc} | La serie no estaba en el Inventario General; no se modificó el inventario"))
+                            if series_eliminadas:
                                 guardar_datos(df_inv)
-                                registrar_historial(serie_sol, modelo_sol, f"SOLICITUD {status_sol.upper()}", f"Cliente: {cliente_sol} | CUC: {cuc} | Eliminado automáticamente del Inventario General por estatus OK")
-                                st.success(f"¡Solicitud guardada! La serie {serie_sol} ha sido eliminada automáticamente del Inventario General debido al estatus '{status_sol}'.")
-                            else:
+                            registrar_historial_lote(mov_hist)
+
+                        if len(series_lista) == 1:
+                            ser = series_lista[0]
+                            if series_eliminadas:
+                                st.success(f"¡Solicitud guardada! La serie {ser} ha sido eliminada automáticamente del Inventario General debido al estatus '{status_sol}'.")
+                            elif series_no_encontradas:
                                 st.success("¡Solicitud guardada correctamente!")
-                                st.warning(f"La serie {serie_sol} no está en el Inventario General; la solicitud se guardó sin afectar el inventario.")
-                                registrar_historial(serie_sol, modelo_sol, f"SOLICITUD {status_sol.upper()} (SIN INVENTARIO)",
-                                                    f"Movimiento: {movimiento_final} | Cliente: {cliente_sol} | CUC: {cuc} | La serie no estaba en el Inventario General; no se modificó el inventario")
+                                st.warning(f"La serie {ser} no está en el Inventario General; la solicitud se guardó sin afectar el inventario.")
+                            else:
+                                st.success("¡Solicitud guardada correctamente (sin afectar el Inventario General)!")
                         else:
-                            st.success("¡Solicitud guardada correctamente (sin afectar el Inventario General)!")
+                            st.success(f"¡{len(series_lista)} solicitudes guardadas correctamente (una por cada serie)!")
+                            if series_eliminadas:
+                                st.success(f"Series eliminadas automáticamente del Inventario General por el estatus '{status_sol}': {', '.join(series_eliminadas)}")
+                            if series_no_encontradas:
+                                st.warning(f"Estas series no están en el Inventario General (las solicitudes se guardaron sin afectar el inventario): {', '.join(series_no_encontradas)}")
+                            if not series_eliminadas and not series_no_encontradas:
+                                st.caption("Con este estatus no se modifica el Inventario General.")
 
     elif modo_solicitud == "Actualizar o Eliminar Solicitudes":
         st.markdown("#### Buscar Solicitud en el Sistema")
@@ -2213,6 +2258,95 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                     serie_txt = f" | Serie: {r['Serie']}" if str(r['Serie']).strip() else " | Sin Serie"
                     status_txt = f" | Status: {r['Status']}"
                     return f"CUC: {r['CUC']} - Cliente: {r['Cliente']} (Modelo: {r['Modelo']}{serie_txt}{status_txt})"
+
+                with st.expander("Acciones en grupo: cambiar el Status o eliminar varias solicitudes a la vez"):
+                    grp_todas = st.checkbox("Seleccionar todas las solicitudes encontradas", key="grp_todas")
+                    seleccion_grupo = st.multiselect(
+                        "Solicitudes del grupo:", opciones_indices,
+                        default=opciones_indices if grp_todas else [],
+                        format_func=format_opcion, key=f"grp_sel_{'todas' if grp_todas else 'manual'}")
+                    st.caption(f"{len(seleccion_grupo)} solicitud(es) seleccionada(s).")
+
+                    st.markdown("**Cambiar Status de las seleccionadas**")
+                    g1, g2 = st.columns(2)
+                    with g1:
+                        status_grupo = st.selectbox("Nuevo Status:", ["Pendiente", "Entregado", "Transferido", "Realizado", "Levantado", "Cancelado"], key="grp_status")
+                    with g2:
+                        fecha_grupo = st.date_input("Fecha Entrega (para Entregado, Transferido, Realizado o Levantado):", value=date.today(), key="grp_fecha")
+                    aplicar_grupo = st.button(":material/save: Aplicar Status a las seleccionadas", key="grp_aplicar")
+
+                    st.markdown("**Eliminar las seleccionadas**")
+                    grp_confirma = st.checkbox("Confirmo que deseo eliminar definitivamente las solicitudes seleccionadas", key="grp_confirma")
+                    eliminar_grupo = st.button(":material/delete: Eliminar las seleccionadas", disabled=not grp_confirma, key="grp_eliminar")
+
+                    if aplicar_grupo:
+                        if not seleccion_grupo:
+                            st.error("Selecciona al menos una solicitud.")
+                        else:
+                            status_cierre = ["entregado", "realizado", "transferido", "levantado"]
+                            status_baja = ["entregado", "realizado", "transferido"]
+                            fecha_txt = fecha_grupo.strftime("%Y-%m-%d") if status_grupo.lower() in status_cierre else ""
+                            omitidas, aplicadas, previos = [], [], {}
+                            for idx_g in seleccion_grupo:
+                                fila_g = df_sol.loc[idx_g]
+                                mov_g = str(fila_g.get('Movimiento', 'Entrega')).strip()
+                                if status_grupo not in obtener_status_validos(mov_g):
+                                    omitidas.append(f"CUC {fila_g['CUC']} ({mov_g})")
+                                    continue
+                                previos[idx_g] = str(fila_g.get('Status', '')).strip().lower()
+                                df_sol.loc[idx_g, 'Status'] = status_grupo
+                                df_sol.loc[idx_g, 'Fecha_Entregado'] = fecha_txt
+                                aplicadas.append(idx_g)
+                            if not aplicadas:
+                                st.error(f"Ninguna de las solicitudes seleccionadas admite el status '{status_grupo}' según su movimiento.")
+                            elif guardar_solicitudes_seguro(df_sol):
+                                series_eliminadas, series_no_encontradas, mov_hist = [], [], []
+                                if status_grupo.lower() in status_baja:
+                                    for idx_g in aplicadas:
+                                        fila_g = df_sol.loc[idx_g]
+                                        ser = str(fila_g.get('Serie', '')).strip()
+                                        if not ser:
+                                            continue
+                                        if serie_en_inventario(df_inv, ser):
+                                            df_inv = quitar_serie(df_inv, ser)
+                                            series_eliminadas.append(ser)
+                                            mov_hist.append((ser, fila_g['Modelo'], f"SOLICITUD {status_grupo.upper()}", f"Cliente: {fila_g['Cliente']} | CUC: {fila_g['CUC']} | Eliminado por actualización en grupo"))
+                                        else:
+                                            series_no_encontradas.append(ser)
+                                            if previos.get(idx_g) not in status_baja:
+                                                mov_hist.append((ser, fila_g['Modelo'], f"SOLICITUD {status_grupo.upper()} (SIN INVENTARIO)",
+                                                                 f"Movimiento: {fila_g['Movimiento']} | Cliente: {fila_g['Cliente']} | CUC: {fila_g['CUC']} | La serie no estaba en el Inventario General; no se modificó el inventario"))
+                                    if series_eliminadas:
+                                        guardar_datos(df_inv)
+                                    registrar_historial_lote(mov_hist)
+                                st.success(f"Status '{status_grupo}' aplicado a {len(aplicadas)} solicitud(es).")
+                                if series_eliminadas:
+                                    st.success(f"Series eliminadas del Inventario General: {', '.join(series_eliminadas)}")
+                                if series_no_encontradas:
+                                    st.warning(f"Series que no están en el Inventario General (no se modificó el inventario): {', '.join(series_no_encontradas)}")
+                                if omitidas:
+                                    st.warning(f"No se cambiaron (el status no es válido para su movimiento): {', '.join(omitidas)}")
+                                if 'df_pend_busq_resultado' in st.session_state:
+                                    del st.session_state['df_pend_busq_resultado']
+                                time.sleep(6 if (series_no_encontradas or omitidas) else 2.5)
+                                st.rerun()
+                            else:
+                                st.error("Error: No se pudieron guardar los cambios.")
+
+                    if eliminar_grupo:
+                        if not seleccion_grupo:
+                            st.error("Selecciona al menos una solicitud.")
+                        else:
+                            n_borrar = len(seleccion_grupo)
+                            df_sol = df_sol.drop(seleccion_grupo).reset_index(drop=True)
+                            if guardar_solicitudes_seguro(df_sol):
+                                st.success(f"Se eliminaron definitivamente {n_borrar} solicitud(es).")
+                                if 'df_pend_busq_resultado' in st.session_state:
+                                    del st.session_state['df_pend_busq_resultado']
+                                time.sleep(2.5)
+                                st.rerun()
+                            else:
+                                st.error("Error: No se pudieron eliminar las solicitudes.")
 
                 idx_seleccionado = st.selectbox(
                     "Seleccione la solicitud que desea actualizar, cambiar a pendiente/cancelar o eliminar individualmente:", 
