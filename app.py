@@ -378,13 +378,23 @@ def mayus(obj):
         pass
     return obj
 
-LIMITE_FILAS_CON_COLOR = 2000
+LIMITE_FILAS_CON_COLOR = 5000
+_contador_tablas = {"n": 0}
 
 def mostrar_tabla(data, *args, **kwargs):
-    # Pintar de colores miles de filas hace lento el navegador: en tablas grandes se muestra sin colores
+    # Pintar de colores miles de filas hace lento el navegador: las tablas muy grandes se muestran por páginas
     if _Styler is not None and isinstance(data, _Styler) and len(data.data) > LIMITE_FILAS_CON_COLOR:
-        data = data.data
-        st.caption(f"Tabla grande ({len(data):,} filas): se muestra sin colores para que cargue más rápido. Usa los filtros para ver menos filas con colores.")
+        _contador_tablas["n"] += 1
+        total = len(data.data)
+        paginas = -(-total // LIMITE_FILAS_CON_COLOR)
+        p1, p2 = st.columns([1, 3])
+        with p1:
+            pagina = st.number_input(f"Página (de {paginas})", min_value=1, max_value=paginas, value=1, step=1,
+                                     key=f"pag_tabla_{_contador_tablas['n']}")
+        with p2:
+            st.caption(f"Tabla grande: {total:,} filas. Se muestran {LIMITE_FILAS_CON_COLOR:,} por página para que cargue rápido y conserve los colores.")
+        ini = (pagina - 1) * LIMITE_FILAS_CON_COLOR
+        data = data.data.iloc[ini:ini + LIMITE_FILAS_CON_COLOR].style.use(data.export())
     return st.dataframe(mayus(data), *args, **kwargs)
 
 def _fig_mayus(fig, atributos=("x", "y", "labels")):
@@ -638,7 +648,7 @@ UBICACIONES_VALIDAS_ESTADIA = [
     "En almacén de Publicidad"
 ]
 
-ESQUEMA_COLUMNAS = ["Serie", "Modelo", "Tipo", "Imagen", "Canal", "Ubicación", "Estatus", "Ultimo_Movimiento"]
+ESQUEMA_COLUMNAS = ["Serie", "Modelo", "Año", "Tipo", "Imagen", "Canal", "Ubicación", "Estatus", "Ultimo_Movimiento"]
 COLUMNAS_SOLICITUDES = ["Fecha_Entregado", "Status", "Fecha_Recibido", "Proyecto", "CUC", "Cliente", "Jefe_de_Venta", "Supervisor", "Movimiento", "Equipo", "Modelo", "Serie", "Canal", "Ruta", "Motivo", "Observaciones"]
 COLUMNAS_LEVANTAMIENTOS = ["Fecha", "CUC", "Cliente", "Modelo", "Serie", "Tipo", "Imagen", "Canal", "Status", "Motivo", "Ubicación", "Ruta", "Jefe_de_Venta", "Solicitado"]
 
@@ -659,6 +669,19 @@ def limpiar_y_mapear_columnas(df, esquema_objetivo):
         if col not in df_L.columns:
             df_L[col] = ""
     return df_L[esquema_objetivo]
+
+def anio_de_serie(serie):
+    """Año de fabricación según la serie: si empieza con número, son el 2.º y 3.er dígito (02060403T -> 2020);
+    si empieza con letra, el 4.º y 5.º carácter (N30240700217 -> 2024). Devuelve '' si no se puede determinar."""
+    s_ = str(serie).strip().upper()
+    if not s_ or s_ in ("NAN", "NONE"):
+        return ""
+    parte = s_[3:5] if s_[0].isalpha() else s_[1:3]
+    if len(parte) == 2 and parte.isascii() and parte.isdigit():
+        anio = 2000 + int(parte)
+        if 1990 <= anio <= date.today().year + 1:
+            return str(anio)
+    return ""
 
 # =====================================================================
 # BASE DE DATOS (PostgreSQL en Neon)
@@ -703,6 +726,23 @@ def _preparar_db(url):
         con.execute(text('CREATE INDEX IF NOT EXISTS ix_historial_serie ON historial ("Serie")'))
         con.execute(text("CREATE TABLE IF NOT EXISTS imagenes_modelos (clave TEXT PRIMARY KEY, nombre TEXT, "
                          "contenido BYTEA, actualizado TIMESTAMP DEFAULT now())"))
+        # Columnas nuevas en tablas que ya existían (p. ej. "Año" en inventario)
+        existentes = {(r[0], r[1]) for r in con.execute(text(
+            "SELECT table_name, column_name FROM information_schema.columns WHERE table_schema = current_schema()"))}
+        for nombre, cols in _tablas_db().items():
+            for c in cols:
+                if (nombre, c) not in existentes:
+                    con.execute(text(f'ALTER TABLE {nombre} ADD COLUMN IF NOT EXISTS "{c}" TEXT'))
+        # Rellena el Año de los equipos que todavía no lo tienen guardado
+        from psycopg2.extras import execute_values
+        cur = con.connection.cursor()
+        cur.execute('SELECT id, "Serie" FROM inventario WHERE "Año" IS NULL AND "Serie" IS NOT NULL')
+        pares = [(i, anio_de_serie(sr)) for i, sr in cur.fetchall()]
+        pares = [(i, a) for i, a in pares if a]
+        if pares:
+            execute_values(cur, 'UPDATE inventario AS t SET "Año" = v.a FROM (VALUES %s) AS v(id, a) WHERE t.id = v.id',
+                           pares, page_size=1000)
+        cur.close()
     return eng
 
 def _motor():
@@ -944,6 +984,7 @@ def limpiar_fechas_movimiento(serie):
 def cargar_datos():
     df = db_tabla("inventario") if db_activa() else _leer_inventario_archivos()
     df = limpiar_y_mapear_columnas(df, ESQUEMA_COLUMNAS)
+    df["Año"] = df["Serie"].map(anio_de_serie)
     df["Ultimo_Movimiento"] = limpiar_fechas_movimiento(df["Ultimo_Movimiento"])
     if not df.empty and 'Serie' in df.columns:
         df = df.drop_duplicates(subset=['Serie'], keep='last').reset_index(drop=True)
@@ -1178,6 +1219,9 @@ def cargar_solicitudes():
     return df_sol
 
 def guardar_datos(df):
+    if 'Serie' in df.columns:
+        df = df.copy()
+        df['Año'] = df['Serie'].map(anio_de_serie)
     if not df.empty and 'Serie' in df.columns:
         df = df.drop_duplicates(subset=['Serie'], keep='last').reset_index(drop=True)
     if db_activa():
@@ -1392,6 +1436,37 @@ def colorear_ubicaciones(val):
     elif val_lower in ["Uso Interno", "Asignado a Cliente"]:
         return 'background-color: #dbeafe; color: #1e40af; font-weight: 500;'
     return ''
+
+def _edad_anio(val):
+    try:
+        return date.today().year - int(float(val))
+    except (ValueError, TypeError):
+        return None
+
+def colorear_anio(val):
+    """Verde: 3 años o menos. Amarillo: más de 3 y hasta 7. Rojo: más de 7 (contando desde el año actual)."""
+    edad = _edad_anio(val)
+    if edad is None:
+        return ''
+    if edad <= 3:
+        return 'background-color: #dcfce7; color: #166534; font-weight: bold;'
+    if edad <= 7:
+        return 'background-color: #fef9c3; color: #854d0e; font-weight: bold;'
+    return 'background-color: #fee2e2; color: #991b1b; font-weight: bold;'
+
+def color_anio_hex(val):
+    edad = _edad_anio(val)
+    if edad is None:
+        return '#9CA3AF'
+    return '#16A34A' if edad <= 3 else ('#EAB308' if edad <= 7 else '#DC2626')
+
+def grafica_anios(df, titulo):
+    conteo = df['Año'].fillna("").astype(str).replace("", "Sin año").value_counts()
+    orden = sorted(conteo.index, key=lambda a: (1, 0) if a == "Sin año" else (0, int(a)))
+    fig = go.Figure(go.Bar(x=orden, y=[int(conteo[a]) for a in orden], marker_color=[color_anio_hex(a) for a in orden],
+                           text=[int(conteo[a]) for a in orden], textposition="outside"))
+    fig.update_xaxes(type="category")
+    return _estilo_grafica(fig, titulo, 340)
 
 def colorear_dias(val):
     try:
@@ -1617,15 +1692,25 @@ if menu == "Equipos Disponibles":
             
             df_tabla_filtrada = dataframes_canales_filtrados.get(c_d, pd.DataFrame())
             if not df_tabla_filtrada.empty:
-                st.plotly_chart(grafica_barras_conteo(df_tabla_filtrada, 'Modelo', f"Equipos disponibles por modelo en {c_d}", top=12), use_container_width=True)
-                mostrar_tabla(df_tabla_filtrada.groupby(['Tipo', 'Modelo', 'Imagen', 'Estatus']).size().reset_index(name='Cantidad Disponible'), use_container_width=True, hide_index=True)
+                vista_disp = st.radio("Vista", ["Por modelo e imagen", "Mostrar por año"], horizontal=True,
+                                      key=f"vista_disp_{c_d}", label_visibility="collapsed")
+                if vista_disp == "Mostrar por año":
+                    st.plotly_chart(grafica_anios(df_tabla_filtrada, f"Equipos disponibles por año de fabricación en {c_d}"), use_container_width=True)
+                    df_por_anio = df_tabla_filtrada.copy()
+                    df_por_anio['Año'] = df_por_anio['Año'].fillna("").astype(str).replace("", "Sin año")
+                    df_por_anio = df_por_anio.groupby(['Tipo', 'Modelo', 'Año', 'Imagen', 'Estatus']).size().reset_index(name='Cantidad Disponible')
+                    mostrar_tabla(df_por_anio.style.map(colorear_anio, subset=['Año']), use_container_width=True, hide_index=True)
+                    st.caption("Año de fabricación según la serie. Verde: hasta 3 años. Amarillo: más de 3 y hasta 7. Rojo: más de 7.")
+                else:
+                    st.plotly_chart(grafica_barras_conteo(df_tabla_filtrada, 'Modelo', f"Equipos disponibles por modelo en {c_d}", top=12), use_container_width=True)
+                    mostrar_tabla(df_tabla_filtrada.groupby(['Tipo', 'Modelo', 'Imagen', 'Estatus']).size().reset_index(name='Cantidad Disponible'), use_container_width=True, hide_index=True)
                 
                 # Desplegable exacto de series solo visible para administradores
                 if st.session_state.get('autenticado', False):
                     with st.expander(f":material/search: Ver el listado exacto de Series de Equipos - Canal {c_d}"):
-                        df_det_disp = df_tabla_filtrada[['Serie', 'Tipo', 'Modelo', 'Imagen', 'Ubicación', 'Estatus', 'Ultimo_Movimiento']].copy()
+                        df_det_disp = df_tabla_filtrada[['Serie', 'Modelo', 'Año', 'Tipo', 'Imagen', 'Ubicación', 'Estatus', 'Ultimo_Movimiento']].copy()
                         df_det_disp = df_det_disp.rename(columns={'Ultimo_Movimiento': 'Último Movimiento'})
-                        df_det_disp_estilizado = df_det_disp.style.map(colorear_ubicaciones, subset=['Ubicación'])
+                        df_det_disp_estilizado = df_det_disp.style.map(colorear_ubicaciones, subset=['Ubicación']).map(colorear_anio, subset=['Año'])
                         mostrar_tabla(df_det_disp_estilizado, use_container_width=True, hide_index=True)
             else:
                 st.info(f"No hay equipos disponibles que coincidan con los filtros seleccionados para {c_d}.")
@@ -1873,8 +1958,9 @@ elif menu == "Solicitudes Diarias":
 
             # Mostrar la tabla general informativa del día
             df_tabla_diaria = df_filtradas_dia[['Proyecto', 'CUC', 'Cliente', 'Modelo', 'Serie', 'Canal', 'Jefe_de_Venta', 'Supervisor', 'Ruta', 'Movimiento', 'Status', 'Observaciones']].copy()
+            df_tabla_diaria.insert(df_tabla_diaria.columns.get_loc('Serie') + 1, 'Año', df_tabla_diaria['Serie'].map(anio_de_serie))
             df_tabla_diaria = df_tabla_diaria.rename(columns={'Jefe_de_Venta': 'Jefe de Venta', 'Observaciones': 'Motivo / Comentarios'})
-            mostrar_tabla(df_tabla_diaria.style.map(colorear_status, subset=['Status']), use_container_width=True, hide_index=True)
+            mostrar_tabla(df_tabla_diaria.style.map(colorear_status, subset=['Status']).map(colorear_anio, subset=['Año']), use_container_width=True, hide_index=True)
             st.success(f"Se encontraron {len(df_tabla_diaria)} solicitudes registradas bajo los criterios seleccionados.")
         else:
             if st.session_state['es_chofer']:
@@ -2099,7 +2185,7 @@ elif menu == "Inventario General" and st.session_state['autenticado']:
 
         st.markdown("### Detalle de equipos")
 
-    columnas_visibles = ["Serie", "Modelo", "Tipo", "Imagen", "Canal", "Ubicación", "Estatus", "Días sin movimiento", "Ultimo_Movimiento"]
+    columnas_visibles = ["Serie", "Modelo", "Año", "Tipo", "Imagen", "Canal", "Ubicación", "Estatus", "Días sin movimiento", "Ultimo_Movimiento"]
     df_filtrado = df_filtrado[[col for col in columnas_visibles if col in df_filtrado.columns]]
     
     if not df_filtrado.empty and 'Días sin movimiento' in df_filtrado.columns:
@@ -2113,6 +2199,8 @@ elif menu == "Inventario General" and st.session_state['autenticado']:
             df_mostrar = df_mostrar.rename(columns={'Ultimo_Movimiento': 'Último Movimiento'})
 
         df_estilizado = df_mostrar.style.map(colorear_ubicaciones, subset=['Ubicación'])
+        if 'Año' in df_mostrar.columns:
+            df_estilizado = df_estilizado.map(colorear_anio, subset=['Año'])
         if 'Días sin movimiento' in df_filtrado.columns:
             df_estilizado = df_estilizado.map(colorear_dias, subset=['Días sin movimiento'])
         mostrar_tabla(df_estilizado, use_container_width=True, hide_index=True)
