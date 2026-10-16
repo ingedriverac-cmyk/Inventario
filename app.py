@@ -1249,6 +1249,53 @@ def guardar_historial(df_h):
         st.error(f"Error: No se pudo guardar porque el archivo '{HISTORIAL_FILE}' está abierto en Excel.")
         return False
 
+def mapa_clientes_por_cuc():
+    """{CUC: nombre del cliente} usando el registro más reciente de Solicitudes y Levantamientos."""
+    partes = []
+    try:
+        df_s = cargar_solicitudes()
+        if not df_s.empty:
+            partes.append(pd.DataFrame({"CUC": df_s["CUC"], "Cliente": df_s["Cliente"], "F": _fechas_a_datetime(df_s["Fecha_Recibido"])}))
+        df_l = cargar_levantamientos()
+        if not df_l.empty:
+            partes.append(pd.DataFrame({"CUC": df_l["CUC"], "Cliente": df_l["Cliente"], "F": _fechas_a_datetime(df_l["Fecha"])}))
+    except Exception:
+        return {}
+    if not partes:
+        return {}
+    d = pd.concat(partes, ignore_index=True)
+    d["CUC"] = d["CUC"].astype(str).str.strip()
+    d["Cliente"] = d["Cliente"].astype(str).str.strip()
+    d = d[(d["CUC"] != "") & (d["Cliente"] != "") & ~d["Cliente"].str.lower().isin(["nan", "none"]) & ~d["CUC"].str.lower().isin(["nan", "none"])]
+    d = d.sort_values("F", kind="stable", na_position="first")
+    return dict(zip(d["CUC"], d["Cliente"]))
+
+def autocompletar_cliente(key_cuc, key_cliente, key_auto):
+    """Se ejecuta al cambiar el CUC: pone el nombre del cliente del registro más reciente de ese CUC.
+    Si no hay registro, deja el campo para escribirlo a mano (y borra el nombre si venía de otro CUC)."""
+    cuc = str(st.session_state.get(key_cuc, "")).strip()
+    actual = str(st.session_state.get(key_cliente, "")).strip()
+    anterior = st.session_state.get(key_auto, "")
+    nombre = mapa_clientes_por_cuc().get(cuc, "") if cuc else ""
+    if nombre:
+        st.session_state[key_cliente] = nombre
+        st.session_state[key_auto] = nombre
+    else:
+        if actual and actual == anterior:
+            st.session_state[key_cliente] = ""
+        st.session_state[key_auto] = ""
+
+def pista_cliente(key_cuc, key_cliente, key_auto):
+    cuc = str(st.session_state.get(key_cuc, "")).strip()
+    cli = str(st.session_state.get(key_cliente, "")).strip()
+    auto = st.session_state.get(key_auto, "")
+    if not cuc:
+        return
+    if cli and auto and cli == auto:
+        st.caption("Nombre tomado de los registros de este CUC. Si cambió, escríbelo de nuevo.")
+    elif not cli and not auto:
+        st.caption("Este CUC no tiene registros anteriores: escribe el nombre del cliente.")
+
 def parsear_series(texto):
     """Convierte un texto con varias series (una por línea o separadas por coma o punto y coma) en una lista
     sin repetidas (sin distinguir mayúsculas), respetando el orden."""
@@ -2107,6 +2154,13 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
         
         st.markdown("---")
         
+        cc1, cc2 = st.columns(2)
+        with cc1:
+            cuc = st.text_input("CUC:", key="sol_cuc", on_change=autocompletar_cliente, args=("sol_cuc", "sol_cliente", "sol_cliente_auto")).strip()
+        with cc2:
+            cliente_sol = st.text_input("Nombre de Cliente:", key="sol_cliente").strip()
+            pista_cliente("sol_cuc", "sol_cliente", "sol_cliente_auto")
+        
         with st.form("form_solicitud_nueva_ordenada", clear_on_submit=False):
             col_s1, col_s2, col_s3 = st.columns(3)
             
@@ -2120,10 +2174,8 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                 incluir_fecha_entregado = st.checkbox("¿Asignar Fecha Entrega ahora?", value=False)
                 fecha_entregado = st.date_input("Fecha Entrega", value=date.today())
                 fecha_recibido = st.date_input("Fecha de Recibido", value=date.today())
-                cuc = st.text_input("CUC:").strip()
 
             with col_s2:
-                cliente_sol = st.text_input("Nombre de Cliente:").strip()
                 jefe_sol = st.text_input("Jefe de Venta:").strip()
                 supervisor = st.text_input("Supervisor (Opcional):").strip()
                 equipo_tipo = st.selectbox("Equipo:", TIPOS_EQUIPO)
@@ -2601,12 +2653,25 @@ elif menu == "Levantamientos" and st.session_state['autenticado']:
     if modo_levantamiento == "Registrar Levantamiento":
         st.markdown("Registra los equipos levantados. Se agregarán automáticamente al Inventario General.")
         
+        # Tras guardar, se limpian el CUC y el cliente y se muestran los mensajes del guardado anterior
+        if st.session_state.pop("lev_limpiar", False):
+            st.session_state["lev_cuc"] = ""
+            st.session_state["lev_cliente"] = ""
+            st.session_state["lev_cliente_auto"] = ""
+        for _tipo_msg, _texto_msg in st.session_state.pop("lev_msgs", []):
+            getattr(st, _tipo_msg)(_texto_msg)
+
+        cl1, cl2 = st.columns(2)
+        with cl1:
+            cuc_lev = st.text_input("CUC:", key="lev_cuc", on_change=autocompletar_cliente, args=("lev_cuc", "lev_cliente", "lev_cliente_auto")).strip()
+        with cl2:
+            cliente = st.text_input("Cliente / Negocio:", key="lev_cliente").strip()
+            pista_cliente("lev_cuc", "lev_cliente", "lev_cliente_auto")
+
         with st.form("form_levantamiento", clear_on_submit=True):
             col_l1, col_l2 = st.columns(2)
             with col_l1:
                 fecha_lev = st.date_input("Fecha de Levantamiento", value=date.today())
-                cuc_lev = st.text_input("CUC:").strip()
-                cliente = st.text_input("Cliente / Negocio:").strip()
                 modelo = st.text_input("Modelo del Equipo:").strip()
                 serie = st.text_input("Número de Serie:").strip()
                 tipo = st.selectbox("Tipo de Equipo:", TIPOS_EQUIPO)
@@ -2640,7 +2705,9 @@ elif menu == "Levantamientos" and st.session_state['autenticado']:
                     
                     serie_limpia = str(serie).strip()
                     if not df_inv.empty and serie_en_inventario(df_inv, serie_limpia):
-                        st.warning(f"ALERTA: La serie '{serie_limpia}' ya se encuentra registrada en el Inventario General. Los datos no se duplicaron.")
+                        st.session_state["lev_msgs"] = [("warning", f"ALERTA: La serie '{serie_limpia}' ya se encuentra registrada en el Inventario General. Los datos no se duplicaron.")]
+                        st.session_state["lev_limpiar"] = True
+                        st.rerun()
                     else:
                         nueva_inv = pd.DataFrame([{
                             "Serie": serie_limpia, "Modelo": modelo, "Tipo": tipo, "Imagen": imagen,
@@ -2649,7 +2716,9 @@ elif menu == "Levantamientos" and st.session_state['autenticado']:
                         df_inv = pd.concat([df_inv, nueva_inv], ignore_index=True)
                         guardar_datos(df_inv)
                         registrar_historial(serie_limpia, modelo, "LEVANTAMIENTO", f"Cliente: {cliente} | CUC: {cuc_lev} | Agregado automáticamente al Inventario General")
-                        st.success(f"¡Levantamiento registrado y serie {serie_limpia} agregada automáticamente al Inventario General!")
+                        st.session_state["lev_msgs"] = [("success", f"¡Levantamiento registrado y serie {serie_limpia} agregada automáticamente al Inventario General!")]
+                        st.session_state["lev_limpiar"] = True
+                        st.rerun()
 
     elif modo_levantamiento == "Equipos Levantados":
         st.markdown("#### Historial de Equipos Levantados")
@@ -2690,11 +2759,15 @@ elif menu == "Registrar Entrada" and st.session_state['autenticado']:
     st.markdown("---")
     
     if modo_entrada == "Entrada Individual":
+        multi_entrada = st.checkbox("Capturar varias series (mismo modelo y datos)", key="widget_multi_series_entrada")
         with st.form("form_entrada", clear_on_submit=True):
-            serie = st.text_input("Número de Serie:").strip()
+            if multi_entrada:
+                serie = st.text_area("Series (una por línea o separadas por coma):", height=140)
+            else:
+                serie = st.text_input("Número de Serie:").strip()
             modelo = st.text_input("Modelo del Equipo:").strip()
             tipo = st.selectbox("Tipo de Equipo:", TIPOS_EQUIPO)
-            imagen = st.selectbox("Imagen / Marca:", OPCIONES_IMAGEN)
+            imagen = st.selectbox("Imagen:", OPCIONES_IMAGEN)
             canal = st.selectbox("Canal:", [c for c in OPCIONES_CANALES_SOL if c != "Otro"])
             ubicacion = st.selectbox("Ubicación inicial", UBICACIONES)
             estatus = st.selectbox("Estatus inicial", ESTATUS)
@@ -2703,29 +2776,34 @@ elif menu == "Registrar Entrada" and st.session_state['autenticado']:
             submit = st.form_submit_button("Registrar Entrada en Sistema")
             
             if submit:
-                if not serie or not modelo:
-                    st.error("Por favor, completa la serie y el modelo.")
+                series_lista = parsear_series(serie) if multi_entrada else ([str(serie).strip()] if str(serie).strip() else [])
+                if not series_lista or not modelo:
+                    st.error("Por favor, completa la serie y el modelo." if not multi_entrada else "Por favor, escribe al menos una serie y el modelo.")
                 else:
                     fecha_str = fecha_entrada.strftime("%Y-%m-%d")
-                    serie_limpia = str(serie).strip()
-                    
-                    if not df_inv.empty and serie_en_inventario(df_inv, serie_limpia):
-                        st.warning(f"ALERTA: La serie '{serie_limpia}' ya se encuentra registrada en el Inventario General. No se permiten series duplicadas.")
-                    else:
-                        nueva_fila = pd.DataFrame([{
-                            "Serie": serie_limpia,
-                            "Modelo": modelo,
-                            "Tipo": tipo,
-                            "Imagen": imagen,
-                            "Canal": canal,
-                            "Ubicación": ubicacion,
-                            "Estatus": estatus,
-                            "Ultimo_Movimiento": fecha_str
-                        }])
-                        df_inv = pd.concat([df_inv, nueva_fila], ignore_index=True)
+                    existentes = set(df_inv['Serie'].astype(str).str.strip().str.upper()) if not df_inv.empty else set()
+                    duplicadas = [x for x in series_lista if x.upper() in existentes]
+                    nuevas = [x for x in series_lista if x.upper() not in existentes]
+
+                    if nuevas:
+                        filas_nuevas = [{
+                            "Serie": x, "Modelo": modelo, "Tipo": tipo, "Imagen": imagen, "Canal": canal,
+                            "Ubicación": ubicacion, "Estatus": estatus, "Ultimo_Movimiento": fecha_str
+                        } for x in nuevas]
+                        df_inv = pd.concat([df_inv, pd.DataFrame(filas_nuevas)], ignore_index=True)
                         guardar_datos(df_inv)
-                        registrar_historial(serie_limpia, modelo, "ENTRADA", f"Tipo: {tipo} | Canal: {canal} | Ubicación: {ubicacion} | Estatus: {estatus}")
-                        st.success(f"¡Entrada registrada correctamente! La serie {serie_limpia} se agregó al Inventario General.")
+                        registrar_historial_lote([(x, modelo, "ENTRADA", f"Tipo: {tipo} | Canal: {canal} | Ubicación: {ubicacion} | Estatus: {estatus}") for x in nuevas])
+
+                    if len(series_lista) == 1:
+                        if duplicadas:
+                            st.warning(f"ALERTA: La serie '{duplicadas[0]}' ya se encuentra registrada en el Inventario General. No se permiten series duplicadas.")
+                        else:
+                            st.success(f"¡Entrada registrada correctamente! La serie {nuevas[0]} se agregó al Inventario General.")
+                    else:
+                        if nuevas:
+                            st.success(f"¡Entrada registrada correctamente! Se agregaron {len(nuevas)} series al Inventario General: {', '.join(nuevas)}")
+                        if duplicadas:
+                            st.warning(f"ALERTA: Estas series ya estaban registradas en el Inventario General y se omitieron (no se permiten duplicadas): {', '.join(duplicadas)}")
 
     elif modo_entrada == "Carga Masiva (Excel)":
         st.markdown("Sube un archivo Excel (.xlsx o .xls) con múltiples equipos para darles entrada de forma masiva.")
