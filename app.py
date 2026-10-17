@@ -612,6 +612,10 @@ TIPOS_EQUIPO = [
     "Vending"
 ]
 
+# Antigüedad que piden los clientes cuando la solicitud todavía no tiene serie
+RANGOS_ANIO_SOLICITADO = ["Nuevos (año presente)", "Menos de 3 años", "Entre 3 y 5 años", "Más de 5 años"]
+OPCIONES_ANIO_SOLICITADO = ["Sin especificar"] + RANGOS_ANIO_SOLICITADO
+
 OPCIONES_IMAGEN = [
     "Coca-Cola",
     "Hidratación",
@@ -650,21 +654,34 @@ UBICACIONES_VALIDAS_ESTADIA = [
 ]
 
 ESQUEMA_COLUMNAS = ["Serie", "Modelo", "Año", "Tipo", "Imagen", "Canal", "Ubicación", "Estatus", "Ultimo_Movimiento"]
-COLUMNAS_SOLICITUDES = ["Fecha_Entregado", "Status", "Fecha_Recibido", "Proyecto", "CUC", "Cliente", "Jefe_de_Venta", "Supervisor", "Movimiento", "Equipo", "Modelo", "Serie", "Año", "Canal", "Ruta", "Motivo", "Observaciones"]
+COLUMNAS_SOLICITUDES = ["Fecha_Entregado", "Status", "Fecha_Recibido", "Proyecto", "CUC", "Cliente", "Jefe_de_Venta", "Supervisor", "Movimiento", "Equipo", "Modelo", "Serie", "Año", "Año_Solicitado", "Canal", "Ruta", "Motivo", "Observaciones"]
 COLUMNAS_LEVANTAMIENTOS = ["Fecha", "CUC", "Cliente", "Modelo", "Serie", "Tipo", "Imagen", "Canal", "Status", "Motivo", "Ubicación", "Ruta", "Jefe_de_Venta", "Solicitado"]
 
 def limpiar_y_mapear_columnas(df, esquema_objetivo):
-    """Mapeo flexible y automático de columnas para asegurar compatibilidad con cualquier Excel."""
+    """Mapeo flexible y automático de columnas para asegurar compatibilidad con cualquier Excel.
+    Primero se buscan coincidencias exactas (sin importar mayúsculas, espacios o guiones bajos) y, para lo que
+    quede sin mapear, coincidencias parciales."""
     df_L = df.copy()
     df_L.columns = [str(c).strip() for c in df_L.columns]
-    mapa_encontrado = {}
+    mapa_encontrado, usados = {}, set()
+    def _norm(t):
+        return str(t).lower().replace(" ", "_")
     for col_orig in df_L.columns:
+        for col_obj in esquema_objetivo:
+            if col_obj not in usados and _norm(col_orig) == _norm(col_obj):
+                mapa_encontrado[col_orig] = col_obj
+                usados.add(col_obj)
+                break
+    for col_orig in df_L.columns:
+        if col_orig in mapa_encontrado:
+            continue
         c_low = col_orig.lower()
         for col_obj in esquema_objetivo:
             o_low = col_obj.lower()
-            if c_low == o_low or o_low in c_low or c_low in o_low:
-                if col_obj not in mapa_encontrado.values():
-                    mapa_encontrado[col_orig] = col_obj
+            if col_obj not in usados and (o_low in c_low or c_low in o_low):
+                mapa_encontrado[col_orig] = col_obj
+                usados.add(col_obj)
+                break
     df_L = df_L.rename(columns=mapa_encontrado)
     for col in esquema_objetivo:
         if col not in df_L.columns:
@@ -1509,6 +1526,35 @@ def grafica_anios(df, titulo):
     fig.update_xaxes(type="category")
     return _estilo_grafica(fig, titulo, 340)
 
+def rango_anio_solicitado(anio):
+    """Rango de antigüedad de un año de fabricación: Nuevos (año presente), Menos de 3, Entre 3 y 5 o Más de 5 años."""
+    edad = _edad_anio(anio)
+    if edad is None:
+        return ""
+    if edad <= 0:
+        return RANGOS_ANIO_SOLICITADO[0]
+    if edad < 3:
+        return RANGOS_ANIO_SOLICITADO[1]
+    if edad <= 5:
+        return RANGOS_ANIO_SOLICITADO[2]
+    return RANGOS_ANIO_SOLICITADO[3]
+
+_COLORES_RANGO = {"Nuevos (año presente)": "#16A34A", "Menos de 3 años": "#84CC16", "Entre 3 y 5 años": "#EAB308", "Más de 5 años": "#DC2626"}
+
+def colorear_rango_anio(val):
+    return {"Nuevos (año presente)": 'background-color: #dcfce7; color: #166534; font-weight: bold;',
+            "Menos de 3 años": 'background-color: #ecfccb; color: #3f6212; font-weight: bold;',
+            "Entre 3 y 5 años": 'background-color: #fef9c3; color: #854d0e; font-weight: bold;',
+            "Más de 5 años": 'background-color: #fee2e2; color: #991b1b; font-weight: bold;'}.get(str(val), '')
+
+def grafica_rangos(df, columna, titulo):
+    conteo = df[columna].fillna("").astype(str).replace("", "Sin especificar").value_counts()
+    orden = [r for r in RANGOS_ANIO_SOLICITADO + ["Sin especificar"] if r in conteo.index]
+    fig = go.Figure(go.Bar(x=orden, y=[int(conteo[r]) for r in orden], marker_color=[_COLORES_RANGO.get(r, "#9CA3AF") for r in orden],
+                           text=[int(conteo[r]) for r in orden], textposition="outside"))
+    fig.update_xaxes(type="category")
+    return _estilo_grafica(fig, titulo, 340)
+
 def colorear_dias(val):
     try:
         if float(val) > 40:
@@ -1870,61 +1916,71 @@ elif menu == "Estadía":
     
 # 3. SOLICITUDES DIARIAS (ADMINISTRADORES Y CHOFERES CON FILTRO Y EDICIÓN RÁPIDA)
 elif menu == "Necesidades de Taller":
-    render_banner("taller", "Necesidades de Taller", "Modelos y años de fabricación que se necesitan según las solicitudes pendientes, para priorizar su reparación en Taller.")
+    render_banner("taller", "Necesidades de Taller", "Equipos pendientes por entregar (solicitudes pendientes sin serie), por modelo y año solicitado, para que Taller priorice su reparación.")
     df_sol_nt = cargar_solicitudes()
     if not df_sol_nt.empty:
-        pend = df_sol_nt[df_sol_nt['Status'].astype(str).str.strip().str.lower() == 'pendiente'].copy()
+        pend_todas = df_sol_nt[df_sol_nt['Status'].astype(str).str.strip().str.lower() == 'pendiente'].copy()
     else:
-        pend = df_sol_nt.copy()
+        pend_todas = df_sol_nt.copy()
+    _tiene_serie = pend_todas['Serie'].fillna("").astype(str).str.strip().replace("nan", "").ne("")
 
     f_nt1, f_nt2 = st.columns(2)
     with f_nt1:
-        canales_nt = ["Todos"] + sorted({str(c).strip() for c in pend['Canal'].dropna() if str(c).strip() and str(c).strip().lower() != 'nan'})
+        canales_nt = ["Todos"] + sorted({str(c).strip() for c in pend_todas['Canal'].dropna() if str(c).strip() and str(c).strip().lower() != 'nan'})
         canal_nt = st.selectbox("Canal:", canales_nt, key="nt_canal")
     with f_nt2:
         mov_nt = st.selectbox("Movimiento:", ["Entrega", "Todos", "Reubicación", "Levantamiento"], key="nt_mov")
     if mov_nt != "Todos":
-        pend = pend[pend['Movimiento'].astype(str).str.strip() == mov_nt]
+        pend_todas = pend_todas[pend_todas['Movimiento'].astype(str).str.strip() == mov_nt]
     if canal_nt != "Todos":
-        pend = pend[pend['Canal'].astype(str).str.strip() == canal_nt]
+        pend_todas = pend_todas[pend_todas['Canal'].astype(str).str.strip() == canal_nt]
+    _tiene_serie = pend_todas['Serie'].fillna("").astype(str).str.strip().replace("nan", "").ne("")
+    pend = pend_todas[~_tiene_serie].copy()
+    n_con_serie = int(_tiene_serie.sum())
 
     if pend.empty:
-        st.info("No hay solicitudes pendientes con los filtros seleccionados.")
+        st.info("No hay solicitudes pendientes sin serie con los filtros seleccionados.")
+        if n_con_serie:
+            st.caption(f"Hay {n_con_serie} solicitud(es) pendiente(s) que ya tienen serie y por eso no se incluyen aquí.")
     else:
+        pend['Equipo'] = pend['Equipo'].fillna("").astype(str).str.strip().replace("", "Sin equipo")
         pend['Modelo'] = pend['Modelo'].fillna("").astype(str).str.strip().replace("", "Sin modelo")
-        pend['Año'] = pend['Año'].fillna("").astype(str).str.strip()
+        pend['Año_Solicitado'] = pend['Año_Solicitado'].fillna("").astype(str).str.strip().replace("", "Sin especificar")
 
         # Existencias del inventario para compararlas con lo que se necesita
         inv_nt = df_inv[df_inv['Canal'] != "Cedis"].copy() if not df_inv.empty else pd.DataFrame(columns=ESQUEMA_COLUMNAS)
         if canal_nt != "Todos" and not inv_nt.empty:
             inv_nt = inv_nt[inv_nt['Canal'] == canal_nt]
-        disp_my, disp_m, rep_my, rep_m = {}, {}, {}, {}
+        disp_mr, disp_m, rep_mr, rep_m = {}, {}, {}, {}
         if not inv_nt.empty:
             inv_nt['_m'] = inv_nt['Modelo'].astype(str).str.strip().str.upper()
-            inv_nt['_a'] = inv_nt['Año'].fillna("").astype(str)
+            inv_nt['_r'] = inv_nt['Año'].map(rango_anio_solicitado)
             est_nt = inv_nt['Estatus'].astype(str).str.strip().str.lower()
             es_disp = inv_nt['Ubicación'].isin(["En almacén de Comodatos", "En almacén de Publicidad", "En patios"]) & est_nt.isin(["nuevo", "reparado"])
             es_rep = est_nt == "para reparar"
-            disp_my = inv_nt[es_disp].groupby(['_m', '_a']).size().to_dict()
+            disp_mr = inv_nt[es_disp].groupby(['_m', '_r']).size().to_dict()
             disp_m = inv_nt[es_disp].groupby('_m').size().to_dict()
-            rep_my = inv_nt[es_rep].groupby(['_m', '_a']).size().to_dict()
+            rep_mr = inv_nt[es_rep].groupby(['_m', '_r']).size().to_dict()
             rep_m = inv_nt[es_rep].groupby('_m').size().to_dict()
 
-        necesidad = pend.groupby(['Modelo', 'Año']).size().reset_index(name='Pendientes')
-        def _existencia(fila, por_my, por_m):
+        necesidad = pend.groupby(['Equipo', 'Modelo', 'Año_Solicitado']).size().reset_index(name='Pendientes')
+        def _existencia(fila, por_mr, por_m):
             m_ = str(fila['Modelo']).strip().upper()
-            return por_my.get((m_, fila['Año']), 0) if fila['Año'] else por_m.get(m_, 0)
-        necesidad['Disponibles'] = necesidad.apply(lambda r: _existencia(r, disp_my, disp_m), axis=1)
+            if fila['Año_Solicitado'] in RANGOS_ANIO_SOLICITADO and str(fila['Equipo']).lower().startswith("enfriador"):
+                return por_mr.get((m_, fila['Año_Solicitado']), 0)
+            return por_m.get(m_, 0)
+        necesidad['Disponibles'] = necesidad.apply(lambda r: _existencia(r, disp_mr, disp_m), axis=1)
         necesidad['Faltante'] = (necesidad['Pendientes'] - necesidad['Disponibles']).clip(lower=0)
-        necesidad['Para Reparar'] = necesidad.apply(lambda r: _existencia(r, rep_my, rep_m), axis=1)
+        necesidad['Para Reparar'] = necesidad.apply(lambda r: _existencia(r, rep_mr, rep_m), axis=1)
         necesidad['A reparar (sugerido)'] = necesidad[['Faltante', 'Para Reparar']].min(axis=1)
-        necesidad['_orden'] = necesidad['Año'].apply(lambda a: (1, 0) if not a else (0, int(a)))
-        necesidad = necesidad.sort_values(['Modelo', '_orden']).drop(columns='_orden').reset_index(drop=True)
-        necesidad['Año'] = necesidad['Año'].replace("", "Sin año")
+        _orden_r = {r: i for i, r in enumerate(RANGOS_ANIO_SOLICITADO)}
+        necesidad['_orden'] = necesidad['Año_Solicitado'].map(lambda r: _orden_r.get(r, 99))
+        necesidad = necesidad.sort_values(['Equipo', 'Modelo', '_orden']).drop(columns='_orden').reset_index(drop=True)
+        necesidad = necesidad.rename(columns={'Año_Solicitado': 'Año solicitado'})
 
         k_nt1, k_nt2, k_nt3 = st.columns(3)
         with k_nt1:
-            render_kpi("Solicitudes pendientes", len(pend), "Con los filtros seleccionados", "#E60012")
+            render_kpi("Pendientes sin serie", len(pend), "Equipos por entregar", "#E60012")
         with k_nt2:
             render_kpi("Modelos distintos", pend['Modelo'].nunique(), "Que se están necesitando", "#003B5C")
         with k_nt3:
@@ -1932,19 +1988,21 @@ elif menu == "Necesidades de Taller":
 
         g_nt1, g_nt2 = st.columns(2)
         with g_nt1:
-            st.plotly_chart(grafica_barras_conteo(pend, 'Modelo', "Solicitudes pendientes por modelo", top=12), use_container_width=True)
+            st.plotly_chart(grafica_barras_conteo(pend, 'Modelo', "Pendientes por modelo", top=12), use_container_width=True)
         with g_nt2:
-            st.plotly_chart(grafica_anios(pend, "Solicitudes pendientes por año de fabricación"), use_container_width=True)
+            st.plotly_chart(grafica_rangos(pend, 'Año_Solicitado', "Pendientes por año solicitado"), use_container_width=True)
 
-        st.markdown("### Necesidad por modelo y año")
+        st.markdown("### Equipos pendientes por modelo y año solicitado")
         mostrar_tabla(
-            necesidad.style.map(colorear_anio, subset=['Año']).map(
+            necesidad.style.map(colorear_rango_anio, subset=['Año solicitado']).map(
                 lambda v: 'background-color: #fed7aa; font-weight: bold;' if isinstance(v, (int, float)) and v > 0 else '',
                 subset=['A reparar (sugerido)']),
             use_container_width=True, hide_index=True)
-        st.caption("Pendientes: solicitudes en espera. Disponibles: equipos Nuevos o Reparados en almacén o patios. "
-                   "Faltante: pendientes menos disponibles. A reparar (sugerido): equipos Para Reparar que Taller debería atender primero. "
-                   "El año sale de la serie de cada solicitud; si no tiene serie se compara solo por modelo.")
+        st.caption("Solo cuentan las solicitudes pendientes que todavía no tienen serie (las que ya tienen serie son equipos asignados para entrega)"
+                   + (f"; {n_con_serie} solicitud(es) pendiente(s) con serie no se incluyen." if n_con_serie else ".")
+                   + " Disponibles: equipos Nuevos o Reparados en almacén o patios del mismo modelo y rango de año. "
+                     "Faltante: pendientes menos disponibles. A reparar (sugerido): equipos Para Reparar que Taller debería atender primero. "
+                     "Rangos: Nuevos = año presente; Menos de 3 años = 1 o 2 años; Entre 3 y 5 años; Más de 5 años.")
         _buf_nt = io.BytesIO()
         with pd.ExcelWriter(_buf_nt, engine="openpyxl") as _w_nt:
             necesidad.to_excel(_w_nt, index=False, sheet_name="Necesidades de Taller")
@@ -1953,22 +2011,10 @@ elif menu == "Necesidades de Taller":
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
         if st.session_state['autenticado']:
-            with st.expander("Detalle de las solicitudes pendientes"):
-                mapa_inv_nt = {}
-                if not df_inv.empty:
-                    mapa_inv_nt = dict(zip(df_inv['Serie'].astype(str).str.strip().str.upper(),
-                                           zip(df_inv['Estatus'].astype(str), df_inv['Ubicación'].astype(str))))
-                def _estado_inv(ser):
-                    ser_ = str(ser).strip()
-                    if not ser_ or ser_.lower() == 'nan':
-                        return "Sin serie", ""
-                    return mapa_inv_nt.get(ser_.upper(), ("No está en inventario", ""))
-                det_nt = pend[['Fecha_Recibido', 'CUC', 'Cliente', 'Movimiento', 'Canal', 'Modelo', 'Serie', 'Año']].copy()
-                est_ubi = det_nt['Serie'].map(_estado_inv)
-                det_nt['Estatus en inventario'] = est_ubi.map(lambda t: t[0])
-                det_nt['Ubicación en inventario'] = est_ubi.map(lambda t: t[1])
-                det_nt = det_nt.rename(columns={'Fecha_Recibido': 'Fecha Recibido'})
-                mostrar_tabla(det_nt.style.map(colorear_anio, subset=['Año']), use_container_width=True, hide_index=True)
+            with st.expander("Detalle de las solicitudes pendientes sin serie"):
+                det_nt = pend[['Fecha_Recibido', 'CUC', 'Cliente', 'Jefe_de_Venta', 'Movimiento', 'Equipo', 'Modelo', 'Año_Solicitado', 'Canal', 'Motivo']].copy()
+                det_nt = det_nt.rename(columns={'Fecha_Recibido': 'Fecha Recibido', 'Jefe_de_Venta': 'Jefe de Venta', 'Año_Solicitado': 'Año solicitado'})
+                mostrar_tabla(det_nt.style.map(colorear_rango_anio, subset=['Año solicitado']), use_container_width=True, hide_index=True)
 
 elif menu == "Solicitudes Diarias":
     render_banner("calendario", "Solicitudes Diarias", "Seguimiento de solicitudes por fecha.")
@@ -2411,6 +2457,12 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                 supervisor = st.text_input("Supervisor (Opcional):").strip()
                 equipo_tipo = st.selectbox("Equipo:", TIPOS_EQUIPO)
                 modelo_sol = st.text_input("Modelo:").strip()
+                if st.session_state.get('form_movimiento') == "Entrega":
+                    anio_sol_sel = st.selectbox("Año solicitado:", OPCIONES_ANIO_SOLICITADO,
+                                                help="Antigüedad del equipo que piden cuando todavía no hay serie asignada.")
+                else:
+                    anio_sol_sel = "Sin especificar"
+                anio_solicitado = "" if anio_sol_sel == "Sin especificar" else anio_sol_sel
 
             with col_s3:
                 if st.session_state.get("widget_multi_series"):
@@ -2456,7 +2508,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                         "Fecha_Entregado": fecha_e_str, "Status": status_sol, "Fecha_Recibido": fecha_r_str,
                         "Proyecto": proyecto, "CUC": cuc, "Cliente": cliente_sol, "Jefe_de_Venta": jefe_sol,
                         "Supervisor": supervisor, "Movimiento": movimiento_final, "Equipo": equipo_tipo,
-                        "Modelo": modelo_sol, "Serie": ser, "Canal": canal_sol, "Ruta": ruta_sol,
+                        "Modelo": modelo_sol, "Serie": ser, "Año_Solicitado": anio_solicitado, "Canal": canal_sol, "Ruta": ruta_sol,
                         "Motivo": motivo_sol, "Observaciones": observaciones
                     } for ser in series_lista]
                     df_sol = pd.concat([df_sol, pd.DataFrame(filas_nuevas)], ignore_index=True)
@@ -2714,6 +2766,10 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                             equipo_edit = st.selectbox("Equipo:", TIPOS_EQUIPO, index=idx_eq, key=f"eq_{idx_seleccionado}")
                             
                             modelo_edit = st.text_input("Modelo:", value=str(row_sel.get('Modelo', '')), key=f"mod_{idx_seleccionado}").strip()
+                            _as_actual = str(row_sel.get('Año_Solicitado', '')).strip()
+                            anio_sol_edit = st.selectbox("Año solicitado:", OPCIONES_ANIO_SOLICITADO,
+                                                         index=OPCIONES_ANIO_SOLICITADO.index(_as_actual) if _as_actual in OPCIONES_ANIO_SOLICITADO else 0,
+                                                         key=f"aso_{idx_seleccionado}")
 
                         with col_ed3:
                             serie_edit = st.text_input("Número de Serie:", value=str(row_sel.get('Serie', '')), key=f"ser_{idx_seleccionado}").strip()
@@ -2760,6 +2816,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                                 df_sol.loc[idx_seleccionado, 'Equipo'] = equipo_edit
                                 df_sol.loc[idx_seleccionado, 'Modelo'] = modelo_edit
                                 df_sol.loc[idx_seleccionado, 'Serie'] = serie_edit
+                                df_sol.loc[idx_seleccionado, 'Año_Solicitado'] = "" if anio_sol_edit == "Sin especificar" else anio_sol_edit
                                 df_sol.loc[idx_seleccionado, 'Canal'] = canal_edit
                                 df_sol.loc[idx_seleccionado, 'Ruta'] = ruta_edit
                                 df_sol.loc[idx_seleccionado, 'Motivo'] = motivo_edit
