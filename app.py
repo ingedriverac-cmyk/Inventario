@@ -331,6 +331,7 @@ _ICONOS_SVG = {
     "regla": '<path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/>',
     "etiqueta": '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>',
     "rayo": '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+    "taller": '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
     "imagen": '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
     "alerta": '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
 }
@@ -649,7 +650,7 @@ UBICACIONES_VALIDAS_ESTADIA = [
 ]
 
 ESQUEMA_COLUMNAS = ["Serie", "Modelo", "Año", "Tipo", "Imagen", "Canal", "Ubicación", "Estatus", "Ultimo_Movimiento"]
-COLUMNAS_SOLICITUDES = ["Fecha_Entregado", "Status", "Fecha_Recibido", "Proyecto", "CUC", "Cliente", "Jefe_de_Venta", "Supervisor", "Movimiento", "Equipo", "Modelo", "Serie", "Canal", "Ruta", "Motivo", "Observaciones"]
+COLUMNAS_SOLICITUDES = ["Fecha_Entregado", "Status", "Fecha_Recibido", "Proyecto", "CUC", "Cliente", "Jefe_de_Venta", "Supervisor", "Movimiento", "Equipo", "Modelo", "Serie", "Año", "Canal", "Ruta", "Motivo", "Observaciones"]
 COLUMNAS_LEVANTAMIENTOS = ["Fecha", "CUC", "Cliente", "Modelo", "Serie", "Tipo", "Imagen", "Canal", "Status", "Motivo", "Ubicación", "Ruta", "Jefe_de_Venta", "Solicitado"]
 
 def limpiar_y_mapear_columnas(df, esquema_objetivo):
@@ -736,12 +737,13 @@ def _preparar_db(url):
         # Rellena el Año de los equipos que todavía no lo tienen guardado
         from psycopg2.extras import execute_values
         cur = con.connection.cursor()
-        cur.execute('SELECT id, "Serie" FROM inventario WHERE "Año" IS NULL AND "Serie" IS NOT NULL')
-        pares = [(i, anio_de_serie(sr)) for i, sr in cur.fetchall()]
-        pares = [(i, a) for i, a in pares if a]
-        if pares:
-            execute_values(cur, 'UPDATE inventario AS t SET "Año" = v.a FROM (VALUES %s) AS v(id, a) WHERE t.id = v.id',
-                           pares, page_size=1000)
+        for tabla in ("inventario", "solicitudes"):
+            cur.execute(f'SELECT id, "Serie" FROM {tabla} WHERE "Año" IS NULL AND "Serie" IS NOT NULL')
+            pares = [(i, anio_de_serie(sr)) for i, sr in cur.fetchall()]
+            pares = [(i, a) for i, a in pares if a]
+            if pares:
+                execute_values(cur, f'UPDATE {tabla} AS t SET "Año" = v.a FROM (VALUES %s) AS v(id, a) WHERE t.id = v.id',
+                               pares, page_size=1000)
         cur.close()
     return eng
 
@@ -1216,6 +1218,7 @@ def cargar_solicitudes():
         df_sol = pd.DataFrame(columns=COLUMNAS_SOLICITUDES)
         
     df_sol = limpiar_y_mapear_columnas(df_sol, COLUMNAS_SOLICITUDES)
+    df_sol["Año"] = df_sol["Serie"].map(anio_de_serie)
     return df_sol
 
 def guardar_datos(df):
@@ -1249,6 +1252,9 @@ def guardar_levantamientos(df_lev):
         return False
 
 def guardar_solicitudes_seguro(df_sol):
+    if 'Serie' in df_sol.columns:
+        df_sol = df_sol.copy()
+        df_sol['Año'] = df_sol['Serie'].map(anio_de_serie)
     if db_activa():
         return _guardar_db("solicitudes", df_sol, COLUMNAS_SOLICITUDES)
     try:
@@ -1500,6 +1506,7 @@ if st.session_state['autenticado']:
             "Inventario General",
             "Equipos Disponibles",
             "Estadía",
+            "Necesidades de Taller",
             "Solicitudes",
             "Levantamientos",
             "Solicitudes Diarias",
@@ -1547,6 +1554,7 @@ else:
         [
             "Equipos Disponibles",
             "Estadía",
+            "Necesidades de Taller",
             "Solicitudes Diarias",
             "Catálogo de Equipos"
         ],
@@ -1826,6 +1834,107 @@ elif menu == "Estadía":
         st.info("No hay datos suficientes en el inventario.")
     
 # 3. SOLICITUDES DIARIAS (ADMINISTRADORES Y CHOFERES CON FILTRO Y EDICIÓN RÁPIDA)
+elif menu == "Necesidades de Taller":
+    render_banner("taller", "Necesidades de Taller", "Modelos y años de fabricación que se necesitan según las solicitudes pendientes, para priorizar su reparación en Taller.")
+    df_sol_nt = cargar_solicitudes()
+    if not df_sol_nt.empty:
+        pend = df_sol_nt[df_sol_nt['Status'].astype(str).str.strip().str.lower() == 'pendiente'].copy()
+    else:
+        pend = df_sol_nt.copy()
+
+    f_nt1, f_nt2 = st.columns(2)
+    with f_nt1:
+        canales_nt = ["Todos"] + sorted({str(c).strip() for c in pend['Canal'].dropna() if str(c).strip() and str(c).strip().lower() != 'nan'})
+        canal_nt = st.selectbox("Canal:", canales_nt, key="nt_canal")
+    with f_nt2:
+        mov_nt = st.selectbox("Movimiento:", ["Entrega", "Todos", "Reubicación", "Levantamiento"], key="nt_mov")
+    if mov_nt != "Todos":
+        pend = pend[pend['Movimiento'].astype(str).str.strip() == mov_nt]
+    if canal_nt != "Todos":
+        pend = pend[pend['Canal'].astype(str).str.strip() == canal_nt]
+
+    if pend.empty:
+        st.info("No hay solicitudes pendientes con los filtros seleccionados.")
+    else:
+        pend['Modelo'] = pend['Modelo'].fillna("").astype(str).str.strip().replace("", "Sin modelo")
+        pend['Año'] = pend['Año'].fillna("").astype(str).str.strip()
+
+        # Existencias del inventario para compararlas con lo que se necesita
+        inv_nt = df_inv[df_inv['Canal'] != "Cedis"].copy() if not df_inv.empty else pd.DataFrame(columns=ESQUEMA_COLUMNAS)
+        if canal_nt != "Todos" and not inv_nt.empty:
+            inv_nt = inv_nt[inv_nt['Canal'] == canal_nt]
+        disp_my, disp_m, rep_my, rep_m = {}, {}, {}, {}
+        if not inv_nt.empty:
+            inv_nt['_m'] = inv_nt['Modelo'].astype(str).str.strip().str.upper()
+            inv_nt['_a'] = inv_nt['Año'].fillna("").astype(str)
+            est_nt = inv_nt['Estatus'].astype(str).str.strip().str.lower()
+            es_disp = inv_nt['Ubicación'].isin(["En almacén de Comodatos", "En almacén de Publicidad", "En patios"]) & est_nt.isin(["nuevo", "reparado"])
+            es_rep = est_nt == "para reparar"
+            disp_my = inv_nt[es_disp].groupby(['_m', '_a']).size().to_dict()
+            disp_m = inv_nt[es_disp].groupby('_m').size().to_dict()
+            rep_my = inv_nt[es_rep].groupby(['_m', '_a']).size().to_dict()
+            rep_m = inv_nt[es_rep].groupby('_m').size().to_dict()
+
+        necesidad = pend.groupby(['Modelo', 'Año']).size().reset_index(name='Pendientes')
+        def _existencia(fila, por_my, por_m):
+            m_ = str(fila['Modelo']).strip().upper()
+            return por_my.get((m_, fila['Año']), 0) if fila['Año'] else por_m.get(m_, 0)
+        necesidad['Disponibles'] = necesidad.apply(lambda r: _existencia(r, disp_my, disp_m), axis=1)
+        necesidad['Faltante'] = (necesidad['Pendientes'] - necesidad['Disponibles']).clip(lower=0)
+        necesidad['Para Reparar'] = necesidad.apply(lambda r: _existencia(r, rep_my, rep_m), axis=1)
+        necesidad['A reparar (sugerido)'] = necesidad[['Faltante', 'Para Reparar']].min(axis=1)
+        necesidad['_orden'] = necesidad['Año'].apply(lambda a: (1, 0) if not a else (0, int(a)))
+        necesidad = necesidad.sort_values(['Modelo', '_orden']).drop(columns='_orden').reset_index(drop=True)
+        necesidad['Año'] = necesidad['Año'].replace("", "Sin año")
+
+        k_nt1, k_nt2, k_nt3 = st.columns(3)
+        with k_nt1:
+            render_kpi("Solicitudes pendientes", len(pend), "Con los filtros seleccionados", "#E60012")
+        with k_nt2:
+            render_kpi("Modelos distintos", pend['Modelo'].nunique(), "Que se están necesitando", "#003B5C")
+        with k_nt3:
+            render_kpi("A reparar (sugerido)", int(necesidad['A reparar (sugerido)'].sum()), "Equipos Para Reparar que cubren la necesidad", "#FF7F00")
+
+        g_nt1, g_nt2 = st.columns(2)
+        with g_nt1:
+            st.plotly_chart(grafica_barras_conteo(pend, 'Modelo', "Solicitudes pendientes por modelo", top=12), use_container_width=True)
+        with g_nt2:
+            st.plotly_chart(grafica_anios(pend, "Solicitudes pendientes por año de fabricación"), use_container_width=True)
+
+        st.markdown("### Necesidad por modelo y año")
+        mostrar_tabla(
+            necesidad.style.map(colorear_anio, subset=['Año']).map(
+                lambda v: 'background-color: #fed7aa; font-weight: bold;' if isinstance(v, (int, float)) and v > 0 else '',
+                subset=['A reparar (sugerido)']),
+            use_container_width=True, hide_index=True)
+        st.caption("Pendientes: solicitudes en espera. Disponibles: equipos Nuevos o Reparados en almacén o patios. "
+                   "Faltante: pendientes menos disponibles. A reparar (sugerido): equipos Para Reparar que Taller debería atender primero. "
+                   "El año sale de la serie de cada solicitud; si no tiene serie se compara solo por modelo.")
+        _buf_nt = io.BytesIO()
+        with pd.ExcelWriter(_buf_nt, engine="openpyxl") as _w_nt:
+            necesidad.to_excel(_w_nt, index=False, sheet_name="Necesidades de Taller")
+        st.download_button(":material/download: Descargar para Taller (Excel)", _buf_nt.getvalue(),
+                           file_name="necesidades_taller.xlsx",
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+        if st.session_state['autenticado']:
+            with st.expander("Detalle de las solicitudes pendientes"):
+                mapa_inv_nt = {}
+                if not df_inv.empty:
+                    mapa_inv_nt = dict(zip(df_inv['Serie'].astype(str).str.strip().str.upper(),
+                                           zip(df_inv['Estatus'].astype(str), df_inv['Ubicación'].astype(str))))
+                def _estado_inv(ser):
+                    ser_ = str(ser).strip()
+                    if not ser_ or ser_.lower() == 'nan':
+                        return "Sin serie", ""
+                    return mapa_inv_nt.get(ser_.upper(), ("No está en inventario", ""))
+                det_nt = pend[['Fecha_Recibido', 'CUC', 'Cliente', 'Movimiento', 'Canal', 'Modelo', 'Serie', 'Año']].copy()
+                est_ubi = det_nt['Serie'].map(_estado_inv)
+                det_nt['Estatus en inventario'] = est_ubi.map(lambda t: t[0])
+                det_nt['Ubicación en inventario'] = est_ubi.map(lambda t: t[1])
+                det_nt = det_nt.rename(columns={'Fecha_Recibido': 'Fecha Recibido'})
+                mostrar_tabla(det_nt.style.map(colorear_anio, subset=['Año']), use_container_width=True, hide_index=True)
+
 elif menu == "Solicitudes Diarias":
     render_banner("calendario", "Solicitudes Diarias", "Seguimiento de solicitudes por fecha.")
     
@@ -1957,8 +2066,7 @@ elif menu == "Solicitudes Diarias":
                 st.markdown("---")
 
             # Mostrar la tabla general informativa del día
-            df_tabla_diaria = df_filtradas_dia[['Proyecto', 'CUC', 'Cliente', 'Modelo', 'Serie', 'Canal', 'Jefe_de_Venta', 'Supervisor', 'Ruta', 'Movimiento', 'Status', 'Observaciones']].copy()
-            df_tabla_diaria.insert(df_tabla_diaria.columns.get_loc('Serie') + 1, 'Año', df_tabla_diaria['Serie'].map(anio_de_serie))
+            df_tabla_diaria = df_filtradas_dia[['Proyecto', 'CUC', 'Cliente', 'Modelo', 'Serie', 'Año', 'Canal', 'Jefe_de_Venta', 'Supervisor', 'Ruta', 'Movimiento', 'Status', 'Observaciones']].copy()
             df_tabla_diaria = df_tabla_diaria.rename(columns={'Jefe_de_Venta': 'Jefe de Venta', 'Observaciones': 'Motivo / Comentarios'})
             mostrar_tabla(df_tabla_diaria.style.map(colorear_status, subset=['Status']).map(colorear_anio, subset=['Año']), use_container_width=True, hide_index=True)
             st.success(f"Se encontraron {len(df_tabla_diaria)} solicitudes registradas bajo los criterios seleccionados.")
