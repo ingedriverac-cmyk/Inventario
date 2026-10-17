@@ -671,9 +671,12 @@ def limpiar_y_mapear_columnas(df, esquema_objetivo):
             df_L[col] = ""
     return df_L[esquema_objetivo]
 
-def anio_de_serie(serie):
+def anio_de_serie(serie, tipo="Enfriador"):
     """Año de fabricación según la serie: si empieza con número, son el 2.º y 3.er dígito (02060403T -> 2020);
-    si empieza con letra, el 4.º y 5.º carácter (N30240700217 -> 2024). Devuelve '' si no se puede determinar."""
+    si empieza con letra, el 4.º y 5.º carácter (N30240700217 -> 2024). Solo se calcula para Enfriadores
+    (Hidro, PostMix y Vending no llevan año). Devuelve '' si no se puede determinar."""
+    if not str(tipo).strip().lower().startswith("enfriador"):
+        return ""
     s_ = str(serie).strip().upper()
     if not s_ or s_ in ("NAN", "NONE"):
         return ""
@@ -683,6 +686,11 @@ def anio_de_serie(serie):
         if 1990 <= anio <= date.today().year + 1:
             return str(anio)
     return ""
+
+def anios_de_df(df, col_tipo):
+    """Lista de años para cada fila de un DataFrame (con 'Serie' y la columna del tipo de equipo)."""
+    tipos = df[col_tipo] if col_tipo in df.columns else [""] * len(df)
+    return [anio_de_serie(sr, tp) for sr, tp in zip(df["Serie"], tipos)]
 
 # =====================================================================
 # BASE DE DATOS (PostgreSQL en Neon)
@@ -737,13 +745,16 @@ def _preparar_db(url):
         # Rellena el Año de los equipos que todavía no lo tienen guardado
         from psycopg2.extras import execute_values
         cur = con.connection.cursor()
-        for tabla in ("inventario", "solicitudes"):
-            cur.execute(f'SELECT id, "Serie" FROM {tabla} WHERE "Año" IS NULL AND "Serie" IS NOT NULL')
-            pares = [(i, anio_de_serie(sr)) for i, sr in cur.fetchall()]
-            pares = [(i, a) for i, a in pares if a]
-            if pares:
+        for tabla, col_tipo in (("inventario", "Tipo"), ("solicitudes", "Equipo")):
+            cur.execute(f'SELECT id, "Serie", "{col_tipo}", "Año" FROM {tabla}')
+            cambios = []
+            for i, sr, tp, an in cur.fetchall():
+                esperado = anio_de_serie(sr, tp)
+                if (an or "") != esperado:
+                    cambios.append((i, esperado or None))
+            if cambios:
                 execute_values(cur, f'UPDATE {tabla} AS t SET "Año" = v.a FROM (VALUES %s) AS v(id, a) WHERE t.id = v.id',
-                               pares, page_size=1000)
+                               cambios, page_size=1000)
         cur.close()
     return eng
 
@@ -986,7 +997,7 @@ def limpiar_fechas_movimiento(serie):
 def cargar_datos():
     df = db_tabla("inventario") if db_activa() else _leer_inventario_archivos()
     df = limpiar_y_mapear_columnas(df, ESQUEMA_COLUMNAS)
-    df["Año"] = df["Serie"].map(anio_de_serie)
+    df["Año"] = anios_de_df(df, "Tipo")
     df["Ultimo_Movimiento"] = limpiar_fechas_movimiento(df["Ultimo_Movimiento"])
     if not df.empty and 'Serie' in df.columns:
         df = df.drop_duplicates(subset=['Serie'], keep='last').reset_index(drop=True)
@@ -1218,13 +1229,13 @@ def cargar_solicitudes():
         df_sol = pd.DataFrame(columns=COLUMNAS_SOLICITUDES)
         
     df_sol = limpiar_y_mapear_columnas(df_sol, COLUMNAS_SOLICITUDES)
-    df_sol["Año"] = df_sol["Serie"].map(anio_de_serie)
+    df_sol["Año"] = anios_de_df(df_sol, "Equipo")
     return df_sol
 
 def guardar_datos(df):
     if 'Serie' in df.columns:
         df = df.copy()
-        df['Año'] = df['Serie'].map(anio_de_serie)
+        df['Año'] = anios_de_df(df, 'Tipo')
     if not df.empty and 'Serie' in df.columns:
         df = df.drop_duplicates(subset=['Serie'], keep='last').reset_index(drop=True)
     if db_activa():
@@ -1254,7 +1265,7 @@ def guardar_levantamientos(df_lev):
 def guardar_solicitudes_seguro(df_sol):
     if 'Serie' in df_sol.columns:
         df_sol = df_sol.copy()
-        df_sol['Año'] = df_sol['Serie'].map(anio_de_serie)
+        df_sol['Año'] = anios_de_df(df_sol, 'Equipo')
     if db_activa():
         return _guardar_db("solicitudes", df_sol, COLUMNAS_SOLICITUDES)
     try:
@@ -1345,6 +1356,30 @@ def pista_cliente(key_cuc, key_cliente, key_auto):
         st.caption("Nombre tomado de los registros de este CUC. Si cambió, escríbelo de nuevo.")
     elif not cli and not auto:
         st.caption("Este CUC no tiene registros anteriores: escribe el nombre del cliente.")
+
+def leer_excel_texto(archivo, hoja=0):
+    """Lee una pestaña de Excel como texto y conserva los ceros a la izquierda, incluso en las celdas numéricas
+    que Excel muestra con formato de ceros (p. ej. el número 456 con formato 00000 se lee como 00456)."""
+    archivo.seek(0)
+    df = pd.read_excel(archivo, sheet_name=hoja, dtype=str)
+    try:
+        import openpyxl
+        archivo.seek(0)
+        wb = openpyxl.load_workbook(archivo, read_only=True, data_only=True)
+        ws = wb[hoja] if isinstance(hoja, str) else wb.worksheets[hoja]
+        for r_idx, fila in enumerate(ws.iter_rows(min_row=2)):
+            if r_idx >= len(df):
+                break
+            for c_idx, celda in enumerate(fila):
+                v = celda.value
+                if c_idx < df.shape[1] and isinstance(v, (int, float)) and not isinstance(v, bool) and float(v).is_integer():
+                    formato = str(celda.number_format or "")
+                    if re.fullmatch(r"0{2,}", formato):
+                        df.iat[r_idx, c_idx] = str(int(v)).zfill(len(formato))
+        wb.close()
+    except Exception:
+        pass  # archivos .xls antiguos u otros formatos: se queda la lectura normal
+    return df
 
 def parsear_series(texto):
     """Convierte un texto con varias series (una por línea o separadas por coma o punto y coma) en una lista
@@ -2821,7 +2856,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
         
         if archivo_subido is not None:
             try:
-                df_importado = pd.read_excel(archivo_subido, dtype=str)
+                df_importado = leer_excel_texto(archivo_subido)
                 df_importado = df_importado.fillna("")
                 df_importado = limpiar_y_mapear_columnas(df_importado, COLUMNAS_SOLICITUDES)
                 
@@ -3007,7 +3042,7 @@ elif menu == "Registrar Entrada" and st.session_state['autenticado']:
         
         if archivo_entrada_masiva is not None:
             try:
-                df_subido_masivo = pd.read_excel(archivo_entrada_masiva, dtype=str).fillna("")
+                df_subido_masivo = leer_excel_texto(archivo_entrada_masiva).fillna("")
                 df_subido_masivo = limpiar_y_mapear_columnas(df_subido_masivo, ESQUEMA_COLUMNAS)
                 
                 st.markdown("##### Vista previa de los datos a cargar:")
@@ -3027,7 +3062,7 @@ elif menu == "Registrar Entrada" and st.session_state['autenticado']:
                                 alertas_duplicadas += 1
                                 continue
 
-                            t_val = str(row.get('Tipo', 'Enfriador'))
+                            t_val = str(row.get('Tipo', '')).strip() or 'Enfriador'
                             i_val = str(row.get('Imagen', 'Sin Imagen'))
                             c_val = str(row.get('Canal', 'Tradicional'))
                             u_val = str(row.get('Ubicación', 'En almacén de Comodatos'))
@@ -3248,28 +3283,28 @@ elif menu == "Exportar a Excel" and st.session_state['autenticado']:
                     import_count = 0
                     
                     if hoja_inventario != "(No importar esta sección)":
-                        df_temp = pd.read_excel(xls, sheet_name=hoja_inventario, dtype=str).fillna("")
+                        df_temp = leer_excel_texto(archivo_completo, hoja_inventario).fillna("")
                         df_temp = limpiar_y_mapear_columnas(df_temp, ESQUEMA_COLUMNAS)
                         guardar_datos(df_temp)
                         import_count += 1
                         st.success(f"Inventario Actualizado: {len(df_temp)} registros importados desde la pestaña '{hoja_inventario}'.")
                         
                     if hoja_levantamientos != "(No importar esta sección)":
-                        df_temp = pd.read_excel(xls, sheet_name=hoja_levantamientos, dtype=str).fillna("")
+                        df_temp = leer_excel_texto(archivo_completo, hoja_levantamientos).fillna("")
                         df_temp = limpiar_y_mapear_columnas(df_temp, COLUMNAS_LEVANTAMIENTOS)
                         guardar_levantamientos(df_temp)
                         import_count += 1
                         st.success(f"Levantamientos Actualizados: {len(df_temp)} registros importados desde la pestaña '{hoja_levantamientos}'.")
                         
                     if hoja_solicitudes != "(No importar esta sección)":
-                        df_temp = pd.read_excel(xls, sheet_name=hoja_solicitudes, dtype=str).fillna("")
+                        df_temp = leer_excel_texto(archivo_completo, hoja_solicitudes).fillna("")
                         df_temp = limpiar_y_mapear_columnas(df_temp, COLUMNAS_SOLICITUDES)
                         guardar_solicitudes_seguro(df_temp)
                         import_count += 1
                         st.success(f"Solicitudes Actualizadas: {len(df_temp)} registros importados desde la pestaña '{hoja_solicitudes}'.")
 
                     if hoja_historial != "(No importar esta sección)":
-                        df_temp = pd.read_excel(xls, sheet_name=hoja_historial, dtype=str).fillna("")
+                        df_temp = leer_excel_texto(archivo_completo, hoja_historial).fillna("")
                         df_temp = limpiar_y_mapear_columnas(df_temp, COLUMNAS_HISTORIAL)
                         guardar_historial(df_temp)
                         import_count += 1
