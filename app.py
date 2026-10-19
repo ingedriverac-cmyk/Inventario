@@ -736,8 +736,12 @@ def _motor_db(url):
     return create_engine(u, pool_pre_ping=True, pool_size=4, max_overflow=4, pool_recycle=240,
                          connect_args={"connect_timeout": 20})
 
+def _firma_esquema():
+    """Huella de las tablas/columnas de la app: si cambia (p. ej. una columna nueva), se vuelve a preparar la base."""
+    return repr(sorted((n, tuple(c)) for n, c in _tablas_db().items()))
+
 @st.cache_resource(show_spinner=False)
-def _preparar_db(url):
+def _preparar_db(url, firma):
     """Crea las tablas e índices la primera vez (no toca datos existentes)."""
     from sqlalchemy import text
     eng = _motor_db(url)
@@ -776,7 +780,7 @@ def _preparar_db(url):
     return eng
 
 def _motor():
-    return _preparar_db(DATABASE_URL)
+    return _preparar_db(DATABASE_URL, _firma_esquema())
 
 def _error_db(e):
     st.error("No se pudo conectar con la base de datos. Revisa DATABASE_URL en Secrets o intenta de nuevo en unos segundos.")
@@ -824,11 +828,18 @@ def _tabla_cacheada(nombre, version, columnas):
     return _filas_a_df(filas, list(columnas))
 
 def db_tabla(nombre):
-    """Lee una tabla (con caché; se renueva sola al guardar cualquier cambio)."""
-    try:
-        return _tabla_cacheada(nombre, _versiones_tablas().get(nombre, 0), tuple(_tablas_db()[nombre]))
-    except Exception as e:
-        _error_db(e)
+    """Lee una tabla (con caché; se renueva sola al guardar cualquier cambio).
+    Si falta una columna nueva en la base, la agrega automáticamente y reintenta."""
+    for intento in (1, 2):
+        try:
+            return _tabla_cacheada(nombre, _versiones_tablas().get(nombre, 0), tuple(_tablas_db()[nombre]))
+        except Exception as e:
+            falta_columna = getattr(getattr(e, "orig", None), "pgcode", None) == "42703"
+            if intento == 1 and falta_columna:
+                _preparar_db.clear()
+                _tabla_cacheada.clear()
+                continue
+            _error_db(e)
 
 def db_resumen():
     from sqlalchemy import text
