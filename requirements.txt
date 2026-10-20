@@ -10,3 +10,4 @@ xlrd
 jinja2
 SQLAlchemy
 psycopg2-binary
+reportlab
