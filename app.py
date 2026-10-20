@@ -1614,6 +1614,16 @@ def calcular_rendimiento(df_sol, inicio, fin, choferes_base, df_he):
         he['_c'] = he['Chofer'].astype(str).str.strip().str.lower()
         horas = he.groupby('_c')['_h'].sum().to_dict()
     r['Horas extras'] = [round(float(horas.get(str(c).strip().lower(), 0)), 1) for c in r.index]
+    tot_c, tot_h = float(r['Completadas'].sum()), float(r['Horas extras'].sum())
+    r['% de servicios'] = (r['Completadas'] / tot_c * 100).round(1) if tot_c > 0 else 0.0
+    r['% de horas extras'] = (r['Horas extras'] / tot_h * 100).round(1) if tot_h > 0 else 0.0
+    r['Servicios por hora extra'] = (r['Completadas'] / r['Horas extras'].where(lambda x: x > 0)).round(2)
+    r['Horas extras por servicio'] = (r['Horas extras'] / r['Completadas'].where(lambda x: x > 0)).round(2)
+    brecha = r['% de horas extras'] - r['% de servicios']
+    if tot_h > 0:
+        r['Diagnóstico'] = brecha.map(lambda b: "Revisar" if b >= 10 else ("Eficiente" if b <= -10 else "Equilibrado"))
+    else:
+        r['Diagnóstico'] = "Sin horas extras"
     r = r.sort_values(['Completadas', '% Cumplimiento', 'Promedio por día'], ascending=False)
     r.insert(0, 'Posición', r['Completadas'].rank(method='min', ascending=False).astype(int))
     r.index.name = 'Chofer'
@@ -1688,9 +1698,9 @@ def generar_pdf_rendimiento(resumen, diario, inicio, fin, modo="general", chofer
                                    ("ALIGN", (1, 1), (1, -1), "LEFT")]))
         elementos += [tabla, Spacer(1, 10), Paragraph("Servicios completados por chofer", e_h2)]
         if len(resumen):
-            dib = Drawing(24*cm, 6*cm)
+            dib = Drawing(24*cm, 5.2*cm)
             graf = VerticalBarChart()
-            graf.x, graf.y, graf.width, graf.height = 40, 25, 24*cm - 80, 6*cm - 40
+            graf.x, graf.y, graf.width, graf.height = 40, 25, 24*cm - 80, 5.2*cm - 40
             graf.data = [list(resumen['Completadas'].astype(int))]
             graf.categoryAxis.categoryNames = [str(c).upper() for c in resumen['Chofer']]
             graf.categoryAxis.labels.fontSize = 8
@@ -1705,6 +1715,20 @@ def generar_pdf_rendimiento(resumen, diario, inicio, fin, modo="general", chofer
             graf.barLabels.nudge = 7
             dib.add(graf)
             elementos.append(dib)
+        if float(resumen['Horas extras'].sum()) > 0:
+            elementos.append(Paragraph("Horas extras contra rendimiento", e_h2))
+            filas_h = [["Chofer", "Completadas", "% de servicios", "Hrs extra", "% de hrs extra", "Servicios por hr extra", "Hrs extra por servicio", "Diagnóstico"]]
+            for _, f in resumen.iterrows():
+                sph = "—" if pd.isna(f['Servicios por hora extra']) else _fmt(float(f['Servicios por hora extra']))
+                hps = "—" if pd.isna(f['Horas extras por servicio']) else _fmt(float(f['Horas extras por servicio']))
+                filas_h.append([str(f['Chofer']).upper(), int(f['Completadas']), f"{f['% de servicios']:g}%", _fmt(float(f['Horas extras'])),
+                                f"{f['% de horas extras']:g}%", sph, hps, str(f['Diagnóstico'])])
+            th = _tabla(filas_h, [4.2*cm, 2.6*cm, 2.8*cm, 2.2*cm, 2.8*cm, 3.6*cm, 3.6*cm, 3.2*cm], alinear_derecha_desde=1)
+            colores_d = {"Revisar": colors.HexColor("#FEE2E2"), "Eficiente": colors.HexColor("#DCFCE7"), "Equilibrado": colors.HexColor("#FEF9C3")}
+            th.setStyle(TableStyle([("BACKGROUND", (7, i), (7, i), colores_d.get(filas_h[i][7], colors.white)) for i in range(1, len(filas_h))]
+                                   + [("ALIGN", (0, 1), (0, -1), "LEFT")]))
+            elementos += [th, Paragraph("Revisar: su parte de las horas extras del equipo supera en 10 puntos o más su parte de los servicios. "
+                                        "Eficiente: ocurre lo contrario. Equilibrado: están parejas.", e_nota)]
         elementos += [Spacer(1, 6), Paragraph(notas, e_nota)]
         doc.build(elementos)
         return buf.getvalue()
@@ -1731,7 +1755,17 @@ def generar_pdf_rendimiento(resumen, diario, inicio, fin, modo="general", chofer
                                 ("FONTSIZE", (0, 1), (-1, 1), 14), ("FONTSIZE", (0, 3), (-1, 3), 14),
                                 ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#D1D5DB")),
                                 ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6)]))
-        elementos += [tk, Paragraph("Servicios completados por tipo", e_h2)]
+        elementos.append(tk)
+        if float(resumen['Horas extras'].sum()) > 0:
+            sph = "—" if pd.isna(f['Servicios por hora extra']) else _fmt(float(f['Servicios por hora extra']))
+            prom_sph = resumen['Completadas'].sum() / resumen['Horas extras'].sum()
+            elementos.append(Paragraph("Horas extras contra servicios", e_h2))
+            th = _tabla([["Horas\nextras", "% de las horas\nextras del equipo", "% de los servicios\ndel equipo", "Servicios por\nhora extra", "Diagnóstico"],
+                         [_fmt(float(f['Horas extras'])), f"{f['% de horas extras']:g}%", f"{f['% de servicios']:g}%",
+                          f"{sph} (equipo: {prom_sph:.2f})", str(f['Diagnóstico'])]],
+                        [2.6*cm, 3.6*cm, 3.6*cm, 4.0*cm, 3.6*cm], alinear_derecha_desde=0, tam=9.5)
+            elementos.append(th)
+        elementos.append(Paragraph("Servicios completados por tipo", e_h2))
         total = max(int(f['Completadas']), 1)
         filas_t = [["Tipo de servicio", "Cantidad", "% del total", "Promedio del equipo"]]
         for t in TIPOS_SERVICIO:
@@ -2393,6 +2427,36 @@ elif menu == "Rendimiento de Choferes" and st.session_state['autenticado']:
             fig_d = _estilo_grafica(fig_d, "Servicios completados por día", 360)
             fig_d.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.15))
             st.plotly_chart(fig_d, use_container_width=True)
+
+        st.markdown("### Horas extras vs. rendimiento")
+        if float(resumen['Horas extras'].sum()) <= 0:
+            st.info("Todavía no hay horas extras capturadas en esta catorcena. Captúralas en el desplegable de abajo para compararlas con los servicios.")
+        else:
+            _col_diag = {"Revisar": "#DC2626", "Equilibrado": "#EAB308", "Eficiente": "#16A34A"}
+            fig_s = go.Figure(go.Scatter(
+                x=resumen['Horas extras'], y=resumen['Completadas'], mode="markers+text",
+                text=[str(c).upper() for c in resumen['Chofer']], textposition="top center",
+                marker=dict(size=15, color=[_col_diag.get(d_, "#9CA3AF") for d_ in resumen['Diagnóstico']])))
+            fig_s.add_hline(y=float(resumen['Completadas'].mean()), line_dash="dash", line_color="#9CA3AF")
+            fig_s.add_vline(x=float(resumen['Horas extras'].mean()), line_dash="dash", line_color="#9CA3AF")
+            fig_s = _estilo_grafica(fig_s, "Horas extras contra servicios completados (las líneas son el promedio del equipo)", 380)
+            fig_s.update_xaxes(title_text="Horas extras")
+            fig_s.update_yaxes(title_text="Servicios completados")
+            fig_s.add_annotation(xref="paper", yref="paper", x=1, y=0, text="Más horas extras, menos servicios", showarrow=False,
+                                 xanchor="right", yanchor="bottom", font=dict(color="#991b1b", size=11))
+            fig_s.add_annotation(xref="paper", yref="paper", x=0, y=1, text="Menos horas extras, más servicios", showarrow=False,
+                                 xanchor="left", yanchor="top", font=dict(color="#166534", size=11))
+            st.plotly_chart(fig_s, use_container_width=True)
+            cmp_cols = ['Chofer', 'Completadas', '% de servicios', 'Horas extras', '% de horas extras',
+                        'Servicios por hora extra', 'Horas extras por servicio', 'Diagnóstico']
+            estilo_cmp = resumen[cmp_cols].style.format(na_rep="—", subset=['Servicios por hora extra', 'Horas extras por servicio']).map(
+                lambda v: {"Revisar": 'background-color: #fee2e2; color: #991b1b; font-weight: bold;',
+                           "Eficiente": 'background-color: #dcfce7; color: #166534; font-weight: bold;',
+                           "Equilibrado": 'background-color: #fef9c3; color: #854d0e; font-weight: bold;'}.get(v, ''),
+                subset=['Diagnóstico'])
+            mostrar_tabla(estilo_cmp, use_container_width=True, hide_index=True)
+            st.caption("Revisar: su parte de las horas extras del equipo supera en 10 puntos o más su parte de los servicios. "
+                       "Eficiente: ocurre lo contrario. Equilibrado: están parejas.")
 
         with st.expander("Detalle por día"):
             if diario.empty:
