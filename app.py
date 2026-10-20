@@ -331,6 +331,7 @@ _ICONOS_SVG = {
     "regla": '<path d="M21.3 15.3a2.4 2.4 0 0 1 0 3.4l-2.6 2.6a2.4 2.4 0 0 1-3.4 0L2.7 8.7a2.41 2.41 0 0 1 0-3.4l2.6-2.6a2.41 2.41 0 0 1 3.4 0Z"/><path d="m14.5 12.5 2-2"/><path d="m11.5 9.5 2-2"/><path d="m8.5 6.5 2-2"/><path d="m17.5 15.5 2-2"/>',
     "etiqueta": '<path d="M12.586 2.586A2 2 0 0 0 11.172 2H4a2 2 0 0 0-2 2v7.172a2 2 0 0 0 .586 1.414l8.704 8.704a2.426 2.426 0 0 0 3.42 0l6.58-6.58a2.426 2.426 0 0 0 0-3.42z"/><circle cx="7.5" cy="7.5" r=".5" fill="currentColor"/>',
     "rayo": '<path d="M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z"/>',
+    "choferes": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
     "taller": '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
     "imagen": '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
     "alerta": '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
@@ -731,6 +732,10 @@ def anios_de_df(df, col_tipo):
 # =====================================================================
 DATABASE_URL = _leer_secreto("DATABASE_URL", "")
 COLUMNAS_HISTORIAL = ["Fecha_Hora", "Usuario", "Serie", "Modelo", "Tipo_Movimiento", "Detalles"]
+HORAS_EXTRAS_FILE = "horas_extras.csv"
+CONFIG_FILE = "configuracion.csv"
+COLUMNAS_HORAS_EXTRAS = ["Catorcena_Inicio", "Chofer", "Horas_Extras", "Observaciones"]
+COLUMNAS_CONFIG = ["Clave", "Valor"]
 
 def db_activa():
     return bool(str(DATABASE_URL).strip())
@@ -738,7 +743,8 @@ def db_activa():
 def _tablas_db():
     return {"inventario": ESQUEMA_COLUMNAS, "solicitudes": COLUMNAS_SOLICITUDES,
             "levantamientos": COLUMNAS_LEVANTAMIENTOS, "historial": COLUMNAS_HISTORIAL,
-            "especificaciones": COLUMNAS_ESPECIFICACIONES}
+            "especificaciones": COLUMNAS_ESPECIFICACIONES,
+            "horas_extras": COLUMNAS_HORAS_EXTRAS, "configuracion": COLUMNAS_CONFIG}
 
 @st.cache_resource(show_spinner=False)
 def _motor_db(url):
@@ -1492,6 +1498,261 @@ def aplicar_filtros_solicitudes(df, status_sel, desde, hasta):
     return df
 
 
+# =====================================================================
+# RENDIMIENTO DE CHOFERES POR CATORCENA (de miércoles a martes)
+# =====================================================================
+STATUS_COMPLETADO = ["entregado", "transferido", "realizado", "levantado"]
+TIPOS_SERVICIO = ["Entregas", "Levantamientos", "Reubicaciones", "Documentales"]
+REFERENCIA_CATORCENA_DEFECTO = date(2025, 12, 31)  # un miércoles; se puede cambiar en la pantalla
+
+def _tabla_simple(nombre, archivo, columnas):
+    if db_activa():
+        df = db_tabla(nombre)
+    elif os.path.exists(archivo):
+        try:
+            df = pd.read_csv(archivo, dtype=str)
+        except Exception:
+            df = pd.DataFrame(columns=columnas)
+    else:
+        df = pd.DataFrame(columns=columnas)
+    return limpiar_y_mapear_columnas(df, columnas).fillna("")
+
+def _guardar_tabla_simple(nombre, archivo, columnas, df):
+    if db_activa():
+        return _guardar_db(nombre, df, columnas)
+    try:
+        df.reindex(columns=columnas).to_csv(archivo, index=False)
+        return True
+    except PermissionError:
+        st.error(f"Error: no se pudo guardar porque el archivo '{archivo}' está abierto en Excel.")
+        return False
+
+def cargar_horas_extras():
+    return _tabla_simple("horas_extras", HORAS_EXTRAS_FILE, COLUMNAS_HORAS_EXTRAS)
+
+def guardar_horas_extras(df):
+    return _guardar_tabla_simple("horas_extras", HORAS_EXTRAS_FILE, COLUMNAS_HORAS_EXTRAS, df)
+
+def leer_config(clave, defecto=""):
+    df = _tabla_simple("configuracion", CONFIG_FILE, COLUMNAS_CONFIG)
+    fila = df[df["Clave"].astype(str) == clave]
+    return str(fila.iloc[-1]["Valor"]) if not fila.empty else defecto
+
+def guardar_config(clave, valor):
+    df = _tabla_simple("configuracion", CONFIG_FILE, COLUMNAS_CONFIG)
+    df = df[df["Clave"].astype(str) != clave]
+    df = pd.concat([df, pd.DataFrame([{"Clave": clave, "Valor": str(valor)}])], ignore_index=True)
+    return _guardar_tabla_simple("configuracion", CONFIG_FILE, COLUMNAS_CONFIG, df)
+
+def referencia_catorcena():
+    """Fecha (siempre un miércoles) desde la que se cuentan las catorcenas de 14 días."""
+    try:
+        ref = datetime.strptime(leer_config("catorcena_referencia", ""), "%Y-%m-%d").date()
+    except ValueError:
+        ref = REFERENCIA_CATORCENA_DEFECTO
+    return ref - timedelta(days=(ref.weekday() - 2) % 7)
+
+def inicio_catorcena(fecha, ref):
+    return ref + timedelta(days=14 * ((fecha - ref).days // 14))
+
+def _clasificar_servicios(df_sol, inicio, fin):
+    """Solicitudes cuya Fecha Entrega cae en la catorcena, con chofer (columna Ruta), estado y tipo de servicio."""
+    d = df_sol.copy()
+    d['_f'] = _fechas_a_datetime(d['Fecha_Entregado'])
+    d = d[(d['_f'] >= pd.Timestamp(inicio)) & (d['_f'] <= pd.Timestamp(fin))].copy()
+    ruta = d['Ruta'].fillna("").astype(str).str.strip()
+    sin_ruta = int(ruta.isin(["", "nan", "None"]).sum())
+    d = d[~ruta.isin(["", "nan", "None"])].copy()
+    d['Chofer'] = ruta[d.index]
+    est = d['Status'].astype(str).str.strip().str.lower()
+    d['_completada'] = est.isin(STATUS_COMPLETADO)
+    d['_cancelada'] = est == "cancelado"
+    mov = d['Movimiento'].astype(str).str.lower()
+    doc = d['Proyecto'].astype(str).str.strip().str.lower() == "documental"
+    d['_tipo'] = ["Documentales" if es_doc else ("Levantamientos" if "levant" in m else ("Reubicaciones" if "reubic" in m else "Entregas"))
+                  for m, es_doc in zip(mov, doc)]
+    return d, sin_ruta
+
+def _unificar_choferes(d, choferes_base):
+    """Usa el nombre tal como está registrado en los usuarios de choferes (sin importar mayúsculas)."""
+    mapa = {str(c).strip().lower(): str(c).strip() for c in choferes_base}
+    d = d.copy()
+    d['Chofer'] = d['Chofer'].map(lambda r: mapa.get(str(r).strip().lower(), str(r).strip()))
+    return d
+
+def _resumen_periodo(d, choferes_base):
+    d = _unificar_choferes(d, choferes_base)
+    nombres = list(dict.fromkeys([str(c).strip() for c in choferes_base] + list(d['Chofer'].unique())))
+    r = pd.DataFrame(index=nombres)
+    r['Asignadas'] = d.groupby('Chofer').size().reindex(nombres, fill_value=0)
+    comp = d[d['_completada']]
+    r['Completadas'] = comp.groupby('Chofer').size().reindex(nombres, fill_value=0)
+    por_tipo = comp.groupby(['Chofer', '_tipo']).size().unstack(fill_value=0).reindex(index=nombres, columns=TIPOS_SERVICIO, fill_value=0)
+    for t in TIPOS_SERVICIO:
+        r[t] = por_tipo[t]
+    r['Canceladas'] = d[d['_cancelada']].groupby('Chofer').size().reindex(nombres, fill_value=0)
+    r['Pendientes'] = r['Asignadas'] - r['Completadas'] - r['Canceladas']
+    base_cumpl = (r['Asignadas'] - r['Canceladas']).where(lambda x: x > 0)
+    r['% Cumplimiento'] = (r['Completadas'] / base_cumpl * 100).fillna(0).round(1)
+    r['Días con actividad'] = comp.groupby('Chofer')['_f'].nunique().reindex(nombres, fill_value=0)
+    r['Promedio por día'] = (r['Completadas'] / r['Días con actividad'].where(lambda x: x > 0)).fillna(0).round(1)
+    return r, d
+
+def calcular_rendimiento(df_sol, inicio, fin, choferes_base, df_he):
+    """Devuelve (resumen por chofer, servicios completados por día, solicitudes del periodo, solicitudes sin chofer asignado)."""
+    d, sin_ruta = _clasificar_servicios(df_sol, inicio, fin)
+    r, d = _resumen_periodo(d, choferes_base)
+    ini_ant, fin_ant = inicio - timedelta(days=14), inicio - timedelta(days=1)
+    d_ant, _ = _clasificar_servicios(df_sol, ini_ant, fin_ant)
+    r_ant, _ = _resumen_periodo(d_ant, list(r.index))
+    r['Anterior'] = r_ant['Completadas'].reindex(r.index, fill_value=0)
+    r['Variación'] = r['Completadas'] - r['Anterior']
+    horas = {}
+    if df_he is not None and not df_he.empty:
+        he = df_he[df_he['Catorcena_Inicio'].astype(str) == inicio.isoformat()].copy()
+        he['_h'] = pd.to_numeric(he['Horas_Extras'], errors='coerce').fillna(0)
+        he['_c'] = he['Chofer'].astype(str).str.strip().str.lower()
+        horas = he.groupby('_c')['_h'].sum().to_dict()
+    r['Horas extras'] = [round(float(horas.get(str(c).strip().lower(), 0)), 1) for c in r.index]
+    r = r.sort_values(['Completadas', '% Cumplimiento', 'Promedio por día'], ascending=False)
+    r.insert(0, 'Posición', r['Completadas'].rank(method='min', ascending=False).astype(int))
+    r.index.name = 'Chofer'
+    r = r.reset_index()
+    comp = d[d['_completada']].copy()
+    comp['Día'] = comp['_f'].dt.date
+    diario = comp.groupby(['Chofer', 'Día', '_tipo']).size().unstack(fill_value=0).reindex(columns=TIPOS_SERVICIO, fill_value=0).reset_index()
+    diario['Total'] = diario[TIPOS_SERVICIO].sum(axis=1)
+    return r, diario, d, sin_ruta
+
+def generar_pdf_rendimiento(resumen, diario, inicio, fin, modo="general", choferes=None):
+    """PDF imprimible. modo='general': ranking de todos los choferes. modo='individual': una hoja por chofer."""
+    from reportlab.lib.pagesizes import A4, landscape
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import cm
+    from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+    from reportlab.graphics.shapes import Drawing
+    from reportlab.graphics.charts.barcharts import VerticalBarChart
+
+    naranja, azul, gris = colors.HexColor("#D95F00"), colors.HexColor("#003B5C"), colors.HexColor("#F3F4F6")
+    estilos = getSampleStyleSheet()
+    e_titulo = ParagraphStyle("t", parent=estilos["Title"], textColor=azul, fontSize=20, leading=24, alignment=0, spaceAfter=2)
+    e_sub = ParagraphStyle("s", parent=estilos["Normal"], textColor=colors.HexColor("#4B5563"), fontSize=11, spaceAfter=10)
+    e_h2 = ParagraphStyle("h2", parent=estilos["Heading2"], textColor=azul, fontSize=13, spaceBefore=10, spaceAfter=4)
+    e_nota = ParagraphStyle("n", parent=estilos["Normal"], textColor=colors.HexColor("#6B7280"), fontSize=8, leading=10)
+    periodo = f"Catorcena del {inicio:%d/%m/%Y} al {fin:%d/%m/%Y}"
+    generado = f"Generado el {datetime.now():%d/%m/%Y %H:%M}"
+    notas = ("Completadas: servicios con estatus Entregado, Transferido, Realizado o Levantado y fecha de entrega dentro de la catorcena. "
+             "Documentales: solicitudes de proyecto Documental. % Cumplimiento = Completadas / (Asignadas - Canceladas). "
+             "Prom/día = Completadas / días con actividad. vs ant. = diferencia de Completadas contra la catorcena anterior.")
+
+    def _tabla(datos, anchos, encabezado=True, alinear_derecha_desde=1, tam=8.5):
+        t = Table(datos, colWidths=anchos, repeatRows=1 if encabezado else 0)
+        estilo = [("FONTSIZE", (0, 0), (-1, -1), tam), ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#D1D5DB")),
+                  ("VALIGN", (0, 0), (-1, -1), "MIDDLE"), ("ALIGN", (alinear_derecha_desde, 0), (-1, -1), "CENTER"),
+                  ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]
+        if encabezado:
+            estilo += [("BACKGROUND", (0, 0), (-1, 0), naranja), ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                       ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold")]
+            for i in range(1, len(datos)):
+                if i % 2 == 0:
+                    estilo.append(("BACKGROUND", (0, i), (-1, i), gris))
+        t.setStyle(TableStyle(estilo))
+        return t
+
+    def _fmt(v):
+        return f"{v:g}" if isinstance(v, float) else str(v)
+
+    buf = io.BytesIO()
+    elementos = []
+    if modo == "general":
+        doc = SimpleDocTemplate(buf, pagesize=landscape(A4), leftMargin=1.2*cm, rightMargin=1.2*cm, topMargin=1.2*cm, bottomMargin=1.2*cm,
+                                title="Rendimiento de Choferes")
+        elementos += [Paragraph("Rendimiento de Choferes", e_titulo), Paragraph(f"{periodo} (de miércoles a martes) · {generado}", e_sub)]
+        enc = ["Pos.", "Chofer", "Asign.", "Compl.", "Entregas", "Levant.", "Reubic.", "Docum.", "Cancel.", "Pend.", "% Cumpl.", "Días", "Prom/día", "Hrs extra", "vs ant."]
+        filas = [enc]
+        for _, f in resumen.iterrows():
+            var = int(f['Variación'])
+            filas.append([int(f['Posición']), str(f['Chofer']).upper(), int(f['Asignadas']), int(f['Completadas']), int(f['Entregas']),
+                          int(f['Levantamientos']), int(f['Reubicaciones']), int(f['Documentales']), int(f['Canceladas']), int(f['Pendientes']),
+                          f"{f['% Cumplimiento']:g}%", int(f['Días con actividad']), _fmt(float(f['Promedio por día'])),
+                          _fmt(float(f['Horas extras'])), f"{var:+d}" if var else "0"])
+        tot = resumen[["Asignadas", "Completadas", "Entregas", "Levantamientos", "Reubicaciones", "Documentales", "Canceladas", "Pendientes"]].sum()
+        filas.append(["", "TOTAL", int(tot['Asignadas']), int(tot['Completadas']), int(tot['Entregas']), int(tot['Levantamientos']),
+                      int(tot['Reubicaciones']), int(tot['Documentales']), int(tot['Canceladas']), int(tot['Pendientes']), "", "", "",
+                      _fmt(float(resumen['Horas extras'].sum())), ""])
+        anchos = [1.2, 4.2, 1.6, 1.7, 1.7, 1.7, 1.7, 1.7, 1.7, 1.5, 1.9, 1.3, 1.8, 1.8, 1.5]
+        tabla = _tabla(filas, [a*cm for a in anchos], alinear_derecha_desde=2)
+        tabla.setStyle(TableStyle([("FONTNAME", (0, len(filas)-1), (-1, len(filas)-1), "Helvetica-Bold"),
+                                   ("BACKGROUND", (0, len(filas)-1), (-1, len(filas)-1), colors.HexColor("#FDE68A")),
+                                   ("ALIGN", (1, 1), (1, -1), "LEFT")]))
+        elementos += [tabla, Spacer(1, 10), Paragraph("Servicios completados por chofer", e_h2)]
+        if len(resumen):
+            dib = Drawing(24*cm, 6*cm)
+            graf = VerticalBarChart()
+            graf.x, graf.y, graf.width, graf.height = 40, 25, 24*cm - 80, 6*cm - 40
+            graf.data = [list(resumen['Completadas'].astype(int))]
+            graf.categoryAxis.categoryNames = [str(c).upper() for c in resumen['Chofer']]
+            graf.categoryAxis.labels.fontSize = 8
+            graf.valueAxis.valueMin = 0
+            graf.valueAxis.labels.fontSize = 8
+            graf.bars[0].fillColor = naranja
+            graf.bars[0].strokeColor = None
+            graf.barWidth = 28
+            graf.groupSpacing = 40
+            graf.barLabelFormat = "%d"
+            graf.barLabels.fontSize = 8
+            graf.barLabels.nudge = 7
+            dib.add(graf)
+            elementos.append(dib)
+        elementos += [Spacer(1, 6), Paragraph(notas, e_nota)]
+        doc.build(elementos)
+        return buf.getvalue()
+
+    doc = SimpleDocTemplate(buf, pagesize=A4, leftMargin=1.8*cm, rightMargin=1.8*cm, topMargin=1.6*cm, bottomMargin=1.6*cm,
+                            title="Hoja de rendimiento")
+    lista = [c for c in (choferes or list(resumen['Chofer'])) if c in set(resumen['Chofer'])]
+    total_choferes = len(resumen)
+    prom_equipo = resumen[TIPOS_SERVICIO + ["Completadas"]].mean()
+    for n, nombre in enumerate(lista):
+        f = resumen[resumen['Chofer'] == nombre].iloc[0]
+        elementos += [Paragraph("Hoja de rendimiento", e_titulo), Paragraph(f"<b>{str(nombre).upper()}</b> · {periodo} · {generado}", e_sub)]
+        var = int(f['Variación'])
+        kpis = [["Posición", "Completadas", "% Cumplimiento", "Promedio por día"],
+                [f"{int(f['Posición'])}.º de {total_choferes}", int(f['Completadas']), f"{f['% Cumplimiento']:g}%", _fmt(float(f['Promedio por día']))],
+                ["Días con actividad", "Horas extras", "vs catorcena anterior", "Canceladas / Pendientes"],
+                [int(f['Días con actividad']), _fmt(float(f['Horas extras'])), f"{var:+d}" if var else "0", f"{int(f['Canceladas'])} / {int(f['Pendientes'])}"]]
+        tk = Table(kpis, colWidths=[4.35*cm]*4)
+        tk.setStyle(TableStyle([("FONTSIZE", (0, 0), (-1, -1), 10), ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                                ("BACKGROUND", (0, 0), (-1, 0), naranja), ("BACKGROUND", (0, 2), (-1, 2), naranja),
+                                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white), ("TEXTCOLOR", (0, 2), (-1, 2), colors.white),
+                                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"), ("FONTNAME", (0, 2), (-1, 2), "Helvetica-Bold"),
+                                ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"), ("FONTNAME", (0, 3), (-1, 3), "Helvetica-Bold"),
+                                ("FONTSIZE", (0, 1), (-1, 1), 14), ("FONTSIZE", (0, 3), (-1, 3), 14),
+                                ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#D1D5DB")),
+                                ("TOPPADDING", (0, 0), (-1, -1), 6), ("BOTTOMPADDING", (0, 0), (-1, -1), 6)]))
+        elementos += [tk, Paragraph("Servicios completados por tipo", e_h2)]
+        total = max(int(f['Completadas']), 1)
+        filas_t = [["Tipo de servicio", "Cantidad", "% del total", "Promedio del equipo"]]
+        for t in TIPOS_SERVICIO:
+            filas_t.append([t, int(f[t]), f"{int(f[t]) / total * 100:.0f}%" if int(f['Completadas']) else "0%", _fmt(round(float(prom_equipo[t]), 1))])
+        filas_t.append(["Total", int(f['Completadas']), "100%" if int(f['Completadas']) else "0%", _fmt(round(float(prom_equipo['Completadas']), 1))])
+        tt = _tabla(filas_t, [6*cm, 3.5*cm, 3.5*cm, 4.3*cm], tam=10)
+        tt.setStyle(TableStyle([("FONTNAME", (0, len(filas_t)-1), (-1, len(filas_t)-1), "Helvetica-Bold"), ("ALIGN", (0, 1), (0, -1), "LEFT")]))
+        elementos += [tt, Paragraph("Servicios completados por día", e_h2)]
+        dd = diario[diario['Chofer'] == nombre].sort_values('Día')
+        filas_d = [["Fecha", "Entregas", "Levant.", "Reubic.", "Docum.", "Total"]]
+        for _, r_ in dd.iterrows():
+            filas_d.append([f"{r_['Día']:%d/%m/%Y}", int(r_['Entregas']), int(r_['Levantamientos']), int(r_['Reubicaciones']), int(r_['Documentales']), int(r_['Total'])])
+        if len(filas_d) == 1:
+            filas_d.append(["Sin servicios completados en la catorcena", "", "", "", "", ""])
+        td = _tabla(filas_d, [5.5*cm, 2.4*cm, 2.4*cm, 2.4*cm, 2.4*cm, 2.2*cm], tam=10)
+        elementos += [td, Spacer(1, 10), Paragraph(notas, e_nota)]
+        if n < len(lista) - 1:
+            elementos.append(PageBreak())
+    doc.build(elementos)
+    return buf.getvalue()
+
 def calcular_dias_sin_movimiento(df):
     if df.empty:
         return df
@@ -1619,6 +1880,7 @@ if st.session_state['autenticado']:
             "Equipos Disponibles",
             "Estadía",
             "Necesidades de Taller",
+            "Rendimiento de Choferes",
             "Solicitudes",
             "Levantamientos",
             "Solicitudes Diarias",
@@ -2060,6 +2322,149 @@ elif menu == "Necesidades de Taller":
                 det_nt = pend[['Fecha_Recibido', 'CUC', 'Cliente', 'Jefe_de_Venta', 'Movimiento', 'Equipo', 'Modelo', 'Año_Solicitado', 'Canal', 'Motivo']].copy()
                 det_nt = det_nt.rename(columns={'Fecha_Recibido': 'Fecha Recibido', 'Jefe_de_Venta': 'Jefe de Venta', 'Año_Solicitado': 'Año solicitado'})
                 mostrar_tabla(det_nt.style.map(colorear_rango_anio, subset=['Año solicitado']), use_container_width=True, hide_index=True)
+
+elif menu == "Rendimiento de Choferes" and st.session_state['autenticado']:
+    render_banner("choferes", "Rendimiento de Choferes", "Servicios completados por chofer en cada catorcena (de miércoles a martes): entregas, levantamientos, reubicaciones, documentales y horas extras.")
+    df_sol_r = cargar_solicitudes()
+    df_he_r = cargar_horas_extras()
+    ref_cat = referencia_catorcena()
+    inicio_actual = inicio_catorcena(date.today(), ref_cat)
+    opciones_cat = [inicio_actual - timedelta(days=14 * i) for i in range(0, 27)]
+    cc1, cc2 = st.columns([2, 1])
+    with cc1:
+        inicio_sel = st.selectbox("Catorcena:", opciones_cat, key="rc_catorcena",
+                                  format_func=lambda i: f"{i:%d/%m/%Y} al {i + timedelta(days=13):%d/%m/%Y}" + (" (actual)" if i == inicio_actual else ""))
+    fin_sel = inicio_sel + timedelta(days=13)
+    with st.expander("Calendario de catorcenas"):
+        st.caption("Las catorcenas duran 14 días y empiezan en miércoles. Indica un miércoles en el que haya comenzado una catorcena para alinear el calendario con el de la empresa.")
+        nueva_ref = st.date_input("Un miércoles de inicio de catorcena:", value=ref_cat, key="rc_ref")
+        if st.button(":material/save: Guardar calendario", key="rc_guardar_ref"):
+            if guardar_config("catorcena_referencia", nueva_ref.isoformat()):
+                st.success("Calendario actualizado.")
+                time.sleep(1.2)
+                st.rerun()
+
+    choferes_base = list(CHOFERES_AUTORIZADOS.keys())
+    resumen, diario, serv_periodo, sin_ruta = calcular_rendimiento(df_sol_r, inicio_sel, fin_sel, choferes_base, df_he_r)
+
+    if resumen.empty or int(resumen['Asignadas'].sum()) == 0 and float(resumen['Horas extras'].sum()) == 0:
+        st.info("No hay solicitudes con Fecha Entrega y chofer (Ruta) asignados en esta catorcena.")
+    else:
+        mas = resumen.iloc[0]
+        menos = resumen.sort_values(['Completadas', '% Cumplimiento'], ascending=True).iloc[0]
+        k_r1, k_r2, k_r3, k_r4 = st.columns(4)
+        with k_r1:
+            render_kpi("Servicios completados", int(resumen['Completadas'].sum()), "Entre todos los choferes", "#003B5C")
+        with k_r2:
+            render_kpi("Más servicios", str(mas['Chofer']).upper(), f"{int(mas['Completadas'])} completados", "#16A34A")
+        with k_r3:
+            render_kpi("Menos servicios", str(menos['Chofer']).upper(), f"{int(menos['Completadas'])} completados", "#E60012")
+        with k_r4:
+            render_kpi("Horas extras", f"{float(resumen['Horas extras'].sum()):g}", "Capturadas en la catorcena", "#FF7F00")
+
+        st.markdown("### Ranking de la catorcena")
+        cols_vista = ['Posición', 'Chofer', 'Asignadas', 'Completadas', 'Entregas', 'Levantamientos', 'Reubicaciones', 'Documentales',
+                      'Canceladas', 'Pendientes', '% Cumplimiento', 'Días con actividad', 'Promedio por día', 'Horas extras', 'Anterior', 'Variación']
+        _max_c, _min_c = resumen['Completadas'].max(), resumen['Completadas'].min()
+        estilo_rank = resumen[cols_vista].style.map(
+            lambda v: 'background-color: #dcfce7; color: #166534; font-weight: bold;' if v == _max_c and _max_c != _min_c else
+                      ('background-color: #fee2e2; color: #991b1b; font-weight: bold;' if v == _min_c and _max_c != _min_c else ''),
+            subset=['Completadas']).map(
+            lambda v: 'color: #166534; font-weight: bold;' if v > 0 else ('color: #991b1b; font-weight: bold;' if v < 0 else ''),
+            subset=['Variación'])
+        mostrar_tabla(estilo_rank, use_container_width=True, hide_index=True)
+        if sin_ruta:
+            st.caption(f"{sin_ruta} solicitud(es) de esta catorcena no tienen chofer (Ruta) asignado y no se cuentan.")
+
+        g_r1, g_r2 = st.columns(2)
+        with g_r1:
+            fig_t = go.Figure()
+            for t_, c_ in zip(TIPOS_SERVICIO, ["#D95F00", "#003B5C", "#16A34A", "#9CA3AF"]):
+                fig_t.add_trace(go.Bar(name=t_, x=[str(c).upper() for c in resumen['Chofer']], y=resumen[t_], marker_color=c_))
+            fig_t = _estilo_grafica(fig_t, "Servicios completados por chofer y tipo", 360)
+            fig_t.update_layout(barmode="stack", showlegend=True, legend=dict(orientation="h", y=-0.15))
+            st.plotly_chart(fig_t, use_container_width=True)
+        with g_r2:
+            fig_d = go.Figure()
+            if not diario.empty:
+                for ch_ in diario['Chofer'].unique():
+                    dd_ = diario[diario['Chofer'] == ch_].sort_values('Día')
+                    fig_d.add_trace(go.Scatter(name=str(ch_).upper(), x=[f"{x:%d/%m}" for x in dd_['Día']], y=dd_['Total'], mode="lines+markers"))
+            fig_d = _estilo_grafica(fig_d, "Servicios completados por día", 360)
+            fig_d.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.15))
+            st.plotly_chart(fig_d, use_container_width=True)
+
+        with st.expander("Detalle por día"):
+            if diario.empty:
+                st.info("Todavía no hay servicios completados en esta catorcena.")
+            else:
+                dv = diario.sort_values(['Día', 'Chofer']).copy()
+                dv['Día'] = dv['Día'].map(lambda x: f"{x:%d/%m/%Y}")
+                mostrar_tabla(dv, use_container_width=True, hide_index=True)
+        with st.expander("Detalle de solicitudes de la catorcena"):
+            nombres_det = ["Todos"] + list(resumen['Chofer'])
+            ch_det = st.selectbox("Chofer:", nombres_det, key="rc_det")
+            det = serv_periodo.copy()
+            if ch_det != "Todos":
+                det = det[det['Chofer'].str.lower() == str(ch_det).lower()]
+            det = det[['Fecha_Entregado', 'Chofer', 'CUC', 'Cliente', 'Movimiento', 'Proyecto', 'Equipo', 'Modelo', 'Serie', 'Status']].rename(columns={'Fecha_Entregado': 'Fecha Entrega'})
+            mostrar_tabla(det, use_container_width=True, hide_index=True)
+
+    # ----- Horas extras -----
+    with st.expander("Capturar horas extras de la catorcena"):
+        nombres_he = list(dict.fromkeys([str(c).strip() for c in choferes_base] + list(resumen['Chofer'] if not resumen.empty else [])))
+        he_ini = df_he_r[df_he_r['Catorcena_Inicio'].astype(str) == inicio_sel.isoformat()]
+        he_prev = {str(r_['Chofer']).strip().lower(): (r_['Horas_Extras'], r_['Observaciones']) for _, r_ in he_ini.iterrows()}
+        st.caption(f"Catorcena del {inicio_sel:%d/%m/%Y} al {fin_sel:%d/%m/%Y}. Escribe el total de horas extras de cada chofer en la catorcena.")
+        with st.form(f"form_horas_extras_{inicio_sel.isoformat()}"):
+            captura = {}
+            for ch_ in nombres_he:
+                h_prev, o_prev = he_prev.get(ch_.lower(), ("0", ""))
+                try:
+                    h_prev_f = float(h_prev)
+                except (ValueError, TypeError):
+                    h_prev_f = 0.0
+                x1, x2, x3 = st.columns([2, 1, 3])
+                x1.markdown(f"**{ch_}**")
+                horas_in = x2.number_input("Horas extras", min_value=0.0, max_value=300.0, step=0.5, value=h_prev_f,
+                                           key=f"he_h_{inicio_sel.isoformat()}_{ch_}", label_visibility="collapsed")
+                obs_in = x3.text_input("Observaciones", value=str(o_prev), key=f"he_o_{inicio_sel.isoformat()}_{ch_}",
+                                       placeholder="Observaciones (opcional)", label_visibility="collapsed")
+                captura[ch_] = (horas_in, obs_in.strip())
+            guardar_he = st.form_submit_button(":material/save: Guardar horas extras")
+        if guardar_he:
+            df_resto = df_he_r[df_he_r['Catorcena_Inicio'].astype(str) != inicio_sel.isoformat()]
+            nuevas_he = [{"Catorcena_Inicio": inicio_sel.isoformat(), "Chofer": ch_, "Horas_Extras": f"{h_:g}", "Observaciones": o_}
+                         for ch_, (h_, o_) in captura.items() if h_ > 0 or o_]
+            df_nuevo_he = pd.concat([df_resto, pd.DataFrame(nuevas_he, columns=COLUMNAS_HORAS_EXTRAS)], ignore_index=True)
+            if guardar_horas_extras(df_nuevo_he):
+                st.success("Horas extras guardadas.")
+                time.sleep(1.2)
+                st.rerun()
+
+    # ----- Reportes imprimibles -----
+    st.markdown("### Reportes para imprimir")
+    try:
+        import reportlab  # noqa: F401
+        hay_pdf = True
+    except ImportError:
+        hay_pdf = False
+    if not hay_pdf:
+        st.warning("Para generar los PDF agrega la línea 'reportlab' al archivo requirements.txt del repositorio.")
+    elif resumen.empty:
+        st.info("No hay datos para generar el reporte de esta catorcena.")
+    else:
+        pdf_general = generar_pdf_rendimiento(resumen, diario, inicio_sel, fin_sel, "general")
+        pdf_todas = generar_pdf_rendimiento(resumen, diario, inicio_sel, fin_sel, "individual")
+        d1, d2, d3 = st.columns(3)
+        with d1:
+            st.download_button(":material/download: Reporte general (PDF)", pdf_general, file_name=f"rendimiento_choferes_{inicio_sel:%Y%m%d}.pdf", mime="application/pdf")
+        with d2:
+            st.download_button(":material/download: Hojas de todos los choferes (PDF)", pdf_todas, file_name=f"hojas_choferes_{inicio_sel:%Y%m%d}.pdf", mime="application/pdf")
+        with d3:
+            ch_pdf = st.selectbox("Hoja individual de:", list(resumen['Chofer']), key="rc_pdf_chofer", label_visibility="collapsed")
+            pdf_uno = generar_pdf_rendimiento(resumen, diario, inicio_sel, fin_sel, "individual", [ch_pdf])
+            st.download_button(":material/download: Hoja individual (PDF)", pdf_uno, file_name=f"hoja_{str(ch_pdf).lower().replace(' ', '_')}_{inicio_sel:%Y%m%d}.pdf", mime="application/pdf")
 
 elif menu == "Solicitudes Diarias":
     render_banner("calendario", "Solicitudes Diarias", "Seguimiento de solicitudes por fecha.")
@@ -3318,7 +3723,7 @@ elif menu == "Exportar a Excel" and st.session_state['autenticado']:
         try:
             _res_db = db_resumen()
             st.success("Base de datos conectada (PostgreSQL). Registros guardados: " +
-                       " | ".join(f"{ {'imagenes_modelos': 'Imágenes'}.get(k, k.capitalize()) }: {v:,}" for k, v in _res_db.items()))
+                       " | ".join(f"{ {'imagenes_modelos': 'Imágenes', 'horas_extras': 'Horas extras', 'configuracion': 'Configuración'}.get(k, k.capitalize()) }: {v:,}" for k, v in _res_db.items()))
         except Exception as e_db:
             st.error(f"No se pudo consultar la base de datos: {type(e_db).__name__}")
     else:
