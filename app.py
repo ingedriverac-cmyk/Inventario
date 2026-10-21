@@ -270,6 +270,10 @@ st.markdown("""
     [data-testid="stMetricValue"] { text-transform: uppercase; }
     [data-testid="stSidebar"] .stTextInput input { text-transform: none !important; }
 
+    /* Gráficas: en el celular, deslizar el dedo sobre ellas desplaza la página */
+    .js-plotly-plot, .js-plotly-plot .plotly, .js-plotly-plot .plotly .main-svg, .js-plotly-plot .plotly .nsewdrag,
+    .js-plotly-plot .plotly .draglayer { touch-action: pan-y !important; }
+
     /* Contenedores */
     [data-testid="stExpander"] { background: #FFFFFF; border: 1px solid var(--borde); border-radius: 8px; }
     [data-testid="stDataFrame"] { border: 1px solid var(--borde); border-radius: 8px; overflow: hidden; }
@@ -383,6 +387,19 @@ def mayus(obj):
 LIMITE_FILAS_CON_COLOR = 5000
 _contador_tablas = {"n": 0}
 
+def mostrar_grafica(fig, **kwargs):
+    """Muestra una gráfica sin zoom ni arrastre: así, al deslizar el dedo sobre ella en el celular, la página sigue
+    desplazándose. Se conservan las etiquetas al tocar y el botón para descargar la imagen."""
+    try:
+        fig.update_layout(dragmode=False)
+    except Exception:
+        pass
+    kwargs.setdefault("config", {
+        "scrollZoom": False, "doubleClick": False, "displaylogo": False,
+        "modeBarButtonsToRemove": ["zoom2d", "pan2d", "select2d", "lasso2d", "zoomIn2d", "zoomOut2d", "autoScale2d", "resetScale2d"],
+    })
+    return st.plotly_chart(fig, **kwargs)
+
 def mostrar_tabla(data, *args, **kwargs):
     # Pintar de colores miles de filas hace lento el navegador: las tablas muy grandes se muestran por páginas
     if _Styler is not None and isinstance(data, _Styler) and len(data.data) > LIMITE_FILAS_CON_COLOR:
@@ -454,7 +471,7 @@ def grafica_estadia(df, eje, titulo, umbral=UMBRAL_ALERTA_DIAS):
 
 
 def mostrar_grafica_estadia(df, eje, titulo):
-    st.plotly_chart(grafica_estadia(df, eje, titulo), use_container_width=True)
+    mostrar_grafica(grafica_estadia(df, eje, titulo), use_container_width=True)
     st.caption("Rojo: más de 40 días. Ámbar: más de 30 días. Azul: dentro de lo esperado.")
 
 
@@ -2111,14 +2128,14 @@ if menu == "Equipos Disponibles":
                 vista_disp = st.radio("Vista", ["Por modelo e imagen", "Mostrar por año"], horizontal=True,
                                       key=f"vista_disp_{c_d}", label_visibility="collapsed")
                 if vista_disp == "Mostrar por año":
-                    st.plotly_chart(grafica_anios(df_tabla_filtrada, f"Equipos disponibles por año de fabricación en {c_d}"), use_container_width=True)
+                    mostrar_grafica(grafica_anios(df_tabla_filtrada, f"Equipos disponibles por año de fabricación en {c_d}"), use_container_width=True)
                     df_por_anio = df_tabla_filtrada.copy()
                     df_por_anio['Año'] = df_por_anio['Año'].fillna("").astype(str).replace("", "Sin año")
                     df_por_anio = df_por_anio.groupby(['Tipo', 'Modelo', 'Año', 'Imagen', 'Estatus']).size().reset_index(name='Cantidad Disponible')
                     mostrar_tabla(df_por_anio.style.map(colorear_anio, subset=['Año']), use_container_width=True, hide_index=True)
                     st.caption("Año de fabricación según la serie. Verde: hasta 3 años. Amarillo: más de 3 y hasta 7. Rojo: más de 7.")
                 else:
-                    st.plotly_chart(grafica_barras_conteo(df_tabla_filtrada, 'Modelo', f"Equipos disponibles por modelo en {c_d}", top=12), use_container_width=True)
+                    mostrar_grafica(grafica_barras_conteo(df_tabla_filtrada, 'Modelo', f"Equipos disponibles por modelo en {c_d}", top=12), use_container_width=True)
                     mostrar_tabla(df_tabla_filtrada.groupby(['Tipo', 'Modelo', 'Imagen', 'Estatus']).size().reset_index(name='Cantidad Disponible'), use_container_width=True, hide_index=True)
                 
                 # Desplegable exacto de series solo visible para administradores
@@ -2155,7 +2172,7 @@ elif menu == "Estadía":
             margin=dict(t=20, l=0, r=0, b=0), height=460,
             paper_bgcolor="#ECE5E1", font=dict(family=FUENTE_GRAFICAS, size=13)
         )
-        st.plotly_chart(fig_treemap, use_container_width=True)
+        mostrar_grafica(fig_treemap, use_container_width=True)
         st.markdown("<br>", unsafe_allow_html=True)
 
     render_banner("estadia", "Estadía y Saturación", "Promedio de días sin movimiento y saturación de inventario. Las barras en <b>rojo</b> superan los <b>40 días</b>; las <b>ámbar</b> se acercan al límite.")
@@ -2310,9 +2327,9 @@ elif menu == "Necesidades de Taller":
 
         g_nt1, g_nt2 = st.columns(2)
         with g_nt1:
-            st.plotly_chart(grafica_barras_conteo(pend, 'Modelo', "Pendientes por modelo", top=12), use_container_width=True)
+            mostrar_grafica(grafica_barras_conteo(pend, 'Modelo', "Pendientes por modelo", top=12), use_container_width=True)
         with g_nt2:
-            st.plotly_chart(grafica_rangos(pend, 'Año_Solicitado', "Pendientes por año solicitado"), use_container_width=True)
+            mostrar_grafica(grafica_rangos(pend, 'Año_Solicitado', "Pendientes por año solicitado"), use_container_width=True)
 
         st.markdown("### Equipos pendientes por modelo y año solicitado")
         mostrar_tabla(
@@ -2417,7 +2434,7 @@ elif menu == "Rendimiento de Choferes" and st.session_state['autenticado']:
                 fig_t.add_trace(go.Bar(name=t_, x=[str(c).upper() for c in resumen['Chofer']], y=resumen[t_], marker_color=c_))
             fig_t = _estilo_grafica(fig_t, "Servicios completados por chofer y tipo", 360)
             fig_t.update_layout(barmode="stack", showlegend=True, legend=dict(orientation="h", y=-0.15))
-            st.plotly_chart(fig_t, use_container_width=True)
+            mostrar_grafica(fig_t, use_container_width=True)
         with g_r2:
             fig_d = go.Figure()
             if not diario.empty:
@@ -2426,7 +2443,7 @@ elif menu == "Rendimiento de Choferes" and st.session_state['autenticado']:
                     fig_d.add_trace(go.Scatter(name=str(ch_).upper(), x=[f"{x:%d/%m}" for x in dd_['Día']], y=dd_['Total'], mode="lines+markers"))
             fig_d = _estilo_grafica(fig_d, "Servicios completados por día", 360)
             fig_d.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.15))
-            st.plotly_chart(fig_d, use_container_width=True)
+            mostrar_grafica(fig_d, use_container_width=True)
 
         st.markdown("### Horas extras vs. rendimiento")
         if float(resumen['Horas extras'].sum()) <= 0:
@@ -2446,7 +2463,7 @@ elif menu == "Rendimiento de Choferes" and st.session_state['autenticado']:
                                  xanchor="right", yanchor="bottom", font=dict(color="#991b1b", size=11))
             fig_s.add_annotation(xref="paper", yref="paper", x=0, y=1, text="Menos horas extras, más servicios", showarrow=False,
                                  xanchor="left", yanchor="top", font=dict(color="#166534", size=11))
-            st.plotly_chart(fig_s, use_container_width=True)
+            mostrar_grafica(fig_s, use_container_width=True)
             cmp_cols = ['Chofer', 'Completadas', '% de servicios', 'Horas extras', '% de horas extras',
                         'Servicios por hora extra', 'Horas extras por servicio', 'Diagnóstico']
             estilo_cmp = resumen[cmp_cols].style.format(na_rep="—", subset=['Servicios por hora extra', 'Horas extras por servicio']).map(
@@ -2871,9 +2888,9 @@ elif menu == "Inventario General" and st.session_state['autenticado']:
         st.markdown("### Distribución del inventario")
         g1, g2 = st.columns(2)
         with g1:
-            st.plotly_chart(grafica_dona(df_filtrado, 'Estatus', 'Equipos por estatus', COLOR_ESTATUS), use_container_width=True)
+            mostrar_grafica(grafica_dona(df_filtrado, 'Estatus', 'Equipos por estatus', COLOR_ESTATUS), use_container_width=True)
         with g2:
-            st.plotly_chart(grafica_barras_conteo(df_filtrado, 'Ubicación', 'Equipos por ubicación', COLOR_UBICACION), use_container_width=True)
+            mostrar_grafica(grafica_barras_conteo(df_filtrado, 'Ubicación', 'Equipos por ubicación', COLOR_UBICACION), use_container_width=True)
 
         if 'Días sin movimiento' in df_filtrado.columns:
             df_estadia_gen = df_filtrado[~df_filtrado['Ubicación'].isin(UBICACIONES_SIN_ESTADIA)]
@@ -2881,9 +2898,9 @@ elif menu == "Inventario General" and st.session_state['autenticado']:
                 st.markdown("### Estadía del inventario")
                 g3, g4 = st.columns(2)
                 with g3:
-                    st.plotly_chart(grafica_antiguedad(df_estadia_gen), use_container_width=True)
+                    mostrar_grafica(grafica_antiguedad(df_estadia_gen), use_container_width=True)
                 with g4:
-                    st.plotly_chart(grafica_top_modelos(df_estadia_gen), use_container_width=True)
+                    mostrar_grafica(grafica_top_modelos(df_estadia_gen), use_container_width=True)
                 st.caption("Excluye equipos en uso interno, en proceso de baja y asignados a cliente.")
 
         st.markdown("### Detalle de equipos")
