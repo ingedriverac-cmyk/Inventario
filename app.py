@@ -296,6 +296,24 @@ COLOR_UBICACION = {
     "Uso Interno": "#3B6FA8",
     "Asignado a Cliente": "#7FA3CF",
 }
+# Paleta del mapa de saturación (treemap): tonos sobrios que combinan con el naranja y el azul de la app
+COLORES_TREEMAP = {
+    "En almacén de Comodatos": "#0F4C75",
+    "En almacén de Publicidad": "#3282B8",
+    "En patios": "#1B998B",
+    "En taller": "#E8710A",
+    "En proceso de Baja": "#B23A48",
+    "Uso Interno": "#6D597A",
+    "Asignado a Cliente": "#5C7A99",
+    "Sin dato": "#94A3B8",
+}
+
+def _aclarar_hex(color, factor):
+    """Mezcla un color hexadecimal con blanco (factor 0 = igual, 1 = blanco)."""
+    c = color.lstrip("#")
+    r, g, b = (int(c[i:i + 2], 16) for i in (0, 2, 4))
+    return "#%02X%02X%02X" % tuple(int(v + (255 - v) * factor) for v in (r, g, b))
+
 COLOR_ESTATUS = {
     "Nuevo": "#16A34A",
     "Reparado": "#0F766E",
@@ -416,6 +434,15 @@ def mostrar_tabla(data, *args, **kwargs):
         data = data.data.iloc[ini:ini + LIMITE_FILAS_CON_COLOR].style.use(data.export())
     return st.dataframe(mayus(data), *args, **kwargs)
 
+def _fig_minusculas(fig, atributos=("x", "y", "labels")):
+    """Pone en minúsculas las etiquetas de datos de una gráfica (la información de los modelos se deja en mayúsculas)."""
+    for tr in fig.data:
+        for a in atributos:
+            vals = getattr(tr, a, None)
+            if vals is not None and len(vals) and all(isinstance(v, str) for v in vals):
+                setattr(tr, a, [v.lower() for v in vals])
+    return fig
+
 def _fig_mayus(fig, atributos=("x", "y", "labels")):
     """Pone en MAYÚSCULAS las etiquetas de datos de una gráfica (categorías, modelos, ubicaciones)."""
     for tr in fig.data:
@@ -467,7 +494,8 @@ def grafica_estadia(df, eje, titulo, umbral=UMBRAL_ALERTA_DIAS):
     maximo = max(float(d['Promedio de Días'].max()), float(umbral))
     fig.update_xaxes(range=[0, maximo * 1.2], showgrid=True, gridcolor="#E5E7EB", zeroline=False, title=None)
     fig.update_yaxes(title=None, automargin=True)
-    return _estilo_grafica(_fig_mayus(fig, ('y',)), titulo, max(300, 46 * len(d) + 120))
+    fig = _fig_mayus(fig, ('y',)) if eje == 'Modelo' else _fig_minusculas(fig, ('y',))
+    return _estilo_grafica(fig, titulo, max(300, 46 * len(d) + 120))
 
 
 def mostrar_grafica_estadia(df, eje, titulo):
@@ -495,7 +523,8 @@ def grafica_barras_conteo(df, columna, titulo, mapa_color=None, top=None):
     fig.update_xaxes(showgrid=True, gridcolor="#E5E7EB", zeroline=False, title=None,
                      range=[0, max(int(c.max()), 1) * 1.18] if len(c) else None)
     fig.update_yaxes(title=None, automargin=True)
-    return _estilo_grafica(_fig_mayus(fig, ('y',)), titulo, max(300, 44 * len(c) + 110))
+    fig = _fig_mayus(fig, ('y',)) if columna == 'Modelo' else _fig_minusculas(fig, ('y',))
+    return _estilo_grafica(fig, titulo, max(300, 44 * len(c) + 110))
 
 
 def grafica_dona(df, columna, titulo, mapa_color=None):
@@ -505,7 +534,7 @@ def grafica_dona(df, columna, titulo, mapa_color=None):
                  color=columna, color_discrete_map=mapa_color or {})
     fig.update_traces(textinfo="percent", sort=False,
                       hovertemplate="<b>%{label}</b><br>%{value} equipos (%{percent})<extra></extra>")
-    _fig_mayus(fig, ('labels',))
+    _fig_minusculas(fig, ('labels',))
     _estilo_grafica(fig, titulo, 340)
     fig.update_layout(showlegend=True, legend=dict(orientation="v", y=0.5, x=1.0))
     fig.add_annotation(text=f"<b>{int(conteo['Cantidad'].sum()):,}</b><br>equipos", showarrow=False,
@@ -515,7 +544,7 @@ def grafica_dona(df, columna, titulo, mapa_color=None):
 
 def grafica_antiguedad(df, titulo="Antigüedad sin movimiento"):
     dias = pd.to_numeric(df['Días sin movimiento'], errors='coerce').dropna()
-    etiquetas = ["0 a 15 días", "16 a 30 días", "31 a 40 días", "Más de 40 días"]
+    etiquetas = ["0 a 15 días", "16 a 30 días", "31 a 40 días", "más de 40 días"]
     valores = [int(dias.between(0, 15).sum()), int(dias.between(16, 30).sum()),
                int(dias.between(31, 40).sum()), int((dias > 40).sum())]
     fig = go.Figure(go.Bar(
@@ -1484,17 +1513,35 @@ def _fechas_a_datetime(serie):
             pass
     return f
 
+def lista_choferes(df_sol):
+    """Choferes registrados (usuarios de chofer) más cualquier nombre que ya aparezca en la columna Ruta."""
+    base = [str(c).strip() for c in CHOFERES_AUTORIZADOS.keys()]
+    vistos = {c.lower() for c in base}
+    extra = []
+    if df_sol is not None and 'Ruta' in df_sol.columns:
+        for r in df_sol['Ruta'].dropna().astype(str).str.strip().unique():
+            if r and r.lower() not in vistos and r.lower() not in ("nan", "none"):
+                extra.append(r)
+                vistos.add(r.lower())
+    return base + sorted(extra)
+
 def filtro_solicitudes_status_fecha(prefijo, opciones_status):
-    """Filtros de solicitudes: Status (con 'Todos') y rango de fechas. Devuelve (status, desde, hasta);
-    desde/hasta son None si no se activa el rango de fechas."""
+    """Filtros de solicitudes: Status (con 'Todos') y fecha (sin filtro, un día o un rango).
+    Devuelve (status, desde, hasta); desde/hasta son None si no se filtra por fecha."""
     c1, c2 = st.columns([1, 1])
     with c1:
         status_sel = st.selectbox("Filtrar por Status:", ["Todos"] + list(opciones_status), key=f"{prefijo}_status")
     with c2:
-        usar_rango = st.checkbox("Filtrar por rango de fechas", value=False, key=f"{prefijo}_usar_rango")
-        rango = st.date_input("Rango de fechas (desde - hasta)", value=(date.today() - timedelta(days=30), date.today()), key=f"{prefijo}_fecha_rango")
+        modo = st.radio("Filtrar por fecha:", ["Sin filtro", "Un día", "Rango de fechas"], horizontal=True, key=f"{prefijo}_modo_fecha")
+    d1, d2 = st.columns([1, 1])
+    with d1:
+        dia = st.date_input("Día:", value=date.today(), key=f"{prefijo}_dia")
+    with d2:
+        rango = st.date_input("Rango de fechas (desde - hasta):", value=(date.today() - timedelta(days=30), date.today()), key=f"{prefijo}_fecha_rango")
     desde = hasta = None
-    if usar_rango:
+    if modo == "Un día":
+        desde = hasta = dia
+    elif modo == "Rango de fechas":
         if isinstance(rango, (tuple, list)):
             desde = rango[0] if len(rango) > 0 else None
             hasta = rango[1] if len(rango) > 1 else desde
@@ -1864,7 +1911,7 @@ def color_anio_hex(val):
 def grafica_anios(df, titulo):
     conteo = df['Año'].fillna("").astype(str).replace("", "Sin año").value_counts()
     orden = sorted(conteo.index, key=lambda a: (1, 0) if a == "Sin año" else (0, int(a)))
-    fig = go.Figure(go.Bar(x=orden, y=[int(conteo[a]) for a in orden], marker_color=[color_anio_hex(a) for a in orden],
+    fig = go.Figure(go.Bar(x=[a.lower() for a in orden], y=[int(conteo[a]) for a in orden], marker_color=[color_anio_hex(a) for a in orden],
                            text=[int(conteo[a]) for a in orden], textposition="outside"))
     fig.update_xaxes(type="category")
     return _estilo_grafica(fig, titulo, 340)
@@ -1893,7 +1940,7 @@ def colorear_rango_anio(val):
 def grafica_rangos(df, columna, titulo):
     conteo = df[columna].fillna("").astype(str).replace("", "Sin especificar").value_counts()
     orden = [r for r in RANGOS_ANIO_SOLICITADO + ["Sin especificar"] if r in conteo.index]
-    fig = go.Figure(go.Bar(x=[r.upper() for r in orden], y=[int(conteo[r]) for r in orden], marker_color=[_COLORES_RANGO.get(r, "#9CA3AF") for r in orden],
+    fig = go.Figure(go.Bar(x=[r.lower() for r in orden], y=[int(conteo[r]) for r in orden], marker_color=[_COLORES_RANGO.get(r, "#9CA3AF") for r in orden],
                            text=[int(conteo[r]) for r in orden], textposition="outside"))
     fig.update_xaxes(type="category")
     return _estilo_grafica(fig, titulo, 340)
@@ -2166,11 +2213,32 @@ elif menu == "Estadía":
             color_discrete_map={**COLOR_UBICACION, "(?)": "#1965C1"},
             maxdepth=2
         )
-        fig_treemap.update_traces(textinfo="label+value", root_color="#ECE5E1")
-        _fig_mayus(fig_treemap, ("labels",))
+        fig_treemap.update_traces(textinfo="label+value", root_color="#F5F7FA")
+        # Etiquetas en minúsculas, salvo el nivel de los modelos (3.er nivel: ubicación > canal > modelo > imagen)
+        _tr = fig_treemap.data[0]
+        _padre = dict(zip(_tr.ids, _tr.parents))
+        def _nivel(i_):
+            n_ = 0
+            while _padre.get(i_, "") != "":
+                i_ = _padre[i_]
+                n_ += 1
+            return n_
+        def _raiz(i_):
+            while _padre.get(i_, "") != "":
+                i_ = _padre[i_]
+            return i_
+        # Cada ubicación con su color; los niveles internos van un poco más claros
+        _tr.marker.colors = [_aclarar_hex(COLORES_TREEMAP.get(_raiz(i_), "#64748B"), min(0.16 * _nivel(i_), 0.45)) for i_ in _tr.ids]
+        _tr.marker.line = dict(width=2, color="#FFFFFF")
+        try:
+            _tr.marker.cornerradius = 6
+        except Exception:
+            pass
+        _tr.textfont = dict(color="#FFFFFF", size=14)
+        _tr.labels = [str(l_).upper() if _nivel(i_) == 2 else str(l_).lower() for l_, i_ in zip(_tr.labels, _tr.ids)]
         fig_treemap.update_layout(
             margin=dict(t=20, l=0, r=0, b=0), height=460,
-            paper_bgcolor="#ECE5E1", font=dict(family=FUENTE_GRAFICAS, size=13)
+            paper_bgcolor="rgba(0,0,0,0)", font=dict(family=FUENTE_GRAFICAS, size=13)
         )
         mostrar_grafica(fig_treemap, use_container_width=True)
         st.markdown("<br>", unsafe_allow_html=True)
@@ -2337,6 +2405,7 @@ elif menu == "Necesidades de Taller":
                 lambda v: 'background-color: #fed7aa; font-weight: bold;' if isinstance(v, (int, float)) and v > 0 else '',
                 subset=['A reparar (sugerido)']),
             use_container_width=True, hide_index=True)
+        st.caption("Rangos: Nuevos = Año presente, Reciente = 1 o 2 años, Menor a 5 años = de 3 a 5 años y Mayor a 5 años = 6 o más años.")
         _buf_nt = io.BytesIO()
         with pd.ExcelWriter(_buf_nt, engine="openpyxl") as _w_nt:
             necesidad.to_excel(_w_nt, index=False, sheet_name="Necesidades de Taller")
@@ -2431,7 +2500,7 @@ elif menu == "Rendimiento de Choferes" and st.session_state['autenticado']:
         with g_r1:
             fig_t = go.Figure()
             for t_, c_ in zip(TIPOS_SERVICIO, ["#D95F00", "#003B5C", "#16A34A", "#9CA3AF"]):
-                fig_t.add_trace(go.Bar(name=t_, x=[str(c).upper() for c in resumen['Chofer']], y=resumen[t_], marker_color=c_))
+                fig_t.add_trace(go.Bar(name=t_.lower(), x=[str(c).lower() for c in resumen['Chofer']], y=resumen[t_], marker_color=c_))
             fig_t = _estilo_grafica(fig_t, "Servicios completados por chofer y tipo", 360)
             fig_t.update_layout(barmode="stack", showlegend=True, legend=dict(orientation="h", y=-0.15))
             mostrar_grafica(fig_t, use_container_width=True)
@@ -2440,7 +2509,7 @@ elif menu == "Rendimiento de Choferes" and st.session_state['autenticado']:
             if not diario.empty:
                 for ch_ in diario['Chofer'].unique():
                     dd_ = diario[diario['Chofer'] == ch_].sort_values('Día')
-                    fig_d.add_trace(go.Scatter(name=str(ch_).upper(), x=[f"{x:%d/%m}" for x in dd_['Día']], y=dd_['Total'], mode="lines+markers"))
+                    fig_d.add_trace(go.Scatter(name=str(ch_).lower(), x=[f"{x:%d/%m}" for x in dd_['Día']], y=dd_['Total'], mode="lines+markers"))
             fig_d = _estilo_grafica(fig_d, "Servicios completados por día", 360)
             fig_d.update_layout(showlegend=True, legend=dict(orientation="h", y=-0.15))
             mostrar_grafica(fig_d, use_container_width=True)
@@ -2452,7 +2521,7 @@ elif menu == "Rendimiento de Choferes" and st.session_state['autenticado']:
             _col_diag = {"Revisar": "#DC2626", "Equilibrado": "#EAB308", "Eficiente": "#16A34A"}
             fig_s = go.Figure(go.Scatter(
                 x=resumen['Horas extras'], y=resumen['Completadas'], mode="markers+text",
-                text=[str(c).upper() for c in resumen['Chofer']], textposition="top center",
+                text=[str(c).lower() for c in resumen['Chofer']], textposition="top center",
                 marker=dict(size=15, color=[_col_diag.get(d_, "#9CA3AF") for d_ in resumen['Diagnóstico']])))
             fig_s.add_hline(y=float(resumen['Completadas'].mean()), line_dash="dash", line_color="#9CA3AF")
             fig_s.add_vline(x=float(resumen['Horas extras'].mean()), line_dash="dash", line_color="#9CA3AF")
@@ -3087,6 +3156,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
         with st.form("form_buscar_canal"):
             b_canal = st.selectbox("Filtrar por Canal:", ["Todos"] + OPCIONES_CANALES_SOL)
             b_cuc_busqueda = st.text_input("O busque por CUC exacto (Opcional):").strip()
+            b_chofer = st.selectbox("Filtrar por Chofer:", ["Todos", "Sin chofer"] + lista_choferes(df_sol))
             b_status, b_desde, b_hasta = filtro_solicitudes_status_fecha("sol_busq", ["Pendiente", "Entregado", "Transferido", "Realizado", "Levantado", "Cancelado"])
             btn_buscar = st.form_submit_button("Buscar Solicitud")
             
@@ -3097,6 +3167,10 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                 df_pend_busq = df_pend_busq[df_pend_busq['Canal'] == b_canal]
             if b_cuc_busqueda:
                 df_pend_busq = df_pend_busq[df_pend_busq['CUC'].str.contains(b_cuc_busqueda, case=False, na=False)]
+            if b_chofer == "Sin chofer":
+                df_pend_busq = df_pend_busq[df_pend_busq['Ruta'].fillna("").astype(str).str.strip().isin(["", "nan", "None"])]
+            elif b_chofer != "Todos":
+                df_pend_busq = df_pend_busq[df_pend_busq['Ruta'].fillna("").astype(str).str.strip().str.lower() == b_chofer.lower()]
             df_pend_busq = aplicar_filtros_solicitudes(df_pend_busq, b_status, b_desde, b_hasta)
 
             st.session_state['df_pend_busq_resultado'] = df_pend_busq
@@ -3111,8 +3185,8 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                 st.success(f"Se encontraron {total_pendientes} solicitudes pendientes.")
                 
                 st.markdown("##### Listado de Solicitudes Encontradas:")
-                df_mostrar_pend = df_pend_busq[['CUC', 'Cliente', 'Modelo', 'Serie', 'Canal', 'Jefe_de_Venta', 'Status']].copy()
-                df_mostrar_pend = df_mostrar_pend.rename(columns={'Jefe_de_Venta': 'Jefe de Venta'})
+                df_mostrar_pend = df_pend_busq[['CUC', 'Cliente', 'Modelo', 'Serie', 'Canal', 'Jefe_de_Venta', 'Ruta', 'Status']].copy()
+                df_mostrar_pend = df_mostrar_pend.rename(columns={'Jefe_de_Venta': 'Jefe de Venta', 'Ruta': 'Chofer'})
                 mostrar_tabla(df_mostrar_pend, use_container_width=True, hide_index=True)
                 
                 st.markdown("<br>", unsafe_allow_html=True)
@@ -3123,15 +3197,22 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                     r = df_sol.loc[idx_item]
                     serie_txt = f" | Serie: {r['Serie']}" if str(r['Serie']).strip() else " | Sin Serie"
                     status_txt = f" | Status: {r['Status']}"
-                    return f"CUC: {r['CUC']} - Cliente: {r['Cliente']} (Modelo: {r['Modelo']}{serie_txt}{status_txt})"
+                    chofer_txt = f" | Chofer: {str(r['Ruta']).strip()}" if str(r['Ruta']).strip() not in ("", "nan", "None") else " | Sin chofer"
+                    return f"CUC: {r['CUC']} - Cliente: {r['Cliente']} (Modelo: {r['Modelo']}{serie_txt}{status_txt}{chofer_txt})"
 
-                with st.expander("Acciones en grupo: cambiar el Status o eliminar varias solicitudes a la vez"):
-                    grp_todas = st.checkbox("Seleccionar todas las solicitudes encontradas", key="grp_todas")
+                with st.expander("Acciones en grupo: cambiar el Status, el chofer o eliminar varias solicitudes a la vez"):
+                    _orden_st = ["Pendiente", "Entregado", "Transferido", "Realizado", "Levantado", "Cancelado"]
+                    _presentes = {str(x).strip().lower() for x in df_pend_busq['Status'].dropna()}
+                    estados_grp = ["Todos"] + [e for e in _orden_st if e.lower() in _presentes]
+                    filtro_status_grp = st.selectbox("Filtrar por Status:", estados_grp, key="grp_filtro_status")
+                    opciones_grupo = opciones_indices if filtro_status_grp == "Todos" else [
+                        i for i in opciones_indices if str(df_sol.loc[i, 'Status']).strip().lower() == filtro_status_grp.lower()]
+                    grp_todas = st.checkbox("Seleccionar todas las solicitudes mostradas", key="grp_todas")
                     seleccion_grupo = st.multiselect(
-                        "Solicitudes del grupo:", opciones_indices,
-                        default=opciones_indices if grp_todas else [],
-                        format_func=format_opcion, key=f"grp_sel_{'todas' if grp_todas else 'manual'}")
-                    st.caption(f"{len(seleccion_grupo)} solicitud(es) seleccionada(s).")
+                        "Solicitudes del grupo:", opciones_grupo,
+                        default=opciones_grupo if grp_todas else [],
+                        format_func=format_opcion, key=f"grp_sel_{'todas' if grp_todas else 'manual'}_{filtro_status_grp}")
+                    st.caption(f"{len(seleccion_grupo)} solicitud(es) seleccionada(s) de {len(opciones_grupo)} mostradas.")
 
                     st.markdown("**Cambiar Status de las seleccionadas**")
                     g1, g2 = st.columns(2)
@@ -3140,6 +3221,27 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                     with g2:
                         fecha_grupo = st.date_input("Fecha Entrega (para Entregado, Transferido, Realizado o Levantado):", value=date.today(), key="grp_fecha")
                     aplicar_grupo = st.button(":material/save: Aplicar Status a las seleccionadas", key="grp_aplicar")
+
+                    st.markdown("**Cambiar chofer de las seleccionadas**")
+                    h1, h2 = st.columns(2)
+                    with h1:
+                        chofer_grupo = st.selectbox("Nuevo chofer:", ["(Sin chofer)"] + lista_choferes(df_sol), key="grp_chofer")
+                    with h2:
+                        st.markdown("<div style='height:1.9rem'></div>", unsafe_allow_html=True)
+                        aplicar_chofer = st.button(":material/save: Aplicar chofer a las seleccionadas", key="grp_aplicar_chofer")
+                    if aplicar_chofer:
+                        if not seleccion_grupo:
+                            st.error("Selecciona al menos una solicitud.")
+                        else:
+                            df_sol.loc[seleccion_grupo, 'Ruta'] = "" if chofer_grupo == "(Sin chofer)" else chofer_grupo
+                            if guardar_solicitudes_seguro(df_sol):
+                                st.success(f"Chofer '{chofer_grupo}' asignado a {len(seleccion_grupo)} solicitud(es).")
+                                if 'df_pend_busq_resultado' in st.session_state:
+                                    del st.session_state['df_pend_busq_resultado']
+                                time.sleep(2.5)
+                                st.rerun()
+                            else:
+                                st.error("Error: No se pudo guardar el cambio de chofer.")
 
                     st.markdown("**Eliminar las seleccionadas**")
                     grp_confirma = st.checkbox("Confirmo que deseo eliminar definitivamente las solicitudes seleccionadas", key="grp_confirma")
