@@ -36,8 +36,13 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&display=swap');
 
     :root {
-        --azul: #003B5C;
-        --azul-osc: #002A42;
+        --azul: #1F2937;
+        --azul-osc: #111827;
+        --naranja: #FF7F00;
+        --naranja-osc: #D95F00;
+        --naranja-int: #F25C00;
+        --filtro: #D3D7DE;
+        --filtro-borde: #9AA3AF;
         --rojo: #E60012;
         --fondo: #F5F7FA;
         --borde: #E5E7EB;
@@ -101,7 +106,7 @@ st.markdown("""
 
     /* Barra lateral */
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #003B5C 0%, #002A42 100%);
+        background: linear-gradient(180deg, #151515 0%, #000000 100%);
         display: flex;
         flex-direction: column;
         justify-content: space-between;
@@ -162,47 +167,45 @@ st.markdown("""
     [class*="st-key-nav_"] label[data-baseweb="radio"] > div:not(:has([data-testid="stMarkdownContainer"])) { display: none; }
     [class*="st-key-nav_"] label[data-baseweb="radio"]:has(input:checked) {
         background: rgba(255,255,255,.14);
-        border-left-color: var(--rojo);
+        border-left-color: var(--naranja);
     }
     [class*="st-key-nav_"] label[data-baseweb="radio"]:has(input:checked) p { font-weight: 700; }
 
-    /* Botones */
-    div.stButton > button {
-        background-color: var(--rojo);
-        color: #FFFFFF;
-        border: none;
+    /* Botones: naranja */
+    div.stButton > button, div.stFormSubmitButton > button, div.stDownloadButton > button {
+        background-color: var(--naranja) !important;
+        color: #FFFFFF !important;
+        border: none !important;
         border-radius: 8px;
         padding: 8px 18px;
         font-weight: 600;
+        box-shadow: 0 2px 6px rgba(217,95,0,.25);
+        transition: background-color .15s ease, transform .1s ease;
     }
-    div.stButton > button:hover { background-color: #C5000F; color: #FFFFFF; }
-    div.stFormSubmitButton > button {
-        background-color: var(--rojo) !important;
+    div.stFormSubmitButton > button { width: 100%; }
+    div.stButton > button:hover, div.stFormSubmitButton > button:hover, div.stDownloadButton > button:hover {
+        background-color: var(--naranja-osc) !important;
         color: #FFFFFF !important;
-        border: none;
-        border-radius: 8px;
-        padding: 8px 16px;
-        font-weight: 600;
-        width: 100%;
+        transform: translateY(-1px);
     }
-    div.stFormSubmitButton > button:hover { background-color: var(--azul-osc) !important; color: #FFFFFF !important; }
-    div.stDownloadButton > button {
-        background-color: var(--azul);
-        color: #FFFFFF;
-        border: none;
-        border-radius: 8px;
-        font-weight: 600;
+    div.stButton > button:disabled, div.stFormSubmitButton > button:disabled {
+        background-color: #D1D5DB !important; color: #6B7280 !important; box-shadow: none; transform: none;
     }
-    div.stDownloadButton > button:hover { background-color: var(--azul-osc); color: #FFFFFF; }
-    div.stButton > button p,
-    div.stFormSubmitButton > button p,
-    div.stDownloadButton > button p { color: inherit !important; }
+    /* Inicio y cierre de sesión: naranja intenso */
+    [data-testid="stSidebar"] div.stButton > button, [data-testid="stSidebar"] div.stFormSubmitButton > button {
+        background-color: var(--naranja-int) !important;
+        box-shadow: 0 2px 8px rgba(242,92,0,.45);
+    }
+    [data-testid="stSidebar"] div.stButton > button:hover, [data-testid="stSidebar"] div.stFormSubmitButton > button:hover {
+        background-color: #D94F00 !important;
+    }
+    div.stButton > button p, div.stFormSubmitButton > button p, div.stDownloadButton > button p { color: inherit !important; }
 
     /* Tarjetas KPI (una sola clase; el color solo marca el tipo de indicador) */
     .kpi {
         background: #FFFFFF;
         border: 1px solid var(--borde);
-        border-top: 3px solid var(--c, #003B5C);
+        border-top: 3px solid var(--c, #1F2937);
         border-radius: 8px;
         padding: 14px 18px 12px 18px;
         margin-bottom: 12px;
@@ -274,6 +277,74 @@ st.markdown("""
     .js-plotly-plot, .js-plotly-plot .plotly, .js-plotly-plot .plotly .main-svg, .js-plotly-plot .plotly .nsewdrag,
     .js-plotly-plot .plotly .draglayer { touch-action: pan-y !important; }
 
+    /* Filtros: gris más oscuro para que se distingan */
+    [data-testid="stMain"] [data-baseweb="select"] > div,
+    section.main [data-baseweb="select"] > div {
+        background-color: var(--filtro) !important;
+        border: 1px solid var(--filtro-borde) !important;
+    }
+    [data-testid="stMain"] [data-testid="stSelectbox"] [role="group"], [data-testid="stMain"] [data-testid="stMultiSelect"] [role="group"],
+    section.main [data-testid="stSelectbox"] [role="group"], section.main [data-testid="stMultiSelect"] [role="group"] {
+        background-color: var(--filtro) !important;
+        border: 1px solid var(--filtro-borde) !important;
+    }
+    [data-testid="stMain"] [data-baseweb="input"], [data-testid="stMain"] [data-baseweb="base-input"],
+    [data-testid="stMain"] [data-baseweb="textarea"], section.main [data-baseweb="input"],
+    section.main [data-baseweb="base-input"], section.main [data-baseweb="textarea"] {
+        background-color: var(--filtro) !important;
+        border-color: var(--filtro-borde) !important;
+    }
+    [data-testid="stMain"] input, [data-testid="stMain"] textarea, section.main input, section.main textarea {
+        background-color: var(--filtro) !important;
+        color: #111827 !important;
+    }
+    [data-testid="stMain"] [data-testid="stDateInputField"], section.main [data-testid="stDateInputField"] {
+        background-color: var(--filtro) !important;
+    }
+    /* Selector de la solicitud a editar: azul oscuro traslúcido */
+    [data-testid="stMain"] [class*="st-key-sel_solicitud_edit"] [data-baseweb="select"] > div,
+    [data-testid="stMain"] [class*="st-key-sel_solicitud_edit"] [role="group"],
+    section.main [class*="st-key-sel_solicitud_edit"] [data-baseweb="select"] > div,
+    section.main [class*="st-key-sel_solicitud_edit"] [role="group"] {
+        background-color: rgba(15, 38, 64, 0.16) !important;
+        border: 1px solid rgba(15, 38, 64, 0.45) !important;
+    }
+    [data-testid="stMain"] [class*="st-key-sel_solicitud_edit"] input, section.main [class*="st-key-sel_solicitud_edit"] input {
+        background-color: transparent !important;
+        color: #0F2640 !important;
+        font-weight: 600;
+    }
+
+    /* Desplegables: naranja claro (pastel) y gris para los que contienen tablas */
+    [data-testid="stExpander"] { border: 1px solid #F3D3B0; overflow: hidden; }
+    [data-testid="stExpander"] summary { background-color: #FFE6CC !important; color: #7C2D12 !important; font-weight: 600; }
+    [data-testid="stExpander"] summary:hover { background-color: #FFDDB8 !important; }
+    [data-testid="stExpander"]:has([data-testid="stDataFrame"]) { border-color: #C3C9D1; }
+    [data-testid="stExpander"]:has([data-testid="stDataFrame"]) summary { background-color: #CBD0D8 !important; color: #1F2937 !important; }
+    [data-testid="stExpander"]:has([data-testid="stDataFrame"]) summary:hover { background-color: #BFC5CE !important; }
+
+    /* Encabezados de sección y tarjetas */
+    .stMarkdown h3 { border-left: 5px solid var(--naranja); padding-left: 10px; }
+    .kpi { box-shadow: 0 1px 4px rgba(17,24,39,.08); }
+
+    /* Pasos de los formularios (colores para que se entienda de un vistazo) */
+    .paso { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1rem; color: var(--pc, #1F2937);
+        margin: 8px 0 6px 0; padding: 6px 12px; border-radius: 10px; border-left: 5px solid var(--pc, #1F2937);
+        background: rgba(17, 24, 39, 0.05); }
+    @supports (background: color-mix(in srgb, red 10%, white)) {
+        .paso { background: color-mix(in srgb, var(--pc, #1F2937) 11%, white); }
+    }
+    .paso .num { background: var(--pc, #1F2937); color: #FFFFFF; border-radius: 50%; width: 24px; height: 24px; flex: none;
+        display: inline-flex; align-items: center; justify-content: center; font-size: .85rem; }
+
+    /* Pie de la barra lateral siempre al fondo */
+    [data-testid="stSidebarUserContent"] { padding-bottom: 1rem !important; }
+    [data-testid="stSidebarContent"] { display: flex; flex-direction: column; min-height: 100vh; }
+    [data-testid="stSidebarUserContent"] { flex: 1 1 auto; display: flex; flex-direction: column; }
+    [data-testid="stSidebarUserContent"] > div { flex: 1 1 auto; display: flex; flex-direction: column; }
+    [data-testid="stSidebarUserContent"] > div > [data-testid="stVerticalBlock"] { flex: 1 1 auto; }
+    [data-testid="stSidebarUserContent"] [data-testid="stElementContainer"]:has(.side-foot) { margin-top: auto; }
+
     /* Contenedores */
     [data-testid="stExpander"] { background: #FFFFFF; border: 1px solid var(--borde); border-radius: 8px; }
     [data-testid="stDataFrame"] { border: 1px solid var(--borde); border-radius: 8px; overflow: hidden; }
@@ -298,14 +369,14 @@ COLOR_UBICACION = {
 }
 # Paleta del mapa de saturación (treemap): tonos sobrios que combinan con el naranja y el azul de la app
 COLORES_TREEMAP = {
-    "En almacén de Comodatos": "#0F4C75",
-    "En almacén de Publicidad": "#3282B8",
-    "En patios": "#1B998B",
-    "En taller": "#E8710A",
-    "En proceso de Baja": "#B23A48",
-    "Uso Interno": "#6D597A",
-    "Asignado a Cliente": "#5C7A99",
-    "Sin dato": "#94A3B8",
+    "En almacén de Comodatos": "#1F2937",
+    "En almacén de Publicidad": "#6B7280",
+    "En patios": "#D97706",
+    "En taller": "#EA580C",
+    "En proceso de Baja": "#9F1239",
+    "Uso Interno": "#7C2D12",
+    "Asignado a Cliente": "#4D7C0F",
+    "Sin dato": "#A8A29E",
 }
 
 def _aclarar_hex(color, factor):
@@ -323,7 +394,7 @@ COLOR_ESTATUS = {
 }
 
 
-def render_kpi(etiqueta, valor, apoyo="", color="#003B5C"):
+def render_kpi(etiqueta, valor, apoyo="", color="#1F2937"):
     """Tarjeta KPI ejecutiva: etiqueta, valor y una línea de apoyo opcional."""
     if isinstance(valor, (int, float)):
         valor = f"{int(valor):,}"
@@ -365,6 +436,23 @@ def svg_icono(nombre, px=16, trazo=1.75):
             f'stroke="currentColor" stroke-width="{trazo}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
             f'{_ICONOS_SVG[nombre]}</svg>')
 
+def titulo_paso(num, texto, color="#1F2937"):
+    """Encabezado numerado y con color para separar las partes de un formulario."""
+    st.markdown(f'<div class="paso" style="--pc:{color};"><span class="num">{num}</span>{texto}</div>', unsafe_allow_html=True)
+
+def config_barras(df, columnas, formato="%d", maximo=None):
+    """Columnas numéricas con barra de progreso (mismo estilo que Promedio de días en Estadía)."""
+    cfg = {}
+    if df is None or len(df) == 0:
+        return cfg
+    cols_ok = [c for c in columnas if c in df.columns]
+    if not cols_ok:
+        return cfg
+    tope = float(maximo) if maximo else float(max(1, pd.to_numeric(df[cols_ok].stack(), errors="coerce").max()))
+    for c in cols_ok:
+        cfg[c] = st.column_config.ProgressColumn(c, format=formato, min_value=0, max_value=tope)
+    return cfg
+
 def render_banner(icono, titulo, subtitulo=""):
     """Banner naranja de encabezado de cada apartado, con la fecha de la información a la derecha."""
     sub = f"<p>{subtitulo}</p>" if subtitulo else ""
@@ -382,7 +470,14 @@ except Exception:  # sin jinja2 no hay Styler
     _Styler = None
 
 def _mayus_valor(v):
-    return v.upper() if isinstance(v, str) else v
+    if isinstance(v, str):
+        return v.upper()
+    try:
+        if pd.isna(v):
+            return ""   # los vacíos se ven en blanco, no como "None"
+    except (TypeError, ValueError):
+        pass
+    return v
 
 def mayus(obj):
     """Devuelve la tabla (DataFrame o Styler) con sus textos en MAYÚSCULAS, solo para mostrarla.
@@ -471,6 +566,7 @@ def _estilo_grafica(fig, titulo=None, alto=360):
         font=dict(family=FUENTE_GRAFICAS, size=12, color="#111827"),
         margin=dict(t=64 if titulo else 16, l=8, r=28, b=8),
         showlegend=False,
+        colorway=["#111827", "#D95F00", "#6B7280", "#F59E0B", "#374151", "#B45309"],
     )
     return fig
 
@@ -478,7 +574,7 @@ def _estilo_grafica(fig, titulo=None, alto=360):
 def grafica_estadia(df, eje, titulo, umbral=UMBRAL_ALERTA_DIAS):
     """Barras horizontales de promedio de días con semáforo y línea de límite."""
     d = df.sort_values('Promedio de Días', ascending=True).reset_index(drop=True)
-    colores = ['#DC2626' if v > umbral else '#F59E0B' if v > umbral * 0.75 else '#003B5C'
+    colores = ['#DC2626' if v > umbral else '#F59E0B' if v > umbral * 0.75 else '#111827'
                for v in d['Promedio de Días']]
     tiene_cant = 'Cantidad' in d.columns
     fig = go.Figure(go.Bar(
@@ -514,7 +610,7 @@ def grafica_barras_conteo(df, columna, titulo, mapa_color=None, top=None):
     c = df[columna].replace('', pd.NA).dropna().value_counts().sort_values(ascending=True)
     if top:
         c = c.tail(top)
-    colores = [(mapa_color or {}).get(k, '#003B5C') for k in c.index]
+    colores = [(mapa_color or {}).get(k, '#111827') for k in c.index]
     fig = go.Figure(go.Bar(
         x=c.values, y=c.index, orientation='h', marker_color=colores,
         text=c.values, textposition='outside', cliponaxis=False,
@@ -538,7 +634,7 @@ def grafica_dona(df, columna, titulo, mapa_color=None):
     _estilo_grafica(fig, titulo, 340)
     fig.update_layout(showlegend=True, legend=dict(orientation="v", y=0.5, x=1.0))
     fig.add_annotation(text=f"<b>{int(conteo['Cantidad'].sum()):,}</b><br>equipos", showarrow=False,
-                       font=dict(size=18, color="#003B5C"))
+                       font=dict(size=18, color="#111827"))
     return fig
 
 
@@ -548,7 +644,7 @@ def grafica_antiguedad(df, titulo="Antigüedad sin movimiento"):
     valores = [int(dias.between(0, 15).sum()), int(dias.between(16, 30).sum()),
                int(dias.between(31, 40).sum()), int((dias > 40).sum())]
     fig = go.Figure(go.Bar(
-        x=etiquetas, y=valores, marker_color=['#003B5C', '#3B6FA8', '#F59E0B', '#DC2626'],
+        x=etiquetas, y=valores, marker_color=['#111827', '#4B5563', '#F59E0B', '#DC2626'],
         text=valores, textposition='outside', cliponaxis=False,
         hovertemplate="%{x}: %{y} equipos<extra></extra>",
     ))
@@ -1093,7 +1189,7 @@ def limpiar_fechas_movimiento(serie):
 
 def cargar_datos():
     df = db_tabla("inventario") if db_activa() else _leer_inventario_archivos()
-    df = limpiar_y_mapear_columnas(df, ESQUEMA_COLUMNAS)
+    df = limpiar_y_mapear_columnas(df, ESQUEMA_COLUMNAS).fillna("")
     df["Año"] = anios_de_df(df, "Tipo")
     df["Ultimo_Movimiento"] = limpiar_fechas_movimiento(df["Ultimo_Movimiento"])
     if not df.empty and 'Serie' in df.columns:
@@ -1328,6 +1424,7 @@ def cargar_solicitudes():
     df_sol = limpiar_y_mapear_columnas(df_sol, COLUMNAS_SOLICITUDES)
     df_sol["Año"] = anios_de_df(df_sol, "Equipo")
     df_sol["Año_Solicitado"] = df_sol["Año_Solicitado"].map(normalizar_rango_solicitado)
+    df_sol = df_sol.fillna("")
     return df_sol
 
 def guardar_datos(df):
@@ -1708,7 +1805,7 @@ def generar_pdf_rendimiento(resumen, diario, inicio, fin, modo="general", chofer
     from reportlab.graphics.shapes import Drawing
     from reportlab.graphics.charts.barcharts import VerticalBarChart
 
-    naranja, azul, gris = colors.HexColor("#D95F00"), colors.HexColor("#003B5C"), colors.HexColor("#F3F4F6")
+    naranja, azul, gris = colors.HexColor("#D95F00"), colors.HexColor("#1F2937"), colors.HexColor("#F3F4F6")
     estilos = getSampleStyleSheet()
     e_titulo = ParagraphStyle("t", parent=estilos["Title"], textColor=azul, fontSize=20, leading=24, alignment=0, spaceAfter=2)
     e_sub = ParagraphStyle("s", parent=estilos["Normal"], textColor=colors.HexColor("#4B5563"), fontSize=11, spaceAfter=10)
@@ -2073,15 +2170,14 @@ else:
                     st.error("Usuario o contraseña de chofer incorrectos.")
 
 # Pie de página fijo al fondo de la barra lateral (Copyright)
-st.sidebar.markdown("<div style='flex-grow: 1;'></div>", unsafe_allow_html=True)
-st.sidebar.markdown("---")
 st.sidebar.markdown(
-    """<p style='text-align: center; font-size: 12px; color: rgba(255,255,255,.75); line-height: 1.4; margin-bottom: 10px;'>
+    """<div class='side-foot'><hr style='border-color: rgba(255,255,255,.25); margin: 0 0 10px 0;'>
+    <p style='text-align: center; font-size: 12px; color: rgba(255,255,255,.75); line-height: 1.4; margin-bottom: 10px;'>
     <b>Desarrollado y diseñado por:</b><br>
     Eduardo Rivera Chulin<br><br>
     © 2026 Bepensa / Coca-Cola.<br>
     Todos los derechos reservados.
-    </p>""", 
+    </p></div>""",
     unsafe_allow_html=True
 )
 
@@ -2157,7 +2253,7 @@ if menu == "Equipos Disponibles":
             n_modelos = int(df_kpi['Modelo'].nunique()) if not df_kpi.empty else 0
             k1, k2, k3, k4 = st.columns(4)
             with k1:
-                render_kpi(f"Disponibles en {c_kpi}", cant_canal, "Con los filtros aplicados", "#003B5C")
+                render_kpi(f"Disponibles en {c_kpi}", cant_canal, "Con los filtros aplicados", "#1F2937")
             with k2:
                 render_kpi("Nuevos", n_nuevos, porcentaje_texto(n_nuevos, cant_canal, "de los disponibles"), "#16A34A")
             with k3:
@@ -2179,11 +2275,13 @@ if menu == "Equipos Disponibles":
                     df_por_anio = df_tabla_filtrada.copy()
                     df_por_anio['Año'] = df_por_anio['Año'].fillna("").astype(str).replace("", "Sin año")
                     df_por_anio = df_por_anio.groupby(['Tipo', 'Modelo', 'Año', 'Imagen', 'Estatus']).size().reset_index(name='Cantidad Disponible')
-                    mostrar_tabla(df_por_anio.style.map(colorear_anio, subset=['Año']), use_container_width=True, hide_index=True)
+                    mostrar_tabla(df_por_anio.style.map(colorear_anio, subset=['Año']), use_container_width=True, hide_index=True,
+                                  column_config=config_barras(df_por_anio, ['Cantidad Disponible']))
                     st.caption("Año de fabricación según la serie. Verde: hasta 3 años. Amarillo: más de 3 y hasta 7. Rojo: más de 7.")
                 else:
                     mostrar_grafica(grafica_barras_conteo(df_tabla_filtrada, 'Modelo', f"Equipos disponibles por modelo en {c_d}", top=12), use_container_width=True)
-                    mostrar_tabla(df_tabla_filtrada.groupby(['Tipo', 'Modelo', 'Imagen', 'Estatus']).size().reset_index(name='Cantidad Disponible'), use_container_width=True, hide_index=True)
+                    df_por_modelo = df_tabla_filtrada.groupby(['Tipo', 'Modelo', 'Imagen', 'Estatus']).size().reset_index(name='Cantidad Disponible')
+                    mostrar_tabla(df_por_modelo, use_container_width=True, hide_index=True, column_config=config_barras(df_por_modelo, ['Cantidad Disponible']))
                 
                 # Desplegable exacto de series solo visible para administradores
                 if st.session_state.get('autenticado', False):
@@ -2199,6 +2297,7 @@ if menu == "Equipos Disponibles":
 
 # 2. ESTADÍA (PÚBLICO)
 elif menu == "Estadía":
+    render_banner("estadia", "Estadía y Saturación", "Promedio de días sin movimiento y saturación de inventario. Las barras en <b>rojo</b> superan los <b>40 días</b>; las <b>ámbar</b> se acercan al límite.")
     if not df_inv.empty:
         st.markdown("### Mapa de saturación por ubicación")
         st.caption("Haz clic en un bloque para ver el detalle por canal, modelo e imagen.")
@@ -2214,7 +2313,7 @@ elif menu == "Estadía":
             maxdepth=2
         )
         fig_treemap.update_traces(textinfo="label+value", root_color="#F5F7FA")
-        # Etiquetas en minúsculas, salvo el nivel de los modelos (3.er nivel: ubicación > canal > modelo > imagen)
+        # Etiquetas en minúsculas, salvo canal y modelo (niveles: ubicación > canal > modelo > imagen)
         _tr = fig_treemap.data[0]
         _padre = dict(zip(_tr.ids, _tr.parents))
         def _nivel(i_):
@@ -2235,7 +2334,7 @@ elif menu == "Estadía":
         except Exception:
             pass
         _tr.textfont = dict(color="#FFFFFF", size=14)
-        _tr.labels = [str(l_).upper() if _nivel(i_) == 2 else str(l_).lower() for l_, i_ in zip(_tr.labels, _tr.ids)]
+        _tr.labels = [str(l_).upper() if _nivel(i_) in (1, 2) else str(l_).lower() for l_, i_ in zip(_tr.labels, _tr.ids)]
         fig_treemap.update_layout(
             margin=dict(t=20, l=0, r=0, b=0), height=460,
             paper_bgcolor="rgba(0,0,0,0)", font=dict(family=FUENTE_GRAFICAS, size=13)
@@ -2243,7 +2342,6 @@ elif menu == "Estadía":
         mostrar_grafica(fig_treemap, use_container_width=True)
         st.markdown("<br>", unsafe_allow_html=True)
 
-    render_banner("estadia", "Estadía y Saturación", "Promedio de días sin movimiento y saturación de inventario. Las barras en <b>rojo</b> superan los <b>40 días</b>; las <b>ámbar</b> se acercan al límite.")
     st.markdown("---")
     
     opciones_estadia_filtro = [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
@@ -2389,7 +2487,7 @@ elif menu == "Necesidades de Taller":
         with k_nt1:
             render_kpi("Pendientes sin Asignación", len(pend), "Equipos por entregar", "#E60012")
         with k_nt2:
-            render_kpi("Modelos distintos", pend['Modelo'].nunique(), "Que se están necesitando", "#003B5C")
+            render_kpi("Modelos distintos", pend['Modelo'].nunique(), "Que se están necesitando", "#1F2937")
         with k_nt3:
             render_kpi("A reparar (sugerido)", int(necesidad['A reparar (sugerido)'].sum()), "Equipos Para Reparar que cubren la necesidad", "#FF7F00")
 
@@ -2404,7 +2502,8 @@ elif menu == "Necesidades de Taller":
             necesidad.style.map(colorear_rango_anio, subset=['Año solicitado']).map(
                 lambda v: 'background-color: #fed7aa; font-weight: bold;' if isinstance(v, (int, float)) and v > 0 else '',
                 subset=['A reparar (sugerido)']),
-            use_container_width=True, hide_index=True)
+            use_container_width=True, hide_index=True,
+            column_config=config_barras(necesidad, ['Pendientes', 'Disponibles', 'Faltante', 'Para Reparar', 'A reparar (sugerido)']))
         st.caption("Rangos: Nuevos = Año presente, Reciente = 1 o 2 años, Menor a 5 años = de 3 a 5 años y Mayor a 5 años = 6 o más años.")
         _buf_nt = io.BytesIO()
         with pd.ExcelWriter(_buf_nt, engine="openpyxl") as _w_nt:
@@ -2474,7 +2573,7 @@ elif menu == "Rendimiento de Choferes" and st.session_state['autenticado']:
         menos = resumen.sort_values(['Completadas', '% Cumplimiento'], ascending=True).iloc[0]
         k_r1, k_r2, k_r3, k_r4 = st.columns(4)
         with k_r1:
-            render_kpi("Servicios completados", int(resumen['Completadas'].sum()), "Entre todos los choferes", "#003B5C")
+            render_kpi("Servicios completados", int(resumen['Completadas'].sum()), "Entre todos los choferes", "#1F2937")
         with k_r2:
             render_kpi("Más servicios", str(mas['Chofer']).upper(), f"{int(mas['Completadas'])} completados", "#16A34A")
         with k_r3:
@@ -2492,14 +2591,16 @@ elif menu == "Rendimiento de Choferes" and st.session_state['autenticado']:
             subset=['Completadas']).map(
             lambda v: 'color: #166534; font-weight: bold;' if v > 0 else ('color: #991b1b; font-weight: bold;' if v < 0 else ''),
             subset=['Variación'])
-        mostrar_tabla(estilo_rank, use_container_width=True, hide_index=True)
+        cfg_rank = config_barras(resumen, ['% Cumplimiento'], formato="%.1f%%", maximo=100)
+        cfg_rank.update(config_barras(resumen, ['Horas extras', 'Promedio por día'], formato="%.1f"))
+        mostrar_tabla(estilo_rank, use_container_width=True, hide_index=True, column_config=cfg_rank)
         if sin_ruta:
             st.caption(f"{sin_ruta} solicitud(es) de esta catorcena no tienen chofer (Ruta) asignado y no se cuentan.")
 
         g_r1, g_r2 = st.columns(2)
         with g_r1:
             fig_t = go.Figure()
-            for t_, c_ in zip(TIPOS_SERVICIO, ["#D95F00", "#003B5C", "#16A34A", "#9CA3AF"]):
+            for t_, c_ in zip(TIPOS_SERVICIO, ["#D95F00", "#111827", "#16A34A", "#9CA3AF"]):
                 fig_t.add_trace(go.Bar(name=t_.lower(), x=[str(c).lower() for c in resumen['Chofer']], y=resumen[t_], marker_color=c_))
             fig_t = _estilo_grafica(fig_t, "Servicios completados por chofer y tipo", 360)
             fig_t.update_layout(barmode="stack", showlegend=True, legend=dict(orientation="h", y=-0.15))
@@ -2540,7 +2641,8 @@ elif menu == "Rendimiento de Choferes" and st.session_state['autenticado']:
                            "Eficiente": 'background-color: #dcfce7; color: #166534; font-weight: bold;',
                            "Equilibrado": 'background-color: #fef9c3; color: #854d0e; font-weight: bold;'}.get(v, ''),
                 subset=['Diagnóstico'])
-            mostrar_tabla(estilo_cmp, use_container_width=True, hide_index=True)
+            mostrar_tabla(estilo_cmp, use_container_width=True, hide_index=True,
+                          column_config=config_barras(resumen, ['% de servicios', '% de horas extras'], formato="%.1f%%", maximo=100))
             st.caption("Revisar: su parte de las horas extras del equipo supera en 10 puntos o más su parte de los servicios. "
                        "Eficiente: ocurre lo contrario. Equilibrado: están parejas.")
 
@@ -2677,7 +2779,7 @@ elif menu == "Solicitudes Diarias":
         _canc_dia = int((_st_dia == 'cancelado').sum())
         kd1, kd2, kd3, kd4 = st.columns(4)
         with kd1:
-            render_kpi("Solicitudes del día", _total_dia, fecha_consulta.strftime("%d/%m/%Y"), "#003B5C")
+            render_kpi("Solicitudes del día", _total_dia, fecha_consulta.strftime("%d/%m/%Y"), "#1F2937")
         with kd2:
             render_kpi("Pendientes", _pend_dia, porcentaje_texto(_pend_dia, _total_dia), "#F59E0B")
         with kd3:
@@ -2829,7 +2931,7 @@ elif menu == "Catálogo de Equipos":
     _n_img = int(df_specs['_con_img'].sum())
     k1, k2, k3 = st.columns(3)
     with k1:
-        render_kpi("Modelos en catálogo", _total, "Registrados con especificaciones", "#003B5C")
+        render_kpi("Modelos en catálogo", _total, "Registrados con especificaciones", "#1F2937")
     with k2:
         render_kpi("Tipos de equipo", df_specs['Tipo'].replace("", pd.NA).dropna().nunique(), "Categorías distintas", "#005B8C")
     with k3:
@@ -2941,7 +3043,7 @@ elif menu == "Inventario General" and st.session_state['autenticado']:
     reparados = len(df_filtrado[df_filtrado['Estatus'] == 'Reparado']) if not df_filtrado.empty else 0
 
     with col1:
-        render_kpi("Total de equipos", total_eq, "Con los filtros aplicados", "#003B5C")
+        render_kpi("Total de equipos", total_eq, "Con los filtros aplicados", "#1F2937")
     with col2:
         render_kpi("En taller", en_taller, porcentaje_texto(en_taller, total_eq), "#EA7A1A")
     with col3:
@@ -3015,6 +3117,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
     df_sol = cargar_solicitudes()
     
     if modo_solicitud == "Registrar Nueva Solicitud":
+        titulo_paso(1, "Tipo de solicitud", "#111827")
         col_p1, col_m1, col_v1 = st.columns([2, 2, 2])
         with col_p1:
             proyecto = st.selectbox("Proyecto:", OPCIONES_PROYECTOS, key="widget_proyecto_nuevo")
@@ -3028,9 +3131,8 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
         with col_v1:
             st.markdown("<div style='height:1.9rem'></div>", unsafe_allow_html=True)
             st.checkbox("Capturar varias series (una solicitud por serie)", key="widget_multi_series")
-        
-        st.markdown("---")
-        
+
+        titulo_paso(2, "Cliente", "#D95F00")
         cc1, cc2 = st.columns(2)
         with cc1:
             cuc = st.text_input("CUC:", key="sol_cuc", on_change=autocompletar_cliente, args=("sol_cuc", "sol_cliente", "sol_cliente_auto")).strip()
@@ -3039,40 +3141,51 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
             pista_cliente("sol_cuc", "sol_cliente", "sol_cliente_auto")
         
         with st.form("form_solicitud_nueva_ordenada", clear_on_submit=False):
-            col_s1, col_s2, col_s3 = st.columns(3)
-            
-            with col_s1:
-                status_permitidos_nuevos = obtener_status_validos(st.session_state['form_movimiento'])
-                idx_st_default = 0
-                if st.session_state['form_status'] in status_permitidos_nuevos:
-                    idx_st_default = status_permitidos_nuevos.index(st.session_state['form_status'])
-                status_sol = st.selectbox("Status:", status_permitidos_nuevos, index=idx_st_default, key="widget_status")
-                
-                incluir_fecha_entregado = st.checkbox("¿Asignar Fecha Entrega ahora?", value=False)
-                fecha_entregado = st.date_input("Fecha Entrega", value=date.today())
-                fecha_recibido = st.date_input("Fecha de Recibido", value=date.today())
-
-            with col_s2:
-                jefe_sol = st.text_input("Jefe de Venta:").strip()
-                supervisor = st.text_input("Supervisor (Opcional):").strip()
+            titulo_paso(3, "Equipo solicitado", "#B45309")
+            col_e1, col_e2, col_e3 = st.columns(3)
+            with col_e1:
                 equipo_tipo = st.selectbox("Equipo:", TIPOS_EQUIPO)
+            with col_e2:
                 modelo_sol = st.text_input("Modelo:").strip()
+            with col_e3:
                 if st.session_state.get('form_movimiento') == "Entrega":
                     anio_sol_sel = st.selectbox("Año solicitado:", OPCIONES_ANIO_SOLICITADO,
                                                 help="Antigüedad del equipo que piden cuando todavía no hay serie asignada.")
                 else:
                     anio_sol_sel = "Sin especificar"
                 anio_solicitado = "" if anio_sol_sel == "Sin especificar" else anio_sol_sel
+            if st.session_state.get("widget_multi_series"):
+                serie_sol = st.text_area("Series (una por línea o separadas por coma):", height=120)
+            else:
+                serie_sol = st.text_input("Número de Serie (Opcional):").strip()
 
+            titulo_paso(4, "Estatus y fechas", "#4D7C0F")
+            col_s1, col_s2, col_s3 = st.columns(3)
+            with col_s1:
+                status_permitidos_nuevos = obtener_status_validos(st.session_state['form_movimiento'])
+                idx_st_default = 0
+                if st.session_state['form_status'] in status_permitidos_nuevos:
+                    idx_st_default = status_permitidos_nuevos.index(st.session_state['form_status'])
+                status_sol = st.selectbox("Status:", status_permitidos_nuevos, index=idx_st_default, key="widget_status")
+            with col_s2:
+                fecha_recibido = st.date_input("Fecha de Recibido", value=date.today())
             with col_s3:
-                if st.session_state.get("widget_multi_series"):
-                    serie_sol = st.text_area("Series (una por línea o separadas por coma):", height=120)
-                else:
-                    serie_sol = st.text_input("Número de Serie (Opcional):").strip()
-                canal_sol = st.selectbox("Canal:", OPCIONES_CANALES_SOL)
-                ruta_sol = st.text_input("Ruta (Opcional):").strip()
-                motivo_sol = st.text_input("Motivo:").strip()
+                incluir_fecha_entregado = st.checkbox("¿Asignar Fecha Entrega ahora?", value=False)
+                fecha_entregado = st.date_input("Fecha Entrega", value=date.today())
 
+            titulo_paso(5, "Asignación y detalles", "#6B7280")
+            col_a1, col_a2, col_a3 = st.columns(3)
+            with col_a1:
+                canal_sol = st.selectbox("Canal:", OPCIONES_CANALES_SOL)
+            with col_a2:
+                ruta_sol = st.text_input("Chofer / Ruta (Opcional):").strip()
+            with col_a3:
+                jefe_sol = st.text_input("Jefe de Venta:").strip()
+            col_b1, col_b2 = st.columns(2)
+            with col_b1:
+                supervisor = st.text_input("Supervisor (Opcional):").strip()
+            with col_b2:
+                motivo_sol = st.text_input("Motivo:").strip()
             observaciones = st.text_area("Observaciones (Obligatorio si Canal es 'Otro'):").strip()
             
             submit_sol = st.form_submit_button(":material/save: Guardar Solicitud")
@@ -3319,7 +3432,8 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                 idx_seleccionado = st.selectbox(
                     "Seleccione la solicitud que desea actualizar, cambiar a pendiente/cancelar o eliminar individualmente:", 
                     opciones_indices, 
-                    format_func=format_opcion
+                    format_func=format_opcion,
+                    key="sel_solicitud_edit"
                 )
                 
                 if idx_seleccionado < len(df_sol):
@@ -3367,6 +3481,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                             dt_ent = date.today()
 
                         with col_ed1:
+                            titulo_paso(1, "Estatus y fechas", "#4D7C0F")
                             status_permitidos_edit = obtener_status_validos(movimiento_edit)
                             status_actual_val = row_sel['Status']
                             
@@ -3391,6 +3506,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                             cuc_edit = st.text_input("CUC:", value=str(row_sel.get('CUC', '')), key=f"cuc_{idx_seleccionado}").strip()
 
                         with col_ed2:
+                            titulo_paso(2, "Cliente y equipo", "#B45309")
                             cliente_edit = st.text_input("Nombre de Cliente:", value=str(row_sel.get('Cliente', '')), key=f"cli_{idx_seleccionado}").strip()
                             jefe_edit = st.text_input("Jefe de Venta:", value=str(row_sel.get('Jefe_de_Venta', '')), key=f"jefe_{idx_seleccionado}").strip()
                             supervisor_edit = st.text_input("Supervisor:", value=str(row_sel.get('Supervisor', '')), key=f"sup_{idx_seleccionado}").strip()
@@ -3405,6 +3521,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                                                          key=f"aso_{idx_seleccionado}")
 
                         with col_ed3:
+                            titulo_paso(3, "Serie y asignación", "#6B7280")
                             serie_edit = st.text_input("Número de Serie:", value=str(row_sel.get('Serie', '')), key=f"ser_{idx_seleccionado}").strip()
                             
                             idx_canal = OPCIONES_CANALES_SOL.index(row_sel['Canal']) if row_sel['Canal'] in OPCIONES_CANALES_SOL else 0
@@ -3582,6 +3699,7 @@ elif menu == "Levantamientos" and st.session_state['autenticado']:
         for _tipo_msg, _texto_msg in st.session_state.pop("lev_msgs", []):
             getattr(st, _tipo_msg)(_texto_msg)
 
+        titulo_paso(1, "Cliente", "#D95F00")
         cl1, cl2 = st.columns(2)
         with cl1:
             cuc_lev = st.text_input("CUC:", key="lev_cuc", on_change=autocompletar_cliente, args=("lev_cuc", "lev_cliente", "lev_cliente_auto")).strip()
@@ -3592,12 +3710,14 @@ elif menu == "Levantamientos" and st.session_state['autenticado']:
         with st.form("form_levantamiento", clear_on_submit=True):
             col_l1, col_l2 = st.columns(2)
             with col_l1:
+                titulo_paso(2, "Equipo levantado", "#B45309")
                 fecha_lev = st.date_input("Fecha de Levantamiento", value=date.today())
                 modelo = st.text_input("Modelo del Equipo:").strip()
                 serie = st.text_input("Número de Serie:").strip()
                 tipo = st.selectbox("Tipo de Equipo:", TIPOS_EQUIPO)
                 imagen = st.selectbox("Imagen:", OPCIONES_IMAGEN)
             with col_l2:
+                titulo_paso(3, "Estado y origen", "#4D7C0F")
                 canal = st.selectbox("Canal:", [c for c in OPCIONES_CANALES_SOL if c != "Otro"])
                 status_lev = st.selectbox("Estatus del Equipo:", ESTATUS)
                 motivo = st.text_input("Motivo del Levantamiento:").strip()
@@ -3682,17 +3802,28 @@ elif menu == "Registrar Entrada" and st.session_state['autenticado']:
     if modo_entrada == "Entrada Individual":
         multi_entrada = st.checkbox("Capturar varias series (mismo modelo y datos)", key="widget_multi_series_entrada")
         with st.form("form_entrada", clear_on_submit=True):
+            titulo_paso(1, "Equipo", "#B45309")
             if multi_entrada:
                 serie = st.text_area("Series (una por línea o separadas por coma):", height=140)
             else:
                 serie = st.text_input("Número de Serie:").strip()
-            modelo = st.text_input("Modelo del Equipo:").strip()
-            tipo = st.selectbox("Tipo de Equipo:", TIPOS_EQUIPO)
-            imagen = st.selectbox("Imagen:", OPCIONES_IMAGEN)
-            canal = st.selectbox("Canal:", [c for c in OPCIONES_CANALES_SOL if c != "Otro"])
-            ubicacion = st.selectbox("Ubicación inicial", UBICACIONES)
-            estatus = st.selectbox("Estatus inicial", ESTATUS)
-            fecha_entrada = st.date_input("Fecha de entrada / Último movimiento", value=date.today())
+            col_r1, col_r2, col_r3 = st.columns(3)
+            with col_r1:
+                modelo = st.text_input("Modelo del Equipo:").strip()
+            with col_r2:
+                tipo = st.selectbox("Tipo de Equipo:", TIPOS_EQUIPO)
+            with col_r3:
+                imagen = st.selectbox("Imagen:", OPCIONES_IMAGEN)
+            titulo_paso(2, "Ubicación y estado inicial", "#4D7C0F")
+            col_u1, col_u2, col_u3, col_u4 = st.columns(4)
+            with col_u1:
+                canal = st.selectbox("Canal:", [c for c in OPCIONES_CANALES_SOL if c != "Otro"])
+            with col_u2:
+                ubicacion = st.selectbox("Ubicación inicial", UBICACIONES)
+            with col_u3:
+                estatus = st.selectbox("Estatus inicial", ESTATUS)
+            with col_u4:
+                fecha_entrada = st.date_input("Fecha de entrada / Último movimiento", value=date.today())
             
             submit = st.form_submit_button("Registrar Entrada en Sistema")
             
