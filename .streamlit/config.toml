@@ -1,1 +1,5 @@
-
+# Copiar este archivo a:  .streamlit/config.toml  (dentro de tu repositorio, junto a app.py)
+# Hace que las barras de progreso, las casillas y los selectores se vean en naranja.
+[theme]
+base = "light"
+primaryColor = "#FF7F00"
