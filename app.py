@@ -23,6 +23,12 @@ import time
 from PIL import Image
 
 # Configuración de la página y diseño estético
+try:  # Color de tema naranja (barras de progreso, casillas, selección) sin necesidad del archivo config.toml
+    st._config.set_option("theme.base", "light")
+    st._config.set_option("theme.primaryColor", "#FF7F00")
+except Exception:
+    pass
+
 st.set_page_config(
     page_title="Control de Inventario - Bepensa / Coca-Cola",
     page_icon=":material/ac_unit:",
@@ -566,7 +572,6 @@ def _estilo_grafica(fig, titulo=None, alto=360):
         font=dict(family=FUENTE_GRAFICAS, size=12, color="#111827"),
         margin=dict(t=64 if titulo else 16, l=8, r=28, b=8),
         showlegend=False,
-        colorway=["#111827", "#D95F00", "#6B7280", "#F59E0B", "#374151", "#B45309"],
     )
     return fig
 
@@ -574,7 +579,7 @@ def _estilo_grafica(fig, titulo=None, alto=360):
 def grafica_estadia(df, eje, titulo, umbral=UMBRAL_ALERTA_DIAS):
     """Barras horizontales de promedio de días con semáforo y línea de límite."""
     d = df.sort_values('Promedio de Días', ascending=True).reset_index(drop=True)
-    colores = ['#DC2626' if v > umbral else '#F59E0B' if v > umbral * 0.75 else '#111827'
+    colores = ['#DC2626' if v > umbral else '#F59E0B' if v > umbral * 0.75 else '#003B5C'
                for v in d['Promedio de Días']]
     tiene_cant = 'Cantidad' in d.columns
     fig = go.Figure(go.Bar(
@@ -610,7 +615,7 @@ def grafica_barras_conteo(df, columna, titulo, mapa_color=None, top=None):
     c = df[columna].replace('', pd.NA).dropna().value_counts().sort_values(ascending=True)
     if top:
         c = c.tail(top)
-    colores = [(mapa_color or {}).get(k, '#111827') for k in c.index]
+    colores = [(mapa_color or {}).get(k, '#003B5C') for k in c.index]
     fig = go.Figure(go.Bar(
         x=c.values, y=c.index, orientation='h', marker_color=colores,
         text=c.values, textposition='outside', cliponaxis=False,
@@ -634,7 +639,7 @@ def grafica_dona(df, columna, titulo, mapa_color=None):
     _estilo_grafica(fig, titulo, 340)
     fig.update_layout(showlegend=True, legend=dict(orientation="v", y=0.5, x=1.0))
     fig.add_annotation(text=f"<b>{int(conteo['Cantidad'].sum()):,}</b><br>equipos", showarrow=False,
-                       font=dict(size=18, color="#111827"))
+                       font=dict(size=18, color="#003B5C"))
     return fig
 
 
@@ -644,7 +649,7 @@ def grafica_antiguedad(df, titulo="Antigüedad sin movimiento"):
     valores = [int(dias.between(0, 15).sum()), int(dias.between(16, 30).sum()),
                int(dias.between(31, 40).sum()), int((dias > 40).sum())]
     fig = go.Figure(go.Bar(
-        x=etiquetas, y=valores, marker_color=['#111827', '#4B5563', '#F59E0B', '#DC2626'],
+        x=etiquetas, y=valores, marker_color=['#003B5C', '#3B6FA8', '#F59E0B', '#DC2626'],
         text=valores, textposition='outside', cliponaxis=False,
         hovertemplate="%{x}: %{y} equipos<extra></extra>",
     ))
@@ -2275,13 +2280,12 @@ if menu == "Equipos Disponibles":
                     df_por_anio = df_tabla_filtrada.copy()
                     df_por_anio['Año'] = df_por_anio['Año'].fillna("").astype(str).replace("", "Sin año")
                     df_por_anio = df_por_anio.groupby(['Tipo', 'Modelo', 'Año', 'Imagen', 'Estatus']).size().reset_index(name='Cantidad Disponible')
-                    mostrar_tabla(df_por_anio.style.map(colorear_anio, subset=['Año']), use_container_width=True, hide_index=True,
-                                  column_config=config_barras(df_por_anio, ['Cantidad Disponible']))
+                    mostrar_tabla(df_por_anio.style.map(colorear_anio, subset=['Año']), use_container_width=True, hide_index=True)
                     st.caption("Año de fabricación según la serie. Verde: hasta 3 años. Amarillo: más de 3 y hasta 7. Rojo: más de 7.")
                 else:
                     mostrar_grafica(grafica_barras_conteo(df_tabla_filtrada, 'Modelo', f"Equipos disponibles por modelo en {c_d}", top=12), use_container_width=True)
                     df_por_modelo = df_tabla_filtrada.groupby(['Tipo', 'Modelo', 'Imagen', 'Estatus']).size().reset_index(name='Cantidad Disponible')
-                    mostrar_tabla(df_por_modelo, use_container_width=True, hide_index=True, column_config=config_barras(df_por_modelo, ['Cantidad Disponible']))
+                    mostrar_tabla(df_por_modelo, use_container_width=True, hide_index=True)
                 
                 # Desplegable exacto de series solo visible para administradores
                 if st.session_state.get('autenticado', False):
@@ -2502,8 +2506,7 @@ elif menu == "Necesidades de Taller":
             necesidad.style.map(colorear_rango_anio, subset=['Año solicitado']).map(
                 lambda v: 'background-color: #fed7aa; font-weight: bold;' if isinstance(v, (int, float)) and v > 0 else '',
                 subset=['A reparar (sugerido)']),
-            use_container_width=True, hide_index=True,
-            column_config=config_barras(necesidad, ['Pendientes', 'Disponibles', 'Faltante', 'Para Reparar', 'A reparar (sugerido)']))
+            use_container_width=True, hide_index=True)
         st.caption("Rangos: Nuevos = Año presente, Reciente = 1 o 2 años, Menor a 5 años = de 3 a 5 años y Mayor a 5 años = 6 o más años.")
         _buf_nt = io.BytesIO()
         with pd.ExcelWriter(_buf_nt, engine="openpyxl") as _w_nt:
@@ -2600,7 +2603,7 @@ elif menu == "Rendimiento de Choferes" and st.session_state['autenticado']:
         g_r1, g_r2 = st.columns(2)
         with g_r1:
             fig_t = go.Figure()
-            for t_, c_ in zip(TIPOS_SERVICIO, ["#D95F00", "#111827", "#16A34A", "#9CA3AF"]):
+            for t_, c_ in zip(TIPOS_SERVICIO, ["#D95F00", "#003B5C", "#16A34A", "#9CA3AF"]):
                 fig_t.add_trace(go.Bar(name=t_.lower(), x=[str(c).lower() for c in resumen['Chofer']], y=resumen[t_], marker_color=c_))
             fig_t = _estilo_grafica(fig_t, "Servicios completados por chofer y tipo", 360)
             fig_t.update_layout(barmode="stack", showlegend=True, legend=dict(orientation="h", y=-0.15))
