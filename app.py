@@ -207,6 +207,20 @@ st.markdown("""
     }
     div.stButton > button p, div.stFormSubmitButton > button p, div.stDownloadButton > button p { color: inherit !important; }
 
+    /* Etiqueta de rol en barra lateral */
+    .role-badge {
+        display: inline-block;
+        background: rgba(255, 127, 0, 0.22);
+        border: 1px solid #FF7F00;
+        color: #FFA03A;
+        font-size: .72rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 999px;
+        text-transform: uppercase;
+        margin-left: 6px;
+    }
+
     /* Tarjetas KPI (una sola clase; el color solo marca el tipo de indicador) */
     .kpi {
         background: #FFFFFF;
@@ -219,6 +233,17 @@ st.markdown("""
     .kpi .lbl { font-size: .9rem; font-weight: 600; color: var(--texto-sec); margin-bottom: 2px; }
     .kpi .val { font-size: 2rem; font-weight: 700; color: var(--texto); line-height: 1.15; font-variant-numeric: tabular-nums; }
     .kpi .sub { font-size: .8rem; color: var(--texto-sec); margin-top: 2px; }
+    .kpi .trend {
+        display: inline-block;
+        font-size: .78rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 999px;
+        margin-top: 4px;
+    }
+    .kpi .trend.pos { background: #DCFCE7; color: #166534; }
+    .kpi .trend.neg { background: #FEE2E2; color: #991B1B; }
+    .kpi .trend.neu { background: #F3F4F6; color: #374151; }
 
     /* ===== Catálogo de especificaciones ===== */
     /* Banner de encabezado de cada apartado (naranja Bepensa) */
@@ -400,14 +425,15 @@ COLOR_ESTATUS = {
 }
 
 
-def render_kpi(etiqueta, valor, apoyo="", color="#1F2937"):
-    """Tarjeta KPI ejecutiva: etiqueta, valor y una línea de apoyo opcional."""
+def render_kpi(etiqueta, valor, apoyo="", color="#1F2937", tendencia="", tipo_tendencia="neu"):
+    """Tarjeta KPI ejecutiva: etiqueta, valor, apoyo y badge opcional de tendencia."""
     if isinstance(valor, (int, float)):
         valor = f"{int(valor):,}"
     sub = f'<div class="sub">{apoyo}</div>' if apoyo else ""
+    tr = f'<div class="trend {tipo_tendencia}">{tendencia}</div>' if tendencia else ""
     st.markdown(
         f'<div class="kpi" style="--c:{color};"><div class="lbl">{etiqueta}</div>'
-        f'<div class="val">{valor}</div>{sub}</div>',
+        f'<div class="val">{valor}</div>{sub}{tr}</div>',
         unsafe_allow_html=True
     )
 
@@ -708,6 +734,7 @@ def _credencial_valida(tabla, usuario, clave):
 WEB_APP_URL = _leer_secreto("WEB_APP_URL", "")
 USUARIOS_AUTORIZADOS = _leer_credenciales("usuarios_admin")
 CHOFERES_AUTORIZADOS = _leer_credenciales("usuarios_chofer")
+GERENTES_AUTORIZADOS = {"Gerentes": "Gerencia2026", **_leer_credenciales("usuarios_gerente")}
 
 OPCIONES_PROYECTOS = [
     "Normal", "Cambio", "Documental", "Fisico", "Prospera", 
@@ -2058,46 +2085,95 @@ def colorear_dias(val):
 df_inv = cargar_datos()
 
 # --- GESTIÓN DE SESIÓN EN LA BARRA LATERAL ---
-if 'autenticado' not in st.session_state:
-    st.session_state['autenticado'] = False
-if 'es_chofer' not in st.session_state:
-    st.session_state['es_chofer'] = False
-if 'usuario_actual' not in st.session_state:
-    st.session_state['usuario_actual'] = ""
-if 'nombre_chofer' not in st.session_state:
-    st.session_state['nombre_chofer'] = ""
+for _k, _def in [('autenticado', False), ('es_chofer', False), ('es_gerente', False),
+                 ('usuario_actual', ""), ('nombre_chofer', "")]:
+    if _k not in st.session_state:
+        st.session_state[_k] = _def
 
 st.sidebar.markdown('<div class="side-brand"><div class="t">Capacidades</div><div class="s">Control de inventario</div></div>', unsafe_allow_html=True)
 st.sidebar.markdown("---")
 
-if st.session_state['autenticado']:
-    st.sidebar.markdown(f'<div class="session-chip"><span class="dot"></span>Sesión activa: <b>{st.session_state["usuario_actual"]}</b></div>', unsafe_allow_html=True)
-    # Menú para administradores
+# --- FILTRO GLOBAL GERENCIAL / OPERATIVO ---
+filtro_global_canal = "Todos"
+filtro_global_jefe = "Todos"
+
+if st.session_state['autenticado'] or st.session_state['es_gerente']:
+    rol_etiqueta = "Admin" if st.session_state['autenticado'] else "Gerencia · Solo Lectura"
+    st.sidebar.markdown(
+        f'<div class="session-chip"><span class="dot"></span><b>{st.session_state["usuario_actual"]}</b>'
+        f'<span class="role-badge">{rol_etiqueta}</span></div>',
+        unsafe_allow_html=True
+    )
+
+    with st.sidebar.expander("🌐 Filtros Globales de Consulta", expanded=st.session_state['es_gerente']):
+        canales_glob = ["Todos"] + [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
+        filtro_global_canal = st.selectbox("Canal Global:", canales_glob, key="glob_canal")
+        df_sol_tmp = cargar_solicitudes()
+        jefes_glob = ["Todos"] + sorted({
+            str(j).strip() for j in df_sol_tmp['Jefe_de_Venta'].dropna()
+            if str(j).strip() and str(j).strip().lower() != "nan"
+        }) if not df_sol_tmp.empty else ["Todos"]
+        filtro_global_jefe = st.selectbox("Jefe de Venta:", jefes_glob, key="glob_jefe")
+
+    # Menú agrupado por categorías para reducir la carga visual
+    if st.session_state['autenticado']:
+        categorias_menu = {
+            "📊 Gerencia y Análisis": [
+                "Dashboard Ejecutivo",
+                "Rendimiento de Choferes",
+                "Estadía",
+                "Reportes Gerenciales"
+            ],
+            "📦 Operación Diaria": [
+                "Equipos Disponibles",
+                "Solicitudes Diarias",
+                "Necesidades de Taller"
+            ],
+            "📝 Gestión y Movimientos": [
+                "Inventario General",
+                "Solicitudes",
+                "Levantamientos",
+                "Registrar Entrada",
+                "Registrar Salida",
+                "Editar / Eliminar"
+            ],
+            "⚙️ Catálogos y Bitácora": [
+                "Catálogo de Equipos",
+                "Historial de Movimientos",
+                "Exportar a Excel"
+            ]
+        }
+    else:
+        # Menú exclusivo para Gerentes (100% consulta, sin vistas de captura/edición)
+        categorias_menu = {
+            "📊 Gerencia y Análisis": [
+                "Dashboard Ejecutivo",
+                "Rendimiento de Choferes",
+                "Estadía",
+                "Reportes Gerenciales"
+            ],
+            "📦 Consulta Operativa": [
+                "Equipos Disponibles",
+                "Solicitudes Diarias",
+                "Necesidades de Taller",
+                "Inventario General",
+                "Catálogo de Equipos"
+            ]
+        }
+
+    cat_sel = st.sidebar.selectbox("Módulo:", list(categorias_menu.keys()), key="nav_categoria")
     menu = st.sidebar.radio(
-        "Menú de Navegación",
-        [
-            "Inventario General",
-            "Equipos Disponibles",
-            "Estadía",
-            "Necesidades de Taller",
-            "Rendimiento de Choferes",
-            "Solicitudes",
-            "Levantamientos",
-            "Solicitudes Diarias",
-            "Catálogo de Equipos",
-            "Registrar Entrada",
-            "Registrar Salida",
-            "Editar / Eliminar",
-            "Historial de Movimientos",
-            "Exportar a Excel"
-        ],
+        "Sección:",
+        categorias_menu[cat_sel],
         format_func=_etiqueta_menu,
-        key="nav_admin",
+        key="nav_seccion",
         label_visibility="collapsed"
     )
+
     if st.sidebar.button("Cerrar sesión"):
         st.session_state['autenticado'] = False
         st.session_state['es_chofer'] = False
+        st.session_state['es_gerente'] = False
         st.session_state['usuario_actual'] = ""
         st.session_state['nombre_chofer'] = ""
         st.rerun()
@@ -2117,6 +2193,7 @@ elif st.session_state['es_chofer']:
     if st.sidebar.button("Cerrar sesión"):
         st.session_state['autenticado'] = False
         st.session_state['es_chofer'] = False
+        st.session_state['es_gerente'] = False
         st.session_state['usuario_actual'] = ""
         st.session_state['nombre_chofer'] = ""
         st.rerun()
@@ -2140,11 +2217,25 @@ else:
     st.sidebar.markdown("---")
     st.sidebar.markdown("<p style='color: #FFFFFF; font-weight: bold; text-align: center;'>Acceso al sistema</p>", unsafe_allow_html=True)
     
-    tipo_acceso = st.sidebar.radio("Tipo de Acceso:", ["Administrativo", "Chofer en Ruta"], horizontal=True)
+    tipo_acceso = st.sidebar.radio("Tipo de Acceso:", ["Gerencia", "Administrativo", "Chofer en Ruta"], horizontal=True)
     if not USUARIOS_AUTORIZADOS and not CHOFERES_AUTORIZADOS:
         st.sidebar.warning("Credenciales no configuradas. Revise el archivo .streamlit/secrets.toml.")
     
-    if tipo_acceso == "Administrativo":
+    if tipo_acceso == "Gerencia":
+        with st.sidebar.form("form_login_gerente"):
+            ger_input = st.text_input("Usuario Gerencia:", value="Gerentes").strip()
+            pass_ger = st.text_input("Contraseña:", type="password").strip()
+            btn_login_ger = st.form_submit_button("Ingresar como Gerente")
+            
+            if btn_login_ger:
+                if _credencial_valida(GERENTES_AUTORIZADOS, ger_input, pass_ger):
+                    st.session_state['es_gerente'] = True
+                    st.session_state['usuario_actual'] = ger_input
+                    st.success("¡Bienvenido a Vista Gerencial!")
+                    st.rerun()
+                else:
+                    st.error("Usuario o contraseña de gerencia incorrectos.")
+    elif tipo_acceso == "Administrativo":
         with st.sidebar.form("form_login_admin"):
             user_input = st.text_input("Usuario Admin:").strip()
             pass_input = st.text_input("Contraseña Admin:", type="password").strip()
@@ -2174,6 +2265,10 @@ else:
                 else:
                     st.error("Usuario o contraseña de chofer incorrectos.")
 
+# Aplicar filtro global de Canal al dataframe de inventario si está activo
+if filtro_global_canal != "Todos" and not df_inv.empty:
+    df_inv = df_inv[df_inv['Canal'] == filtro_global_canal].copy()
+
 # Pie de página fijo al fondo de la barra lateral (Copyright)
 st.sidebar.markdown(
     """<div class='side-foot'><hr style='border-color: rgba(255,255,255,.25); margin: 0 0 10px 0;'>
@@ -2186,8 +2281,131 @@ st.sidebar.markdown(
     unsafe_allow_html=True
 )
 
+# 0. DASHBOARD EJECUTIVO (GERENTES Y ADMINISTRADORES)
+if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.session_state['es_gerente']):
+    render_banner("inventario", "Dashboard Ejecutivo", "Indicadores clave de disponibilidad, estadía crítica, tiempos de ciclo y cumplimiento de ruta.")
+
+    df_dias_dash = calcular_dias_sin_movimiento(df_inv)
+    df_sol_dash = cargar_solicitudes()
+    df_hist_dash = cargar_historial()
+
+    if filtro_global_canal != "Todos" and not df_sol_dash.empty:
+        df_sol_dash = df_sol_dash[df_sol_dash['Canal'] == filtro_global_canal]
+    if filtro_global_jefe != "Todos" and not df_sol_dash.empty:
+        df_sol_dash = df_sol_dash[df_sol_dash['Jefe_de_Venta'].astype(str).str.strip() == filtro_global_jefe]
+
+    # --- KPIs Ejecutivos ---
+    cond_disp = (
+        df_dias_dash['Ubicación'].isin(["En almacén de Comodatos", "En almacén de Publicidad", "En patios"]) &
+        df_dias_dash['Estatus'].astype(str).str.strip().str.lower().isin(["nuevo", "reparado"])
+    ) if not df_dias_dash.empty else pd.Series(dtype=bool)
+
+    total_disp = int(cond_disp.sum()) if not df_dias_dash.empty else 0
+    total_inv = len(df_dias_dash)
+
+    df_estadia_activa = df_dias_dash[~df_dias_dash['Ubicación'].isin(UBICACIONES_SIN_ESTADIA)] if not df_dias_dash.empty else pd.DataFrame()
+    criticos_40 = int((pd.to_numeric(df_estadia_activa['Días sin movimiento'], errors='coerce') > 40).sum()) if not df_estadia_activa.empty else 0
+    en_taller_dash = int((df_dias_dash['Ubicación'] == 'En taller').sum()) if not df_dias_dash.empty else 0
+
+    # Cumplimiento de la catorcena actual vs anterior
+    ref_cat = referencia_catorcena()
+    ini_cat = inicio_catorcena(date.today(), ref_cat)
+    fin_cat = ini_cat + timedelta(days=13)
+    res_cat, _, _, _ = calcular_rendimiento(df_sol_dash, ini_cat, fin_cat, list(CHOFERES_AUTORIZADOS.keys()), cargar_horas_extras())
+
+    comp_actual = int(res_cat['Completadas'].sum()) if not res_cat.empty else 0
+    comp_ant = int(res_cat['Anterior'].sum()) if not res_cat.empty else 0
+    diff_comp = comp_actual - comp_ant
+    pct_cumpl_global = round(float(res_cat['% Cumplimiento'].mean()), 1) if not res_cat.empty else 0.0
+
+    # Tiempo promedio de ciclo de reparación (desde bitácora)
+    ciclo_dias_txt = "Sin datos"
+    if not df_hist_dash.empty:
+        h_tmp = df_hist_dash.copy()
+        h_tmp['_dt'] = pd.to_datetime(h_tmp['Fecha_Hora'], errors='coerce')
+        h_tmp = h_tmp.dropna(subset=['_dt']).sort_values('_dt')
+        ent_rep = h_tmp[h_tmp['Detalles'].str.contains("Para Reparar", case=False, na=False)].groupby('Serie')['_dt'].first()
+        sal_rep = h_tmp[h_tmp['Detalles'].str.contains("Reparado", case=False, na=False)].groupby('Serie')['_dt'].last()
+        ciclos = (sal_rep - ent_rep).dropna()
+        ciclos = ciclos[ciclos.dt.total_seconds() > 0]
+        if not ciclos.empty:
+            prom_ciclo = round(ciclos.dt.total_seconds().mean() / 86400, 1)
+            ciclo_dias_txt = f"{prom_ciclo} días"
+
+    k1, k2, k3, k4 = st.columns(4)
+    with k1:
+        render_kpi("Equipos Listos para Entrega", total_disp, porcentaje_texto(total_disp, total_inv, "del inventario"), "#16A34A",
+                   tendencia="Operativos", tipo_tendencia="pos")
+    with k2:
+        render_kpi("Rezago Crítico (>40 días)", criticos_40, "En almacén o patios sin movimiento", "#DC2626",
+                   tendencia="Atención prioritaria" if criticos_40 > 0 else "Bajo control",
+                   tipo_tendencia="neg" if criticos_40 > 0 else "pos")
+    with k3:
+        render_kpi("Cumplimiento Catorcena", f"{pct_cumpl_global}%", f"{comp_actual} servicios completados", "#FF7F00",
+                   tendencia=f"{diff_comp:+d} vs catorcena ant.",
+                   tipo_tendencia="pos" if diff_comp >= 0 else "neg")
+    with k4:
+        render_kpi("Equipos en Taller", en_taller_dash, f"Ciclo promedio reparación: {ciclo_dias_txt}", "#1F2937",
+                   tendencia=ciclo_dias_txt, tipo_tendencia="neu")
+
+    st.markdown("---")
+    g_ej1, g_ej2 = st.columns(2)
+    with g_ej1:
+        if not df_dias_dash.empty and total_disp > 0:
+            mostrar_grafica(grafica_barras_conteo(df_dias_dash[cond_disp], 'Canal', 'Disponibilidad lista por canal', top=10), use_container_width=True)
+        else:
+            st.info("Sin equipos disponibles con los filtros actuales.")
+    with g_ej2:
+        if not df_estadia_activa.empty:
+            mostrar_grafica(grafica_antiguedad(df_estadia_activa, "Antigüedad de inventario sin movimiento"), use_container_width=True)
+        else:
+            st.info("Sin datos de estadía.")
+
+    st.markdown("### Semáforo de Solicitudes Pendientes por Canal")
+    if not df_sol_dash.empty:
+        pend_ej = df_sol_dash[df_sol_dash['Status'].astype(str).str.strip().str.lower() == 'pendiente'].copy()
+        if not pend_ej.empty:
+            res_pend = pend_ej.groupby(['Canal', 'Movimiento']).size().unstack(fill_value=0).reset_index()
+            res_pend['Total Pendientes'] = res_pend.iloc[:, 1:].sum(axis=1)
+            mostrar_tabla(res_pend.sort_values('Total Pendientes', ascending=False), use_container_width=True, hide_index=True)
+        else:
+            st.success("No hay solicitudes pendientes con los filtros aplicados.")
+
+# 0.5 REPORTES GERENCIALES CENTRALIZADOS (GERENTES Y ADMINISTRADORES)
+elif menu == "Reportes Gerenciales" and (st.session_state['autenticado'] or st.session_state['es_gerente']):
+    render_banner("exportar", "Reportes Gerenciales", "Descarga centralizada de reportes ejecutivos en Excel y PDF.")
+    c_rep1, c_rep2 = st.columns(2)
+    with c_rep1:
+        st.markdown("### 📦 Reporte Maestro de Inventario y Solicitudes (Excel)")
+        st.caption("Incluye inventario actual con días de estadía, levantamientos, solicitudes e historial.")
+        if st.button(":material/download: Preparar Excel Ejecutivo", key="btn_rep_excel_ger"):
+            buf_ger = io.BytesIO()
+            with pd.ExcelWriter(buf_ger, engine="openpyxl") as writer:
+                calcular_dias_sin_movimiento(df_inv).to_excel(writer, sheet_name="Inventario", index=False)
+                cargar_solicitudes().to_excel(writer, sheet_name="Solicitudes", index=False)
+                cargar_levantamientos().to_excel(writer, sheet_name="Levantamientos", index=False)
+            st.download_button(":material/download: Descargar Excel Ejecutivo", buf_ger.getvalue(),
+                               file_name=f"Reporte_Ejecutivo_Bepensa_{date.today():%Y%m%d}.xlsx",
+                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    with c_rep2:
+        st.markdown("### 🚚 Evaluación Catorcenal de Choferes (PDF)")
+        st.caption("Genera el ranking imprimible de productividad y horas extras de la catorcena actual.")
+        ref_r = referencia_catorcena()
+        ini_r = inicio_catorcena(date.today(), ref_r)
+        fin_r = ini_r + timedelta(days=13)
+        res_r, dia_r, _, _ = calcular_rendimiento(cargar_solicitudes(), ini_r, fin_r, list(CHOFERES_AUTORIZADOS.keys()), cargar_horas_extras())
+        if not res_r.empty:
+            try:
+                pdf_ger = generar_pdf_rendimiento(res_r, dia_r, ini_r, fin_r, "general")
+                st.download_button(":material/download: Descargar PDF de Choferes", pdf_ger,
+                                   file_name=f"Rendimiento_Choferes_{ini_r:%Y%m%d}.pdf", mime="application/pdf")
+            except Exception:
+                st.warning("Verifica que 'reportlab' esté instalado para exportar el PDF.")
+        else:
+            st.info("Sin actividad registrada en la catorcena actual.")
+
 # 1. EQUIPOS DISPONIBLES (PÚBLICO Y PRIMERA OPCIÓN PARA GENERALES)
-if menu == "Equipos Disponibles":
+elif menu == "Equipos Disponibles":
     render_banner("equipos", "Equipos Disponibles", "Equipos listos para distribución.")
     
     canales_validos_kpi = [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
@@ -2288,7 +2506,7 @@ if menu == "Equipos Disponibles":
                     mostrar_tabla(df_por_modelo, use_container_width=True, hide_index=True)
                 
                 # Desplegable exacto de series solo visible para administradores
-                if st.session_state.get('autenticado', False):
+                if st.session_state.get('autenticado', False) or st.session_state.get('es_gerente', False):
                     with st.expander(f":material/search: Ver el listado exacto de Series de Equipos - Canal {c_d}"):
                         df_det_disp = df_tabla_filtrada[['Serie', 'Modelo', 'Año', 'Tipo', 'Imagen', 'Ubicación', 'Estatus', 'Ultimo_Movimiento']].copy()
                         df_det_disp = df_det_disp.rename(columns={'Ultimo_Movimiento': 'Último Movimiento'})
@@ -2413,7 +2631,7 @@ elif menu == "Estadía":
                 df_m_tabla['Promedio de Días'] = df_m_tabla['Promedio de Días'].round(1)
                 mostrar_tabla(df_m_tabla, use_container_width=True, hide_index=True, column_config=config_col_estadia(df_m_tabla))
 
-            if st.session_state.get('autenticado', False):
+            if st.session_state.get('autenticado', False) or st.session_state.get('es_gerente', False):
                 with st.expander(f":material/search: Ver el listado exacto de Series de Equipos - Canal {c_val}"):
                     df_detalle_series = df_canal[['Serie', 'Tipo', 'Modelo', 'Imagen', 'Ubicación', 'Estatus', 'Días sin movimiento', 'Ultimo_Movimiento']].copy()
                     df_detalle_series['Días sin movimiento'] = pd.to_numeric(df_detalle_series['Días sin movimiento'], errors='coerce')
@@ -2515,7 +2733,7 @@ elif menu == "Necesidades de Taller":
                            file_name="necesidades_taller.xlsx",
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-        if st.session_state['autenticado']:
+        if st.session_state['autenticado'] or st.session_state['es_gerente']:
             with st.expander("Series de los equipos Disponibles y Para Reparar"):
                 filas_series = []
                 if not inv_nt.empty:
@@ -2545,7 +2763,7 @@ elif menu == "Necesidades de Taller":
                 det_nt = det_nt.rename(columns={'Fecha_Recibido': 'Fecha Recibido', 'Jefe_de_Venta': 'Jefe de Venta', 'Año_Solicitado': 'Año solicitado'})
                 mostrar_tabla(det_nt.style.map(colorear_rango_anio, subset=['Año solicitado']), use_container_width=True, hide_index=True)
 
-elif menu == "Rendimiento de Choferes" and st.session_state['autenticado']:
+elif menu == "Rendimiento de Choferes" and (st.session_state['autenticado'] or st.session_state['es_gerente']):
     render_banner("choferes", "Rendimiento de Choferes", "Servicios completados por chofer en cada catorcena (de miércoles a martes): entregas, levantamientos, reubicaciones, documentales y horas extras.")
     df_sol_r = cargar_solicitudes()
     df_he_r = cargar_horas_extras()
@@ -2557,14 +2775,15 @@ elif menu == "Rendimiento de Choferes" and st.session_state['autenticado']:
         inicio_sel = st.selectbox("Catorcena:", opciones_cat, key="rc_catorcena",
                                   format_func=lambda i: f"{i:%d/%m/%Y} al {i + timedelta(days=13):%d/%m/%Y}" + (" (actual)" if i == inicio_actual else ""))
     fin_sel = inicio_sel + timedelta(days=13)
-    with st.expander("Calendario de catorcenas"):
-        st.caption("Las catorcenas duran 14 días y empiezan en miércoles. Indica un miércoles en el que haya comenzado una catorcena para alinear el calendario con el de la empresa.")
-        nueva_ref = st.date_input("Un miércoles de inicio de catorcena:", value=ref_cat, key="rc_ref")
-        if st.button(":material/save: Guardar calendario", key="rc_guardar_ref"):
-            if guardar_config("catorcena_referencia", nueva_ref.isoformat()):
-                st.success("Calendario actualizado.")
-                time.sleep(1.2)
-                st.rerun()
+    if st.session_state['autenticado']:
+        with st.expander("Calendario de catorcenas"):
+            st.caption("Las catorcenas duran 14 días y empiezan en miércoles. Indica un miércoles en el que haya comenzado una catorcena para alinear el calendario con el de la empresa.")
+            nueva_ref = st.date_input("Un miércoles de inicio de catorcena:", value=ref_cat, key="rc_ref")
+            if st.button(":material/save: Guardar calendario", key="rc_guardar_ref"):
+                if guardar_config("catorcena_referencia", nueva_ref.isoformat()):
+                    st.success("Calendario actualizado.")
+                    time.sleep(1.2)
+                    st.rerun()
 
     choferes_base = list(CHOFERES_AUTORIZADOS.keys())
     resumen, diario, serv_periodo, sin_ruta = calcular_rendimiento(df_sol_r, inicio_sel, fin_sel, choferes_base, df_he_r)
@@ -2665,37 +2884,38 @@ elif menu == "Rendimiento de Choferes" and st.session_state['autenticado']:
             det = det[['Fecha_Entregado', 'Chofer', 'CUC', 'Cliente', 'Movimiento', 'Proyecto', 'Equipo', 'Modelo', 'Serie', 'Status']].rename(columns={'Fecha_Entregado': 'Fecha Entrega'})
             mostrar_tabla(det, use_container_width=True, hide_index=True)
 
-    # ----- Horas extras -----
-    with st.expander("Capturar horas extras de la catorcena"):
-        nombres_he = list(dict.fromkeys([str(c).strip() for c in choferes_base] + list(resumen['Chofer'] if not resumen.empty else [])))
-        he_ini = df_he_r[df_he_r['Catorcena_Inicio'].astype(str) == inicio_sel.isoformat()]
-        he_prev = {str(r_['Chofer']).strip().lower(): (r_['Horas_Extras'], r_['Observaciones']) for _, r_ in he_ini.iterrows()}
-        st.caption(f"Catorcena del {inicio_sel:%d/%m/%Y} al {fin_sel:%d/%m/%Y}. Escribe el total de horas extras de cada chofer en la catorcena.")
-        with st.form(f"form_horas_extras_{inicio_sel.isoformat()}"):
-            captura = {}
-            for ch_ in nombres_he:
-                h_prev, o_prev = he_prev.get(ch_.lower(), ("0", ""))
-                try:
-                    h_prev_f = float(h_prev)
-                except (ValueError, TypeError):
-                    h_prev_f = 0.0
-                x1, x2, x3 = st.columns([2, 1, 3])
-                x1.markdown(f"**{ch_}**")
-                horas_in = x2.number_input("Horas extras", min_value=0.0, max_value=300.0, step=0.5, value=h_prev_f,
-                                           key=f"he_h_{inicio_sel.isoformat()}_{ch_}", label_visibility="collapsed")
-                obs_in = x3.text_input("Observaciones", value=str(o_prev), key=f"he_o_{inicio_sel.isoformat()}_{ch_}",
-                                       placeholder="Observaciones (opcional)", label_visibility="collapsed")
-                captura[ch_] = (horas_in, obs_in.strip())
-            guardar_he = st.form_submit_button(":material/save: Guardar horas extras")
-        if guardar_he:
-            df_resto = df_he_r[df_he_r['Catorcena_Inicio'].astype(str) != inicio_sel.isoformat()]
-            nuevas_he = [{"Catorcena_Inicio": inicio_sel.isoformat(), "Chofer": ch_, "Horas_Extras": f"{h_:g}", "Observaciones": o_}
-                         for ch_, (h_, o_) in captura.items() if h_ > 0 or o_]
-            df_nuevo_he = pd.concat([df_resto, pd.DataFrame(nuevas_he, columns=COLUMNAS_HORAS_EXTRAS)], ignore_index=True)
-            if guardar_horas_extras(df_nuevo_he):
-                st.success("Horas extras guardadas.")
-                time.sleep(1.2)
-                st.rerun()
+    # ----- Horas extras (solo administradores pueden capturar) -----
+    if st.session_state['autenticado']:
+        with st.expander("Capturar horas extras de la catorcena"):
+            nombres_he = list(dict.fromkeys([str(c).strip() for c in choferes_base] + list(resumen['Chofer'] if not resumen.empty else [])))
+            he_ini = df_he_r[df_he_r['Catorcena_Inicio'].astype(str) == inicio_sel.isoformat()]
+            he_prev = {str(r_['Chofer']).strip().lower(): (r_['Horas_Extras'], r_['Observaciones']) for _, r_ in he_ini.iterrows()}
+            st.caption(f"Catorcena del {inicio_sel:%d/%m/%Y} al {fin_sel:%d/%m/%Y}. Escribe el total de horas extras de cada chofer en la catorcena.")
+            with st.form(f"form_horas_extras_{inicio_sel.isoformat()}"):
+                captura = {}
+                for ch_ in nombres_he:
+                    h_prev, o_prev = he_prev.get(ch_.lower(), ("0", ""))
+                    try:
+                        h_prev_f = float(h_prev)
+                    except (ValueError, TypeError):
+                        h_prev_f = 0.0
+                    x1, x2, x3 = st.columns([2, 1, 3])
+                    x1.markdown(f"**{ch_}**")
+                    horas_in = x2.number_input("Horas extras", min_value=0.0, max_value=300.0, step=0.5, value=h_prev_f,
+                                               key=f"he_h_{inicio_sel.isoformat()}_{ch_}", label_visibility="collapsed")
+                    obs_in = x3.text_input("Observaciones", value=str(o_prev), key=f"he_o_{inicio_sel.isoformat()}_{ch_}",
+                                           placeholder="Observaciones (opcional)", label_visibility="collapsed")
+                    captura[ch_] = (horas_in, obs_in.strip())
+                guardar_he = st.form_submit_button(":material/save: Guardar horas extras")
+            if guardar_he:
+                df_resto = df_he_r[df_he_r['Catorcena_Inicio'].astype(str) != inicio_sel.isoformat()]
+                nuevas_he = [{"Catorcena_Inicio": inicio_sel.isoformat(), "Chofer": ch_, "Horas_Extras": f"{h_:g}", "Observaciones": o_}
+                             for ch_, (h_, o_) in captura.items() if h_ > 0 or o_]
+                df_nuevo_he = pd.concat([df_resto, pd.DataFrame(nuevas_he, columns=COLUMNAS_HORAS_EXTRAS)], ignore_index=True)
+                if guardar_horas_extras(df_nuevo_he):
+                    st.success("Horas extras guardadas.")
+                    time.sleep(1.2)
+                    st.rerun()
 
     # ----- Reportes imprimibles -----
     st.markdown("### Reportes para imprimir")
@@ -2729,6 +2949,8 @@ elif menu == "Solicitudes Diarias":
         st.info(f"**Panel de Chofer ({chofer_activo}):** Se muestran exclusivamente las solicitudes asignadas a su nombre. Puede seleccionar una solicitud para actualizar su estatus y motivo.")
     elif st.session_state['autenticado']:
         st.info(f"**Panel de Administrador:** Puede visualizar cualquier solicitud del día y actualizar su estatus o motivo directamente.")
+    elif st.session_state['es_gerente']:
+        st.info(f"**Panel de Gerencia (Solo Lectura):** Consulta ejecutiva de las solicitudes programadas del día.")
     
     st.markdown("---")
     
@@ -2999,7 +3221,7 @@ elif menu == "Catálogo de Equipos":
                     st.markdown("<div style='height:14px'></div>", unsafe_allow_html=True)
 
 # 4. INVENTARIO GENERAL Y BUSCADOR (SOLO ADMINISTRADORES)
-elif menu == "Inventario General" and st.session_state['autenticado']:
+elif menu == "Inventario General" and (st.session_state['autenticado'] or st.session_state['es_gerente']):
     render_banner("inventario", "Inventario General", "Inventario actual de equipos.")
     
     df_con_dias = calcular_dias_sin_movimiento(df_inv)
