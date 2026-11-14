@@ -346,6 +346,32 @@ st.markdown("""
         font-weight: 600;
     }
 
+    /* Desplegable de Filtros Globales en la barra lateral */
+    [data-testid="stSidebar"] [data-testid="stExpander"] {
+        background-color: #1F2937 !important;
+        border: 1px solid #374151 !important;
+        border-radius: 8px !important;
+        margin-bottom: 12px !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary {
+        background-color: var(--naranja-int) !important;
+        color: #FFFFFF !important;
+        font-weight: 700 !important;
+        border-radius: 7px !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary:hover {
+        background-color: #D94F00 !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary p,
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary svg {
+        color: #FFFFFF !important;
+        fill: #FFFFFF !important;
+    }
+    [data-testid="stSidebar"] [data-testid="stExpander"] [data-testid="stExpanderDetails"] {
+        background-color: #1F2937 !important;
+        padding-top: 10px !important;
+    }
+
     /* Desplegables: naranja claro (pastel) y gris para los que contienen tablas */
     [data-testid="stExpander"] { border: 1px solid #F3D3B0; overflow: hidden; }
     [data-testid="stExpander"] summary { background-color: #FFE6CC !important; color: #7C2D12 !important; font-weight: 600; }
@@ -2105,7 +2131,7 @@ if st.session_state['autenticado'] or st.session_state['es_gerente']:
         unsafe_allow_html=True
     )
 
-    with st.sidebar.expander("🌐 Filtros Globales de Consulta", expanded=st.session_state['es_gerente']):
+    with st.sidebar.expander("🌐 Filtros Globales de Consulta", expanded=False):
         canales_glob = ["Todos"] + [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
         filtro_global_canal = st.selectbox("Canal Global:", canales_glob, key="glob_canal")
         df_sol_tmp = cargar_solicitudes()
@@ -2283,7 +2309,125 @@ st.sidebar.markdown(
 
 # 0. DASHBOARD EJECUTIVO (GERENTES Y ADMINISTRADORES)
 if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.session_state['es_gerente']):
-    render_banner("inventario", "Dashboard Ejecutivo", "Indicadores clave de disponibilidad, estadía crítica, tiempos de ciclo y cumplimiento de ruta.")
+    # Estilos exclusivos de fondo negro intenso y estética neón para el Dashboard Ejecutivo
+    st.markdown("""
+        <style>
+        .stApp {
+            background-color: #05050A !important;
+            color: #F3F4F6 !important;
+        }
+        [data-testid="stAppViewContainer"] > .main {
+            background-color: #05050A !important;
+        }
+        .neon-hero {
+            background: linear-gradient(135deg, #090D16 0%, #111827 60%, #1A1025 100%);
+            border: 1px solid #00F5D4;
+            box-shadow: 0 0 18px rgba(0, 245, 212, 0.28), inset 0 0 12px rgba(255, 127, 0, 0.15);
+            border-radius: 14px;
+            padding: 22px 28px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 14px;
+        }
+        .neon-hero h2 {
+            color: #00F5D4 !important;
+            text-shadow: 0 0 10px rgba(0, 245, 212, 0.75);
+            margin: 0 0 4px 0 !important;
+            font-size: 1.8rem;
+            font-weight: 700;
+        }
+        .neon-hero p {
+            color: #CBD5E1 !important;
+            margin: 0 !important;
+            font-size: 0.98rem;
+        }
+        .neon-hero .nh-date {
+            background: rgba(0, 245, 212, 0.12);
+            border: 1px solid #00F5D4;
+            color: #00F5D4;
+            box-shadow: 0 0 10px rgba(0, 245, 212, 0.35);
+            padding: 6px 14px;
+            border-radius: 999px;
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+        .neon-kpi {
+            background: #0B0F19;
+            border: 1px solid var(--nc, #00F5D4);
+            border-top: 3px solid var(--nc, #00F5D4);
+            box-shadow: 0 0 16px var(--ng, rgba(0, 245, 212, 0.25));
+            border-radius: 12px;
+            padding: 16px 18px 14px 18px;
+            margin-bottom: 14px;
+        }
+        .neon-kpi .lbl {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #9CA3AF;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 4px;
+        }
+        .neon-kpi .val {
+            font-size: 2.15rem;
+            font-weight: 800;
+            color: var(--nc, #00F5D4);
+            text-shadow: 0 0 12px var(--ng, rgba(0, 245, 212, 0.65));
+            line-height: 1.15;
+            font-variant-numeric: tabular-nums;
+        }
+        .neon-kpi .sub {
+            font-size: 0.82rem;
+            color: #D1D5DB;
+            margin-top: 4px;
+        }
+        .neon-kpi .trend {
+            display: inline-block;
+            font-size: 0.76rem;
+            font-weight: 700;
+            padding: 2px 10px;
+            border-radius: 999px;
+            margin-top: 6px;
+            border: 1px solid currentColor;
+        }
+        .neon-kpi .trend.pos { background: rgba(57, 255, 20, 0.12); color: #39FF14; text-shadow: 0 0 6px rgba(57, 255, 20, 0.6); }
+        .neon-kpi .trend.neg { background: rgba(255, 7, 58, 0.14); color: #FF073A; text-shadow: 0 0 6px rgba(255, 7, 58, 0.6); }
+        .neon-kpi .trend.neu { background: rgba(0, 245, 212, 0.12); color: #00F5D4; text-shadow: 0 0 6px rgba(0, 245, 212, 0.6); }
+        .neon-sec-title {
+            color: #FF9E00 !important;
+            text-shadow: 0 0 10px rgba(255, 158, 0, 0.7);
+            border-left: 4px solid #FF9E00;
+            padding-left: 12px;
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin: 14px 0 10px 0;
+        }
+        </style>
+    """, unsafe_allow_html=True)
+
+    def render_kpi_neon(etiqueta, valor, apoyo="", neon_color="#00F5D4", neon_glow="rgba(0, 245, 212, 0.35)", tendencia="", tipo_tendencia="neu"):
+        if isinstance(valor, (int, float)):
+            valor = f"{int(valor):,}"
+        sub = f'<div class="sub">{apoyo}</div>' if apoyo else ""
+        tr = f'<div class="trend {tipo_tendencia}">{tendencia}</div>' if tendencia else ""
+        st.markdown(
+            f'<div class="neon-kpi" style="--nc:{neon_color}; --ng:{neon_glow};">'
+            f'<div class="lbl">{etiqueta}</div>'
+            f'<div class="val">{valor}</div>{sub}{tr}</div>',
+            unsafe_allow_html=True
+        )
+
+    st.markdown(
+        f'<div class="neon-hero">'
+        f'<div><h2>⚡ Dashboard Ejecutivo</h2>'
+        f'<p>Indicadores clave de disponibilidad, estadía crítica, tiempos de ciclo y cumplimiento de ruta.</p></div>'
+        f'<div class="nh-date">Información al {datetime.now().strftime("%d/%m/%Y")}</div>'
+        f'</div>',
+        unsafe_allow_html=True
+    )
 
     df_dias_dash = calcular_dias_sin_movimiento(df_inv)
     df_sol_dash = cargar_solicitudes()
@@ -2334,40 +2478,71 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
 
     k1, k2, k3, k4 = st.columns(4)
     with k1:
-        render_kpi("Equipos Listos para Entrega", total_disp, porcentaje_texto(total_disp, total_inv, "del inventario"), "#16A34A",
-                   tendencia="Operativos", tipo_tendencia="pos")
+        render_kpi_neon("Equipos Listos para Entrega", total_disp, porcentaje_texto(total_disp, total_inv, "del inventario"),
+                        neon_color="#39FF14", neon_glow="rgba(57, 255, 20, 0.35)",
+                        tendencia="Operativos", tipo_tendencia="pos")
     with k2:
-        render_kpi("Rezago Crítico (>40 días)", criticos_40, "En almacén o patios sin movimiento", "#DC2626",
-                   tendencia="Atención prioritaria" if criticos_40 > 0 else "Bajo control",
-                   tipo_tendencia="neg" if criticos_40 > 0 else "pos")
+        render_kpi_neon("Rezago Crítico (>40 días)", criticos_40, "En almacén o patios sin movimiento",
+                        neon_color="#FF073A", neon_glow="rgba(255, 7, 58, 0.38)",
+                        tendencia="Atención prioritaria" if criticos_40 > 0 else "Bajo control",
+                        tipo_tendencia="neg" if criticos_40 > 0 else "pos")
     with k3:
-        render_kpi("Cumplimiento Catorcena", f"{pct_cumpl_global}%", f"{comp_actual} servicios completados", "#FF7F00",
-                   tendencia=f"{diff_comp:+d} vs catorcena ant.",
-                   tipo_tendencia="pos" if diff_comp >= 0 else "neg")
+        render_kpi_neon("Cumplimiento Catorcena", f"{pct_cumpl_global}%", f"{comp_actual} servicios completados",
+                        neon_color="#FF9E00", neon_glow="rgba(255, 158, 0, 0.38)",
+                        tendencia=f"{diff_comp:+d} vs catorcena ant.",
+                        tipo_tendencia="pos" if diff_comp >= 0 else "neg")
     with k4:
-        render_kpi("Equipos en Taller", en_taller_dash, f"Ciclo promedio reparación: {ciclo_dias_txt}", "#1F2937",
-                   tendencia=ciclo_dias_txt, tipo_tendencia="neu")
+        render_kpi_neon("Equipos en Taller", en_taller_dash, f"Ciclo promedio reparación: {ciclo_dias_txt}",
+                        neon_color="#00F5D4", neon_glow="rgba(0, 245, 212, 0.35)",
+                        tendencia=ciclo_dias_txt, tipo_tendencia="neu")
 
-    st.markdown("---")
+    st.markdown("<hr style='border-color: #1F2937 !important;'>", unsafe_allow_html=True)
     g_ej1, g_ej2 = st.columns(2)
     with g_ej1:
         if not df_dias_dash.empty and total_disp > 0:
-            mostrar_grafica(grafica_barras_conteo(df_dias_dash[cond_disp], 'Canal', 'Disponibilidad lista por canal', top=10), use_container_width=True)
+            fig_n1 = grafica_barras_conteo(df_dias_dash[cond_disp], 'Canal', 'Disponibilidad lista por canal', top=10)
+            fig_n1.update_traces(marker_color="#00F5D4", textfont_color="#00F5D4")
+            fig_n1.update_layout(
+                paper_bgcolor="#0B0F19", plot_bgcolor="#0B0F19",
+                font=dict(color="#E5E7EB"),
+                title=dict(font=dict(color="#00F5D4", size=16)),
+                xaxis=dict(gridcolor="#1F2937", color="#9CA3AF"),
+                yaxis=dict(color="#F3F4F6")
+            )
+            mostrar_grafica(fig_n1, use_container_width=True)
         else:
             st.info("Sin equipos disponibles con los filtros actuales.")
     with g_ej2:
         if not df_estadia_activa.empty:
-            mostrar_grafica(grafica_antiguedad(df_estadia_activa, "Antigüedad de inventario sin movimiento"), use_container_width=True)
+            fig_n2 = grafica_antiguedad(df_estadia_activa, "Antigüedad de inventario sin movimiento")
+            fig_n2.update_traces(marker_color=["#00F5D4", "#3B82F6", "#FF9E00", "#FF073A"], textfont_color="#F3F4F6")
+            fig_n2.update_layout(
+                paper_bgcolor="#0B0F19", plot_bgcolor="#0B0F19",
+                font=dict(color="#E5E7EB"),
+                title=dict(font=dict(color="#FF9E00", size=16)),
+                yaxis=dict(gridcolor="#1F2937", color="#9CA3AF"),
+                xaxis=dict(color="#F3F4F6")
+            )
+            mostrar_grafica(fig_n2, use_container_width=True)
         else:
             st.info("Sin datos de estadía.")
 
-    st.markdown("### Semáforo de Solicitudes Pendientes por Canal")
+    st.markdown('<div class="neon-sec-title">Semáforo de Solicitudes Pendientes por Canal</div>', unsafe_allow_html=True)
     if not df_sol_dash.empty:
         pend_ej = df_sol_dash[df_sol_dash['Status'].astype(str).str.strip().str.lower() == 'pendiente'].copy()
         if not pend_ej.empty:
             res_pend = pend_ej.groupby(['Canal', 'Movimiento']).size().unstack(fill_value=0).reset_index()
             res_pend['Total Pendientes'] = res_pend.iloc[:, 1:].sum(axis=1)
-            mostrar_tabla(res_pend.sort_values('Total Pendientes', ascending=False), use_container_width=True, hide_index=True)
+            res_pend = res_pend.sort_values('Total Pendientes', ascending=False)
+            estilo_neon_tbl = res_pend.style.set_properties(**{
+                'background-color': '#0B0F19',
+                'color': '#00F5D4',
+                'border-color': '#1F2937'
+            }).map(
+                lambda v: 'color: #FF073A; font-weight: bold;' if isinstance(v, (int, float)) and v > 0 else '',
+                subset=['Total Pendientes']
+            )
+            mostrar_tabla(estilo_neon_tbl, use_container_width=True, hide_index=True)
         else:
             st.success("No hay solicitudes pendientes con los filtros aplicados.")
 
