@@ -801,10 +801,12 @@ def _estilo_grafica(fig, titulo=None, alto=360):
     return fig
 
 
+COLOR_BARRA = "#2FA8F5"   # azul cielo, alegre a la vista (reemplaza al azul oscuro #003B5C en las barras)
+
 def grafica_estadia(df, eje, titulo, umbral=UMBRAL_ALERTA_DIAS):
     """Barras horizontales de promedio de días con semáforo y línea de límite."""
     d = df.sort_values('Promedio de Días', ascending=True).reset_index(drop=True)
-    colores = ['#DC2626' if v > umbral else '#F59E0B' if v > umbral * 0.75 else '#003B5C'
+    colores = ['#DC2626' if v > umbral else '#F59E0B' if v > umbral * 0.75 else COLOR_BARRA
                for v in d['Promedio de Días']]
     tiene_cant = 'Cantidad' in d.columns
     fig = go.Figure(go.Bar(
@@ -840,7 +842,7 @@ def grafica_barras_conteo(df, columna, titulo, mapa_color=None, top=None):
     c = df[columna].replace('', pd.NA).dropna().value_counts().sort_values(ascending=True)
     if top:
         c = c.tail(top)
-    colores = [(mapa_color or {}).get(k, '#003B5C') for k in c.index]
+    colores = [(mapa_color or {}).get(k, COLOR_BARRA) for k in c.index]
     fig = go.Figure(go.Bar(
         x=c.values, y=c.index, orientation='h', marker_color=colores,
         text=c.values, textposition='outside', cliponaxis=False,
@@ -874,7 +876,7 @@ def grafica_antiguedad(df, titulo="Antigüedad sin movimiento"):
     valores = [int(dias.between(0, 15).sum()), int(dias.between(16, 30).sum()),
                int(dias.between(31, 40).sum()), int((dias > 40).sum())]
     fig = go.Figure(go.Bar(
-        x=etiquetas, y=valores, marker_color=['#003B5C', '#3B6FA8', '#F59E0B', '#DC2626'],
+        x=etiquetas, y=valores, marker_color=[COLOR_BARRA, '#8FD0FA', '#F59E0B', '#DC2626'],
         text=valores, textposition='outside', cliponaxis=False,
         hovertemplate="%{x}: %{y} equipos<extra></extra>",
     ))
@@ -2530,7 +2532,6 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
         }
         .neon-hero h2 {
             color: #FF7F00 !important;
-            text-shadow: 0 0 6px rgba(255, 127, 0, 0.95), 0 0 14px rgba(255, 127, 0, 0.7), 0 0 28px rgba(255, 127, 0, 0.45);
             margin: 0 0 4px 0 !important;
             font-size: 1.8rem;
             font-weight: 700;
@@ -2593,7 +2594,7 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
         .neon-kpi .trend.pos { background: rgba(57, 255, 20, 0.12); color: #39FF14; text-shadow: 0 0 6px rgba(57, 255, 20, 0.6); }
         .neon-kpi .trend.neg { background: rgba(255, 7, 58, 0.14); color: #FF073A; text-shadow: 0 0 6px rgba(255, 7, 58, 0.6); }
         .neon-kpi .trend.neu { background: rgba(77, 124, 255, 0.14); color: #7FA0FF; text-shadow: 0 0 6px rgba(77, 124, 255, 0.6); }
-        .neon-hero h2 svg { vertical-align: -5px; margin-right: 10px; filter: drop-shadow(0 0 6px rgba(255, 127, 0, 0.9)); }
+        .neon-hero h2 svg { vertical-align: -5px; margin-right: 10px; }
         .estado-vacio { background: #0B0F19; border: 1px dashed #374151; color: #9CA3AF; }
         .estado-vacio .ev-ic { background: rgba(255, 127, 0, 0.15); color: #FF7F00; }
         @media (max-width: 640px) {
@@ -2608,10 +2609,21 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             box-shadow: 0 0 8px rgba(255, 127, 0, 0.75), 0 0 22px rgba(255, 127, 0, 0.4), inset 0 0 12px rgba(255, 127, 0, 0.18);
             overflow: hidden;
         }
-        [data-testid="stColumn"]:has(.marca-disp-canal) .barlayer path,
-        [data-testid="column"]:has(.marca-disp-canal) .barlayer path {
-            filter: drop-shadow(0 0 5px #1F51FF) drop-shadow(0 0 12px rgba(31, 81, 255, 0.85));
-        }
+        /* Resto de gráficas del dashboard: borde tenue para que combinen con el tema oscuro */
+        [data-testid="stPlotlyChart"] { border: 1px solid #1F2937; border-radius: 12px; overflow: hidden; }
+        /* Tablas del dashboard en estilo neón (encabezado violeta oscuro, contorno naranja) */
+        .neon-tbl-wrap { border: 2px solid #FF7F00; border-radius: 12px; overflow-x: auto; background: #0B0F19;
+            box-shadow: 0 0 8px rgba(255, 127, 0, 0.55), 0 0 18px rgba(255, 127, 0, 0.3); margin-bottom: 14px; }
+        .neon-tbl { width: 100%; border-collapse: collapse; font-size: 0.9rem; color: #F3F4F6; }
+        .neon-tbl thead th { background: #1B1030; color: #FF9E00; text-align: left; padding: 10px 12px; white-space: nowrap;
+            border-bottom: 2px solid #FF7F00; font-size: 0.76rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
+        .neon-tbl thead th.num { text-align: right; }
+        .neon-tbl td { padding: 9px 12px; border-bottom: 1px solid #1F2937; text-transform: uppercase; }
+        .neon-tbl tbody tr:nth-child(even) td { background: #0F1424; }
+        .neon-tbl tbody tr:hover td { background: #16203A; }
+        .neon-tbl tbody tr:last-child td { border-bottom: none; }
+        .neon-tbl td.num { text-align: right; font-variant-numeric: tabular-nums; color: #9CC0FF; }
+        .neon-tbl td.alerta { color: #FF073A; font-weight: 700; }
         .neon-sec-title {
             color: #FF9E00 !important;
             text-shadow: 0 0 10px rgba(255, 158, 0, 0.7);
@@ -2639,7 +2651,7 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
     st.markdown(
         f'<div class="neon-hero">'
         f'<div><h2>{svg_icono("rayo", 28)}Dashboard Ejecutivo</h2>'
-        f'<p>Indicadores clave de disponibilidad, estadía crítica, tiempos de ciclo y cumplimiento de ruta.</p></div>'
+        f'<p>Disponibilidad, estadía, taller, solicitudes y desempeño de choferes en un solo vistazo.</p></div>'
         f'<div class="nh-date">Información al {datetime.now().strftime("%d/%m/%Y")}</div>'
         f'</div>',
         unsafe_allow_html=True
@@ -2712,7 +2724,97 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
                         neon_color="#4D7CFF", neon_glow="rgba(77, 124, 255, 0.4)",
                         tendencia=ciclo_dias_txt, tipo_tendencia="neu")
 
+    # --- Segunda fila de KPIs: inventario, solicitudes, cobertura y horas extras ---
+    def _fecha_sol(serie):
+        f = pd.to_datetime(serie, errors='coerce', format='ISO8601')
+        mal = f.isna() & serie.astype(str).str.strip().ne('')
+        if mal.any():
+            f[mal] = pd.to_datetime(serie[mal], errors='coerce', dayfirst=True)
+        return f
+
+    pend_total = pend_ent = pend_lev = pend_ent_sin_serie = atrasadas = 0
+    pend_ej = pd.DataFrame()
+    if not df_sol_dash.empty:
+        _st = df_sol_dash['Status'].astype(str).str.strip().str.lower()
+        _mov = df_sol_dash['Movimiento'].astype(str).str.strip().str.lower()
+        _serie_vacia = df_sol_dash['Serie'].fillna("").astype(str).str.strip().replace("nan", "").eq("")
+        _f_sol = _fecha_sol(df_sol_dash['Fecha_Entregado'])
+        _pend = _st == 'pendiente'
+        pend_ej = df_sol_dash[_pend].copy()
+        pend_ej['_atrasada'] = (_f_sol[_pend] < pd.Timestamp(date.today())).fillna(False)
+        pend_total = int(_pend.sum())
+        pend_ent = int((_pend & (_mov == 'entrega')).sum())
+        pend_lev = int((_pend & (_mov == 'levantamiento')).sum())
+        pend_ent_sin_serie = int((_pend & (_mov == 'entrega') & _serie_vacia).sum())
+        atrasadas = int(pend_ej['_atrasada'].sum())
+
+    saldo_cobertura = total_disp - pend_ent_sin_serie
+    horas_total = float(res_cat['Horas extras'].sum()) if not res_cat.empty else 0.0
+    horas_por_serv = horas_total / comp_actual if comp_actual else 0.0
+    n_revisar = int((res_cat['Diagnóstico'] == "Revisar").sum()) if not res_cat.empty else 0
+    en_estadia_activa = len(df_estadia_activa)
+
+    k5, k6, k7, k8 = st.columns(4)
+    with k5:
+        render_kpi_neon("Inventario Total", total_inv, f"{en_estadia_activa:,} en estadía activa",
+                        neon_color="#4D7CFF", neon_glow="rgba(77, 124, 255, 0.4)",
+                        tendencia=f"{total_disp:,} listos para entrega", tipo_tendencia="neu")
+    with k6:
+        render_kpi_neon("Solicitudes Pendientes", pend_total, f"{pend_ent:,} entregas · {pend_lev:,} levantamientos",
+                        neon_color="#FFC400", neon_glow="rgba(255, 196, 0, 0.38)",
+                        tendencia=f"{atrasadas:,} atrasadas" if atrasadas else "Al día",
+                        tipo_tendencia="neg" if atrasadas else "pos")
+    with k7:
+        _ok_cob = saldo_cobertura >= 0
+        render_kpi_neon("Cobertura de Entregas", f"{saldo_cobertura:+,d}",
+                        f"{total_disp:,} listos vs {pend_ent_sin_serie:,} entregas pendientes sin serie",
+                        neon_color="#39FF14" if _ok_cob else "#FF073A",
+                        neon_glow="rgba(57, 255, 20, 0.35)" if _ok_cob else "rgba(255, 7, 58, 0.38)",
+                        tendencia="Cobertura suficiente" if _ok_cob else f"Faltan {-saldo_cobertura:,} equipos",
+                        tipo_tendencia="pos" if _ok_cob else "neg")
+    with k8:
+        render_kpi_neon("Horas Extras Catorcena", f"{horas_total:,.1f} h", f"{horas_por_serv:.2f} h extra por servicio",
+                        neon_color="#FF7F00", neon_glow="rgba(255, 127, 0, 0.4)",
+                        tendencia=f"{n_revisar} chofer(es) por revisar" if n_revisar else "Sin alertas",
+                        tipo_tendencia="neg" if n_revisar else "pos")
+
+    def _oscurecer(fig, color_titulo="#FF9E00"):
+        """Fondo y ejes oscuros para que las gráficas combinen con el tema neón del dashboard."""
+        fig.update_layout(paper_bgcolor="#0B0F19", plot_bgcolor="#0B0F19", font=dict(color="#E5E7EB"),
+                          title=dict(font=dict(color=color_titulo, size=16)))
+        fig.update_xaxes(gridcolor="#1F2937", color="#D1D5DB")
+        fig.update_yaxes(gridcolor="#1F2937", color="#D1D5DB")
+        return fig
+
+    def tabla_neon(df, columnas_alerta=()):
+        """Tabla HTML en estilo neón (el encabezado de st.dataframe no se puede colorear)."""
+        cabeza, filas = [], []
+        for c in df.columns:
+            es_num_col = pd.api.types.is_numeric_dtype(df[c])
+            cabeza.append(f'<th class="{"num" if es_num_col else ""}">{_html.escape(str(c))}</th>')
+        for _, r in df.iterrows():
+            celdas = []
+            for c in df.columns:
+                v = r[c]
+                es_num = pd.api.types.is_number(v) and not isinstance(v, bool) and not pd.isna(v)
+                if es_num:
+                    txt = f"{int(v):,}" if float(v).is_integer() else f"{v:,.1f}"
+                else:
+                    txt = _html.escape("" if pd.isna(v) else str(v))
+                clases = ["num"] if es_num else []
+                if es_num and v > 0 and c in columnas_alerta:
+                    clases.append("alerta")
+                celdas.append(f'<td class="{" ".join(clases)}">{txt}</td>')
+            filas.append("<tr>" + "".join(celdas) + "</tr>")
+        st.markdown(
+            '<div class="neon-tbl-wrap"><table class="neon-tbl"><thead><tr>' + "".join(cabeza) +
+            "</tr></thead><tbody>" + "".join(filas) + "</tbody></table></div>",
+            unsafe_allow_html=True
+        )
+
     st.markdown("<hr style='border-color: #1F2937 !important;'>", unsafe_allow_html=True)
+
+    # --- Fila 1 de gráficas: disponibilidad y antigüedad ---
     g_ej1, g_ej2 = st.columns(2)
     with g_ej1:
         if not df_dias_dash.empty and total_disp > 0:
@@ -2720,49 +2822,89 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             fig_n1 = grafica_barras_conteo(df_dias_dash[cond_disp], 'Canal', 'Disponibilidad lista por canal', top=10)
             fig_n1.update_traces(marker_color="#1F51FF", marker_line_color="#4D7CFF", marker_line_width=1.5,
                                  textfont_color="#7FA0FF")
-            fig_n1.update_layout(
-                paper_bgcolor="#0B0F19", plot_bgcolor="#0B0F19",
-                font=dict(color="#E5E7EB"),
-                title=dict(font=dict(color="#FF7F00", size=16)),
-                xaxis=dict(gridcolor="#1F2937", color="#9CA3AF"),
-                yaxis=dict(color="#F3F4F6")
-            )
-            mostrar_grafica(fig_n1, use_container_width=True)
+            mostrar_grafica(_oscurecer(fig_n1, "#FF7F00"), use_container_width=True)
         else:
             estado_vacio("Sin equipos disponibles con los filtros actuales.")
     with g_ej2:
         if not df_estadia_activa.empty:
             fig_n2 = grafica_antiguedad(df_estadia_activa, "Antigüedad de inventario sin movimiento")
             fig_n2.update_traces(marker_color=["#39FF14", "#4D7CFF", "#FF9E00", "#FF073A"], textfont_color="#F3F4F6")
-            fig_n2.update_layout(
-                paper_bgcolor="#0B0F19", plot_bgcolor="#0B0F19",
-                font=dict(color="#E5E7EB"),
-                title=dict(font=dict(color="#FF9E00", size=16)),
-                yaxis=dict(gridcolor="#1F2937", color="#9CA3AF"),
-                xaxis=dict(color="#F3F4F6")
-            )
-            mostrar_grafica(fig_n2, use_container_width=True)
+            mostrar_grafica(_oscurecer(fig_n2), use_container_width=True)
         else:
             estado_vacio("Sin datos de estadía.")
 
-    st.markdown('<div class="neon-sec-title">Semáforo de Solicitudes Pendientes por Canal</div>', unsafe_allow_html=True)
-    if not df_sol_dash.empty:
-        pend_ej = df_sol_dash[df_sol_dash['Status'].astype(str).str.strip().str.lower() == 'pendiente'].copy()
+    # --- Fila 2: inventario por ubicación y desempeño de choferes ---
+    g_ej3, g_ej4 = st.columns(2)
+    with g_ej3:
+        if not df_dias_dash.empty:
+            fig_n3 = grafica_barras_conteo(df_dias_dash, 'Ubicación', 'Inventario por ubicación')
+            fig_n3.update_traces(marker_color="#38B6FF", textfont_color="#E5E7EB")
+            mostrar_grafica(_oscurecer(fig_n3), use_container_width=True)
+        else:
+            estado_vacio("Sin datos de inventario.")
+    with g_ej4:
+        rc = res_cat[(res_cat['Asignadas'] > 0) | (res_cat['Completadas'] > 0)] if not res_cat.empty else res_cat
+        if not rc.empty:
+            rc = rc.sort_values('Completadas', ascending=True).tail(10)
+            nombres_ch = [str(c).upper() for c in rc['Chofer']]
+            fig_n4 = go.Figure()
+            fig_n4.add_trace(go.Bar(y=nombres_ch, x=rc['Anterior'], name="Catorcena anterior", orientation='h',
+                                    marker_color="#7C8BC4", text=rc['Anterior'], textposition='outside', cliponaxis=False))
+            fig_n4.add_trace(go.Bar(y=nombres_ch, x=rc['Completadas'], name="Catorcena actual", orientation='h',
+                                    marker_color="#FF9E00", text=rc['Completadas'], textposition='outside', cliponaxis=False))
+            fig_n4.update_layout(barmode='group')
+            fig_n4.update_xaxes(showgrid=True, zeroline=False, title=None,
+                                range=[0, max(float(rc[['Anterior', 'Completadas']].max().max()), 1) * 1.2])
+            fig_n4.update_yaxes(title=None, automargin=True)
+            _estilo_grafica(fig_n4, "Servicios completados por chofer", max(300, 62 * len(rc) + 120))
+            fig_n4.update_layout(showlegend=True, legend=dict(orientation="h", y=1.14, x=0, font=dict(color="#E5E7EB")))
+            mostrar_grafica(_oscurecer(fig_n4), use_container_width=True)
+        else:
+            estado_vacio("Sin actividad registrada en la catorcena actual.")
+
+    # --- Fila 3: modelos disponibles y pendientes por jefe de venta ---
+    g_ej5, g_ej6 = st.columns(2)
+    with g_ej5:
+        if not df_dias_dash.empty and total_disp > 0:
+            fig_n5 = grafica_barras_conteo(df_dias_dash[cond_disp], 'Modelo', 'Modelos con más equipos listos', top=8)
+            fig_n5.update_traces(marker_color="#38B6FF", textfont_color="#E5E7EB")
+            mostrar_grafica(_oscurecer(fig_n5), use_container_width=True)
+        else:
+            estado_vacio("Sin equipos disponibles con los filtros actuales.")
+    with g_ej6:
+        if not pend_ej.empty and pend_ej['Jefe_de_Venta'].astype(str).str.strip().replace("nan", "").ne("").any():
+            fig_n6 = grafica_barras_conteo(pend_ej, 'Jefe_de_Venta', 'Solicitudes pendientes por jefe de venta', top=8)
+            fig_n6.update_traces(marker_color="#38B6FF", textfont_color="#E5E7EB",
+                                 hovertemplate="<b>%{y}</b><br>%{x} solicitudes<extra></extra>")
+            mostrar_grafica(_oscurecer(fig_n6), use_container_width=True)
+        else:
+            estado_vacio("No hay solicitudes pendientes con jefe de venta asignado.")
+
+    # --- Tablas: semáforo de pendientes y rezago crítico ---
+    t1, t2 = st.columns(2)
+    with t1:
+        st.markdown('<div class="neon-sec-title">Semáforo de Solicitudes Pendientes por Canal</div>', unsafe_allow_html=True)
         if not pend_ej.empty:
-            res_pend = pend_ej.groupby(['Canal', 'Movimiento']).size().unstack(fill_value=0).reset_index()
-            res_pend['Total Pendientes'] = res_pend.iloc[:, 1:].sum(axis=1)
-            res_pend = res_pend.sort_values('Total Pendientes', ascending=False)
-            estilo_neon_tbl = res_pend.style.set_properties(**{
-                'background-color': '#0B0F19',
-                'color': '#F3F4F6',
-                'border-color': '#1F2937'
-            }).map(
-                lambda v: 'color: #FF073A; font-weight: bold;' if isinstance(v, (int, float)) and v > 0 else '',
-                subset=['Total Pendientes']
-            )
-            mostrar_tabla(estilo_neon_tbl, use_container_width=True, hide_index=True)
+            res_pend = pend_ej.groupby(['Canal', 'Movimiento']).size().unstack(fill_value=0)
+            res_pend['Total Pendientes'] = res_pend.sum(axis=1)
+            res_pend['Atrasadas'] = pend_ej.groupby('Canal')['_atrasada'].sum().astype(int)
+            res_pend = res_pend.sort_values('Total Pendientes', ascending=False).reset_index()
+            tabla_neon(res_pend, columnas_alerta=("Total Pendientes", "Atrasadas"))
         else:
             st.success("No hay solicitudes pendientes con los filtros aplicados.")
+    with t2:
+        st.markdown('<div class="neon-sec-title">Rezago Crítico: Equipos con Más Días sin Movimiento</div>', unsafe_allow_html=True)
+        if not df_estadia_activa.empty:
+            rez = df_estadia_activa.copy()
+            rez['Días'] = pd.to_numeric(rez['Días sin movimiento'], errors='coerce')
+            rez = rez[rez['Días'] > 40].sort_values('Días', ascending=False).head(10)
+            if not rez.empty:
+                rez['Días'] = rez['Días'].astype(int)
+                tabla_neon(rez[['Serie', 'Modelo', 'Canal', 'Ubicación', 'Días']], columnas_alerta=("Días",))
+            else:
+                st.success("Ningún equipo supera los 40 días sin movimiento.")
+        else:
+            st.success("Sin datos de estadía.")
 
 # 0.5 REPORTES GERENCIALES CENTRALIZADOS (GERENTES Y ADMINISTRADORES)
 elif menu == "Reportes Gerenciales" and (st.session_state['autenticado'] or st.session_state['es_gerente']):
@@ -3215,7 +3357,7 @@ elif menu == "Rendimiento de Choferes" and (st.session_state['autenticado'] or s
         g_r1, g_r2 = st.columns(2)
         with g_r1:
             fig_t = go.Figure()
-            for t_, c_ in zip(TIPOS_SERVICIO, ["#D95F00", "#003B5C", "#16A34A", "#9CA3AF"]):
+            for t_, c_ in zip(TIPOS_SERVICIO, ["#D95F00", COLOR_BARRA, "#16A34A", "#9CA3AF"]):
                 fig_t.add_trace(go.Bar(name=t_.lower(), x=[str(c).lower() for c in resumen['Chofer']], y=resumen[t_], marker_color=c_))
             fig_t = _estilo_grafica(fig_t, "Servicios completados por chofer y tipo", 360)
             fig_t.update_layout(barmode="stack", showlegend=True, legend=dict(orientation="h", y=-0.15))
