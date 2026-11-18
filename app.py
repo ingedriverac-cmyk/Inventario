@@ -2562,7 +2562,7 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             margin-bottom: 14px;
         }
         .neon-kpi .lbl {
-            font-size: 0.88rem;
+            font-size: 0.8rem;
             font-weight: 600;
             color: #9CA3AF;
             text-transform: uppercase;
@@ -2570,7 +2570,7 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             margin-bottom: 4px;
         }
         .neon-kpi .val {
-            font-size: 2.15rem;
+            font-size: 1.9rem;
             font-weight: 800;
             color: var(--nc, #00F5D4);
             text-shadow: 0 0 12px var(--ng, rgba(0, 245, 212, 0.65));
@@ -2704,7 +2704,12 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             prom_ciclo = round(ciclos.dt.total_seconds().mean() / 86400, 1)
             ciclo_dias_txt = f"{prom_ciclo} días"
 
-    k1, k2, k3, k4 = st.columns(4)
+    en_estadia_activa = len(df_estadia_activa)
+    k0, k1, k2, k3, k4 = st.columns(5)
+    with k0:
+        render_kpi_neon("Inventario Total", total_inv, "Equipos registrados en todos los canales",
+                        neon_color="#4D7CFF", neon_glow="rgba(77, 124, 255, 0.4)",
+                        tendencia=f"{en_estadia_activa:,} en estadía activa", tipo_tendencia="neu")
     with k1:
         render_kpi_neon("Equipos Listos para Entrega", total_disp, porcentaje_texto(total_disp, total_inv, "del inventario"),
                         neon_color="#39FF14", neon_glow="rgba(57, 255, 20, 0.35)",
@@ -2724,7 +2729,7 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
                         neon_color="#4D7CFF", neon_glow="rgba(77, 124, 255, 0.4)",
                         tendencia=ciclo_dias_txt, tipo_tendencia="neu")
 
-    # --- Segunda fila de KPIs: inventario, solicitudes, cobertura y horas extras ---
+    # --- Solicitudes pendientes (para el semáforo y la gráfica por jefe de venta) ---
     def _fecha_sol(serie):
         f = pd.to_datetime(serie, errors='coerce', format='ISO8601')
         mal = f.isna() & serie.astype(str).str.strip().ne('')
@@ -2732,51 +2737,13 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             f[mal] = pd.to_datetime(serie[mal], errors='coerce', dayfirst=True)
         return f
 
-    pend_total = pend_ent = pend_lev = pend_ent_sin_serie = atrasadas = 0
     pend_ej = pd.DataFrame()
     if not df_sol_dash.empty:
         _st = df_sol_dash['Status'].astype(str).str.strip().str.lower()
-        _mov = df_sol_dash['Movimiento'].astype(str).str.strip().str.lower()
-        _serie_vacia = df_sol_dash['Serie'].fillna("").astype(str).str.strip().replace("nan", "").eq("")
         _f_sol = _fecha_sol(df_sol_dash['Fecha_Entregado'])
         _pend = _st == 'pendiente'
         pend_ej = df_sol_dash[_pend].copy()
         pend_ej['_atrasada'] = (_f_sol[_pend] < pd.Timestamp(date.today())).fillna(False)
-        pend_total = int(_pend.sum())
-        pend_ent = int((_pend & (_mov == 'entrega')).sum())
-        pend_lev = int((_pend & (_mov == 'levantamiento')).sum())
-        pend_ent_sin_serie = int((_pend & (_mov == 'entrega') & _serie_vacia).sum())
-        atrasadas = int(pend_ej['_atrasada'].sum())
-
-    saldo_cobertura = total_disp - pend_ent_sin_serie
-    horas_total = float(res_cat['Horas extras'].sum()) if not res_cat.empty else 0.0
-    horas_por_serv = horas_total / comp_actual if comp_actual else 0.0
-    n_revisar = int((res_cat['Diagnóstico'] == "Revisar").sum()) if not res_cat.empty else 0
-    en_estadia_activa = len(df_estadia_activa)
-
-    k5, k6, k7, k8 = st.columns(4)
-    with k5:
-        render_kpi_neon("Inventario Total", total_inv, f"{en_estadia_activa:,} en estadía activa",
-                        neon_color="#4D7CFF", neon_glow="rgba(77, 124, 255, 0.4)",
-                        tendencia=f"{total_disp:,} listos para entrega", tipo_tendencia="neu")
-    with k6:
-        render_kpi_neon("Solicitudes Pendientes", pend_total, f"{pend_ent:,} entregas · {pend_lev:,} levantamientos",
-                        neon_color="#FFC400", neon_glow="rgba(255, 196, 0, 0.38)",
-                        tendencia=f"{atrasadas:,} atrasadas" if atrasadas else "Al día",
-                        tipo_tendencia="neg" if atrasadas else "pos")
-    with k7:
-        _ok_cob = saldo_cobertura >= 0
-        render_kpi_neon("Cobertura de Entregas", f"{saldo_cobertura:+,d}",
-                        f"{total_disp:,} listos vs {pend_ent_sin_serie:,} entregas pendientes sin serie",
-                        neon_color="#39FF14" if _ok_cob else "#FF073A",
-                        neon_glow="rgba(57, 255, 20, 0.35)" if _ok_cob else "rgba(255, 7, 58, 0.38)",
-                        tendencia="Cobertura suficiente" if _ok_cob else f"Faltan {-saldo_cobertura:,} equipos",
-                        tipo_tendencia="pos" if _ok_cob else "neg")
-    with k8:
-        render_kpi_neon("Horas Extras Catorcena", f"{horas_total:,.1f} h", f"{horas_por_serv:.2f} h extra por servicio",
-                        neon_color="#FF7F00", neon_glow="rgba(255, 127, 0, 0.4)",
-                        tendencia=f"{n_revisar} chofer(es) por revisar" if n_revisar else "Sin alertas",
-                        tipo_tendencia="neg" if n_revisar else "pos")
 
     def _oscurecer(fig, color_titulo="#FF9E00"):
         """Fondo y ejes oscuros para que las gráficas combinen con el tema neón del dashboard."""
@@ -2785,6 +2752,8 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
         fig.update_xaxes(gridcolor="#1F2937", color="#D1D5DB")
         fig.update_yaxes(gridcolor="#1F2937", color="#D1D5DB")
         return fig
+
+    PALETA_NEON = ["#38B6FF", "#FF9E00", "#39FF14", "#B26BFF", "#FF5C8A", "#00E5C3", "#FFC400", "#4D7CFF"]
 
     def tabla_neon(df, columnas_alerta=()):
         """Tabla HTML en estilo neón (el encabezado de st.dataframe no se puede colorear)."""
@@ -2837,8 +2806,17 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
     g_ej3, g_ej4 = st.columns(2)
     with g_ej3:
         if not df_dias_dash.empty:
-            fig_n3 = grafica_barras_conteo(df_dias_dash, 'Ubicación', 'Inventario por ubicación')
-            fig_n3.update_traces(marker_color="#38B6FF", textfont_color="#E5E7EB")
+            c_ub = df_dias_dash['Ubicación'].replace('', pd.NA).dropna().value_counts()
+            fig_n3 = go.Figure(go.Pie(
+                labels=list(c_ub.index), values=list(c_ub.values), hole=0.58, sort=False,
+                marker=dict(colors=PALETA_NEON[:len(c_ub)], line=dict(color="#0B0F19", width=2)),
+                textinfo="percent", textfont=dict(color="#05050A", size=13),
+                hovertemplate="<b>%{label}</b><br>%{value} equipos (%{percent})<extra></extra>",
+            ))
+            _estilo_grafica(fig_n3, "Inventario por ubicación", 360)
+            fig_n3.update_layout(showlegend=True, legend=dict(orientation="v", y=0.5, x=1.0, font=dict(color="#E5E7EB")))
+            fig_n3.add_annotation(text=f"<b>{int(c_ub.sum()):,}</b><br>equipos", showarrow=False,
+                                  font=dict(size=18, color="#F3F4F6"))
             mostrar_grafica(_oscurecer(fig_n3), use_container_width=True)
         else:
             estado_vacio("Sin datos de inventario.")
@@ -2866,16 +2844,42 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
     g_ej5, g_ej6 = st.columns(2)
     with g_ej5:
         if not df_dias_dash.empty and total_disp > 0:
-            fig_n5 = grafica_barras_conteo(df_dias_dash[cond_disp], 'Modelo', 'Modelos con más equipos listos', top=8)
-            fig_n5.update_traces(marker_color="#38B6FF", textfont_color="#E5E7EB")
+            c_mod = df_dias_dash[cond_disp]['Modelo'].replace('', pd.NA).dropna().value_counts().head(12)
+            fig_n5 = go.Figure(go.Treemap(
+                labels=[str(m).upper() for m in c_mod.index], parents=[""] * len(c_mod), values=list(c_mod.values),
+                marker=dict(colors=[PALETA_NEON[i % len(PALETA_NEON)] for i in range(len(c_mod))],
+                            line=dict(color="#0B0F19", width=3)),
+                texttemplate="<b>%{label}</b><br>%{value}", textfont=dict(color="#05050A", size=14),
+                hovertemplate="<b>%{label}</b><br>%{value} equipos listos<extra></extra>",
+                tiling=dict(pad=2),
+            ))
+            _estilo_grafica(fig_n5, "Modelos con más equipos listos", 360)
+            fig_n5.update_layout(margin=dict(t=64, l=8, r=8, b=8))
             mostrar_grafica(_oscurecer(fig_n5), use_container_width=True)
         else:
             estado_vacio("Sin equipos disponibles con los filtros actuales.")
     with g_ej6:
-        if not pend_ej.empty and pend_ej['Jefe_de_Venta'].astype(str).str.strip().replace("nan", "").ne("").any():
-            fig_n6 = grafica_barras_conteo(pend_ej, 'Jefe_de_Venta', 'Solicitudes pendientes por jefe de venta', top=8)
-            fig_n6.update_traces(marker_color="#38B6FF", textfont_color="#E5E7EB",
-                                 hovertemplate="<b>%{y}</b><br>%{x} solicitudes<extra></extra>")
+        _jefes_ok = (not pend_ej.empty) and pend_ej['Jefe_de_Venta'].astype(str).str.strip().replace("nan", "").ne("").any()
+        if _jefes_ok:
+            pj = pend_ej[pend_ej['Jefe_de_Venta'].astype(str).str.strip().replace("nan", "").ne("")]
+            tab_j = pj.groupby(['Jefe_de_Venta', 'Movimiento']).size().unstack(fill_value=0)
+            tab_j = tab_j.loc[tab_j.sum(axis=1).sort_values(ascending=False).head(8).index]
+            colores_mov = {"Entrega": "#FF9E00", "Levantamiento": "#38B6FF", "Reubicación": "#B26BFF"}
+            fig_n6 = go.Figure()
+            for i, mov in enumerate(tab_j.columns):
+                vals = tab_j[mov]
+                fig_n6.add_trace(go.Bar(
+                    x=[str(j).upper() for j in tab_j.index], y=vals, name=str(mov),
+                    marker_color=colores_mov.get(mov, PALETA_NEON[(i + 3) % len(PALETA_NEON)]),
+                    text=[str(v) if v > 0 else "" for v in vals], textposition="inside",
+                    textfont=dict(color="#05050A"),
+                    hovertemplate="<b>%{x}</b><br>" + str(mov) + ": %{y}<extra></extra>",
+                ))
+            fig_n6.update_layout(barmode="stack")
+            fig_n6.update_yaxes(title=None, showgrid=True, zeroline=False)
+            fig_n6.update_xaxes(title=None)
+            _estilo_grafica(fig_n6, "Solicitudes pendientes por jefe de venta", 360)
+            fig_n6.update_layout(showlegend=True, legend=dict(orientation="h", y=1.14, x=0, font=dict(color="#E5E7EB")))
             mostrar_grafica(_oscurecer(fig_n6), use_container_width=True)
         else:
             estado_vacio("No hay solicitudes pendientes con jefe de venta asignado.")
