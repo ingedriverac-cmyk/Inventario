@@ -2131,15 +2131,8 @@ if st.session_state['autenticado'] or st.session_state['es_gerente']:
         unsafe_allow_html=True
     )
 
-    with st.sidebar.expander("🌐 Filtros Globales de Consulta", expanded=False):
-        canales_glob = ["Todos"] + [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
-        filtro_global_canal = st.selectbox("Canal Global:", canales_glob, key="glob_canal")
-        df_sol_tmp = cargar_solicitudes()
-        jefes_glob = ["Todos"] + sorted({
-            str(j).strip() for j in df_sol_tmp['Jefe_de_Venta'].dropna()
-            if str(j).strip() and str(j).strip().lower() != "nan"
-        }) if not df_sol_tmp.empty else ["Todos"]
-        filtro_global_jefe = st.selectbox("Jefe de Venta:", jefes_glob, key="glob_jefe")
+    # Espacio reservado en la barra lateral: los filtros globales se dibujan aquí solo si el menú es Dashboard Ejecutivo
+    ph_filtros_globales = st.sidebar.container()
 
     # Menú agrupado por categorías para reducir la carga visual
     if st.session_state['autenticado']:
@@ -2195,6 +2188,25 @@ if st.session_state['autenticado'] or st.session_state['es_gerente']:
         key="nav_seccion",
         label_visibility="collapsed"
     )
+
+    # Filtros Globales de Consulta: solo visibles (y activos) en el Dashboard Ejecutivo
+    if menu == "Dashboard Ejecutivo":
+        with ph_filtros_globales.expander("🌐 Filtros Globales de Consulta", expanded=False):
+            canales_glob = ["Todos"] + [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
+            df_sol_tmp = cargar_solicitudes()
+            jefes_glob = ["Todos"] + sorted({
+                str(j).strip() for j in df_sol_tmp['Jefe_de_Venta'].dropna()
+                if str(j).strip() and str(j).strip().lower() != "nan"
+            }) if not df_sol_tmp.empty else ["Todos"]
+            # Streamlit borra el valor de un filtro cuando no se dibuja; se restaura al volver al Dashboard
+            for _kf, _opciones in (("glob_canal", canales_glob), ("glob_jefe", jefes_glob)):
+                _guardado = st.session_state.get("_keep_" + _kf)
+                if _kf not in st.session_state and _guardado in _opciones:
+                    st.session_state[_kf] = _guardado
+            filtro_global_canal = st.selectbox("Canal Global:", canales_glob, key="glob_canal")
+            filtro_global_jefe = st.selectbox("Jefe de Venta:", jefes_glob, key="glob_jefe")
+            st.session_state["_keep_glob_canal"] = filtro_global_canal
+            st.session_state["_keep_glob_jefe"] = filtro_global_jefe
 
     if st.sidebar.button("Cerrar sesión"):
         st.session_state['autenticado'] = False
@@ -2321,8 +2333,8 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
         }
         .neon-hero {
             background: linear-gradient(135deg, #090D16 0%, #111827 60%, #1A1025 100%);
-            border: 1px solid #00F5D4;
-            box-shadow: 0 0 18px rgba(0, 245, 212, 0.28), inset 0 0 12px rgba(255, 127, 0, 0.15);
+            border: 2px solid #FF7F00;
+            box-shadow: 0 0 8px rgba(255, 127, 0, 0.75), 0 0 22px rgba(255, 127, 0, 0.45), inset 0 0 14px rgba(255, 127, 0, 0.25);
             border-radius: 14px;
             padding: 22px 28px;
             margin-bottom: 20px;
@@ -2333,8 +2345,8 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             gap: 14px;
         }
         .neon-hero h2 {
-            color: #00F5D4 !important;
-            text-shadow: 0 0 10px rgba(0, 245, 212, 0.75);
+            color: #FF7F00 !important;
+            text-shadow: 0 0 6px rgba(255, 127, 0, 0.95), 0 0 14px rgba(255, 127, 0, 0.7), 0 0 28px rgba(255, 127, 0, 0.45);
             margin: 0 0 4px 0 !important;
             font-size: 1.8rem;
             font-weight: 700;
@@ -2345,10 +2357,11 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             font-size: 0.98rem;
         }
         .neon-hero .nh-date {
-            background: rgba(0, 245, 212, 0.12);
-            border: 1px solid #00F5D4;
-            color: #00F5D4;
-            box-shadow: 0 0 10px rgba(0, 245, 212, 0.35);
+            background: rgba(255, 127, 0, 0.12);
+            border: 2px solid #FF7F00;
+            color: #FF7F00;
+            text-shadow: 0 0 8px rgba(255, 127, 0, 0.85);
+            box-shadow: 0 0 8px rgba(255, 127, 0, 0.7), 0 0 18px rgba(255, 127, 0, 0.4);
             padding: 6px 14px;
             border-radius: 999px;
             font-size: 0.85rem;
@@ -2396,6 +2409,18 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
         .neon-kpi .trend.pos { background: rgba(57, 255, 20, 0.12); color: #39FF14; text-shadow: 0 0 6px rgba(57, 255, 20, 0.6); }
         .neon-kpi .trend.neg { background: rgba(255, 7, 58, 0.14); color: #FF073A; text-shadow: 0 0 6px rgba(255, 7, 58, 0.6); }
         .neon-kpi .trend.neu { background: rgba(0, 245, 212, 0.12); color: #00F5D4; text-shadow: 0 0 6px rgba(0, 245, 212, 0.6); }
+        /* Gráfica "Disponibilidad lista por canal": contorno naranja neón y barras azul rey neón con resplandor */
+        [data-testid="stColumn"]:has(.marca-disp-canal) [data-testid="stPlotlyChart"],
+        [data-testid="column"]:has(.marca-disp-canal) [data-testid="stPlotlyChart"] {
+            border: 2px solid #FF7F00;
+            border-radius: 12px;
+            box-shadow: 0 0 8px rgba(255, 127, 0, 0.75), 0 0 22px rgba(255, 127, 0, 0.4), inset 0 0 12px rgba(255, 127, 0, 0.18);
+            overflow: hidden;
+        }
+        [data-testid="stColumn"]:has(.marca-disp-canal) .barlayer path,
+        [data-testid="column"]:has(.marca-disp-canal) .barlayer path {
+            filter: drop-shadow(0 0 5px #1F51FF) drop-shadow(0 0 12px rgba(31, 81, 255, 0.85));
+        }
         .neon-sec-title {
             color: #FF9E00 !important;
             text-shadow: 0 0 10px rgba(255, 158, 0, 0.7);
@@ -2500,12 +2525,14 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
     g_ej1, g_ej2 = st.columns(2)
     with g_ej1:
         if not df_dias_dash.empty and total_disp > 0:
+            st.markdown('<span class="marca-disp-canal"></span>', unsafe_allow_html=True)
             fig_n1 = grafica_barras_conteo(df_dias_dash[cond_disp], 'Canal', 'Disponibilidad lista por canal', top=10)
-            fig_n1.update_traces(marker_color="#00F5D4", textfont_color="#00F5D4")
+            fig_n1.update_traces(marker_color="#1F51FF", marker_line_color="#4D7CFF", marker_line_width=1.5,
+                                 textfont_color="#7FA0FF")
             fig_n1.update_layout(
                 paper_bgcolor="#0B0F19", plot_bgcolor="#0B0F19",
                 font=dict(color="#E5E7EB"),
-                title=dict(font=dict(color="#00F5D4", size=16)),
+                title=dict(font=dict(color="#FF7F00", size=16)),
                 xaxis=dict(gridcolor="#1F2937", color="#9CA3AF"),
                 yaxis=dict(color="#F3F4F6")
             )
