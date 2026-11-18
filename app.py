@@ -2912,7 +2912,9 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             rez = rez[rez['Días'] > 40].sort_values('Días', ascending=False).head(10)
             if not rez.empty:
                 rez['Días'] = rez['Días'].astype(int)
-                tabla_neon(rez[['Serie', 'Modelo', 'Canal', 'Ubicación', 'Días']], columnas_alerta=("Días",))
+                # Año solo para Enfriadores; Vending, Postmix e Hidro quedan en blanco
+                rez['Año'] = rez['Año'].fillna("").astype(str).replace("nan", "")
+                tabla_neon(rez[['Modelo', 'Año', 'Canal', 'Ubicación', 'Días']], columnas_alerta=("Días",))
             else:
                 st.success("Ningún equipo supera los 40 días sin movimiento.")
         else:
