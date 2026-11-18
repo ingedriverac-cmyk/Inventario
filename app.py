@@ -42,8 +42,8 @@ st.markdown("""
     @import url('https://fonts.googleapis.com/css2?family=Source+Sans+3:wght@400;500;600;700&display=swap');
 
     :root {
-        --azul: #1F2937;
-        --azul-osc: #111827;
+        --tinta: #1F2937;
+        --tinta-osc: #111827;
         --naranja: #FF7F00;
         --naranja-osc: #D95F00;
         --naranja-int: #F25C00;
@@ -78,7 +78,7 @@ st.markdown("""
     }
 
     /* Títulos */
-    h1, h2, h3, h4 { color: var(--azul); letter-spacing: -0.01em; }
+    h1, h2, h3, h4 { color: var(--tinta); letter-spacing: -0.01em; }
     h3 { font-weight: 700; }
     hr { border-color: var(--borde) !important; margin: 1.2rem 0 !important; }
 
@@ -102,7 +102,7 @@ st.markdown("""
         padding: 0 !important;
         font-size: 1.9rem;
         font-weight: 700;
-        color: var(--azul);
+        color: var(--tinta);
     }
     .top-bar-naranja .app-header p {
         margin: 4px 0 0 0;
@@ -275,7 +275,7 @@ st.markdown("""
     [data-testid="stDialog"] [data-testid="stImage"] img, [role="dialog"] [data-testid="stImage"] img { max-height: 52vh; width: auto !important;
         max-width: 100%; object-fit: contain; border-radius: 10px; }
     .sp-count { color: var(--texto-sec); font-size: .9rem; margin: 4px 0 14px 0; }
-    .sp-count b { color: var(--azul); }
+    .sp-count b { color: var(--tinta); }
     .sp-card { background: #FFFFFF; border: 1px solid var(--borde); border-radius: 14px; overflow: hidden;
         box-shadow: 0 1px 3px rgba(16,24,40,.06); transition: transform .15s ease, box-shadow .15s ease;
         margin-bottom: 8px; }
@@ -287,7 +287,7 @@ st.markdown("""
     .sp-noimg .ic { font-size: 2.4rem; display: block; margin-bottom: 4px; opacity: .8; }
     .sp-body { padding: 16px 18px 18px 18px; }
     .sp-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 14px; }
-    .sp-model { font-size: 1.35rem; font-weight: 700; color: var(--azul); line-height: 1.1; }
+    .sp-model { font-size: 1.35rem; font-weight: 700; color: var(--tinta); line-height: 1.1; }
     .sp-badge { background: #FDECEE; color: var(--rojo); font-size: .68rem; font-weight: 700; letter-spacing: .04em;
         text-transform: uppercase; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
     .sp-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -299,8 +299,8 @@ st.markdown("""
     /* ===== Datos en MAYÚSCULAS (solo visual; títulos y descripciones se quedan igual) ===== */
     .stTextInput input:not([type="password"]), .stTextArea textarea { text-transform: uppercase; }
     .stTextInput input::placeholder, .stTextArea textarea::placeholder { text-transform: none; }
-    [data-baseweb="select"] div, [data-baseweb="select"] span, [data-baseweb="tag"] span,
-    ul[role="listbox"] li { text-transform: uppercase; }
+    /* Las listas desplegables ya no van en mayúsculas (más legibles con listas largas). Para volver: agregar
+       [data-baseweb="select"] div, [data-baseweb="select"] span, [data-baseweb="tag"] span, ul[role="listbox"] li { text-transform: uppercase; } */
     [data-testid="stMetricValue"] { text-transform: uppercase; }
     [data-testid="stSidebar"] .stTextInput input { text-transform: none !important; }
 
@@ -405,6 +405,74 @@ st.markdown("""
     /* Contenedores */
     [data-testid="stExpander"] { background: #FFFFFF; border: 1px solid var(--borde); border-radius: 8px; }
     [data-testid="stDataFrame"] { border: 1px solid var(--borde); border-radius: 8px; overflow: hidden; }
+
+    /* ===== Mejoras de diseño: contraste, filtros claros, móvil, tarjetas ===== */
+    :root { --naranja-btn: #D95F00; --naranja-btn-osc: #B84F00; --filtro: #FFFFFF; }
+    div.stButton > button, div.stFormSubmitButton > button, div.stDownloadButton > button { background-color: var(--naranja-btn) !important; }
+    div.stButton > button:hover, div.stFormSubmitButton > button:hover, div.stDownloadButton > button:hover { background-color: var(--naranja-btn-osc) !important; }
+    [data-testid="stSidebar"] div.stButton > button, [data-testid="stSidebar"] div.stFormSubmitButton > button { background-color: var(--naranja-btn) !important; }
+    [data-testid="stSidebar"] div.stButton > button:hover, [data-testid="stSidebar"] div.stFormSubmitButton > button:hover { background-color: var(--naranja-btn-osc) !important; }
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary { background-color: var(--naranja-btn) !important; }
+    [data-testid="stSidebar"] [data-testid="stExpander"] summary:hover { background-color: var(--naranja-btn-osc) !important; }
+    .page-hero { background: linear-gradient(135deg, #B84F00 0%, #D95F00 55%, #E8700A 100%); }
+    .page-hero p { color: #FFFFFF !important; }
+    .page-hero .ph-crumb { font-size: .74rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #FFE9D1; margin-bottom: 4px; }
+
+    /* Filtros: campos blancos con borde gris y aro naranja al seleccionarlos */
+    [data-baseweb="select"] > div, [data-baseweb="input"], [data-baseweb="textarea"] { border: 1px solid #9AA3AF !important; }
+    [data-baseweb="select"] > div:focus-within, [data-baseweb="input"]:focus-within, [data-baseweb="textarea"]:focus-within {
+        border-color: var(--naranja-btn) !important; box-shadow: 0 0 0 3px rgba(217, 95, 0, 0.25) !important; }
+
+    /* Estados vacíos */
+    .estado-vacio { display: flex; align-items: center; gap: 14px; background: #FFFFFF; border: 1px dashed #C3C9D1;
+        border-radius: 12px; padding: 18px 20px; margin: 8px 0 14px 0; color: #4B5563; }
+    .estado-vacio .ev-ic { width: 44px; height: 44px; border-radius: 50%; background: #FFE6CC; color: #D95F00;
+        display: flex; align-items: center; justify-content: center; flex: none; }
+    .estado-vacio .ev-tx { font-size: .98rem; line-height: 1.4; }
+
+    /* Bienvenida (usuarios generales) y acceso en la barra lateral */
+    .bienvenida { display: flex; gap: 16px; align-items: center; background: #FFFFFF; border: 1px solid var(--borde);
+        border-left: 5px solid var(--naranja-btn); border-radius: 12px; padding: 14px 18px; margin-bottom: 14px;
+        box-shadow: 0 1px 4px rgba(17, 24, 39, 0.08); }
+    .bienvenida .ic { width: 46px; height: 46px; border-radius: 50%; background: #FFE6CC; color: #D95F00;
+        display: flex; align-items: center; justify-content: center; flex: none; }
+    .bienvenida .t { font-weight: 700; font-size: 1.05rem; color: var(--tinta); }
+    .bienvenida .s { color: var(--texto-sec); font-size: .9rem; line-height: 1.4; }
+    .acceso-card { display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; color: #FFFFFF;
+        background: rgba(255, 255, 255, 0.10); border: 1px solid rgba(255, 138, 0, 0.6); border-radius: 8px;
+        padding: 8px 12px; margin-bottom: 8px; }
+
+    /* Vista de chofer: saludo, tarjetas grandes y sin menú de una sola opción */
+    [class*="st-key-nav_chofer"] { display: none; }
+    .chofer-hola { display: flex; gap: 14px; align-items: center; background: linear-gradient(135deg, #111827, #1F2937);
+        color: #FFFFFF; border-radius: 14px; padding: 16px 20px; margin-bottom: 12px; border-bottom: 3px solid #FF7F00; }
+    .chofer-hola .ic { width: 48px; height: 48px; border-radius: 50%; background: #D95F00; color: #FFFFFF;
+        display: flex; align-items: center; justify-content: center; flex: none; }
+    .chofer-hola .hi { font-size: 1.25rem; font-weight: 700; }
+    .chofer-hola .sb { font-size: .9rem; color: #D1D5DB; line-height: 1.35; }
+    .sol-card { background: #FFFFFF; border: 1px solid var(--borde); border-left: 6px solid var(--sc, #9CA3AF);
+        border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; box-shadow: 0 1px 4px rgba(17, 24, 39, 0.08); }
+    .sol-card .hd { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .sol-card .cl { font-weight: 700; font-size: 1.05rem; color: var(--tinta); text-transform: uppercase; }
+    .sol-card .st { font-size: .72rem; font-weight: 700; padding: 3px 10px; border-radius: 999px; background: var(--sb);
+        color: var(--sc); text-transform: uppercase; white-space: nowrap; }
+    .sol-card .gr { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 14px; margin-top: 10px; }
+    .sol-card .k { font-size: .66rem; font-weight: 600; color: var(--texto-sec); text-transform: uppercase; letter-spacing: .04em; }
+    .sol-card .v { font-size: .95rem; font-weight: 600; color: var(--texto); text-transform: uppercase; word-break: break-word; }
+    .sol-card .mo { margin-top: 10px; font-size: .88rem; color: #374151; background: #F5F7FA; border-radius: 8px; padding: 8px 10px; }
+
+    /* Celular: banners compactos y botones fáciles de tocar */
+    @media (max-width: 640px) {
+        .page-hero { padding: 16px 18px; border-radius: 12px; flex-direction: column; align-items: flex-start; gap: 10px; }
+        .page-hero:before, .page-hero:after { display: none; }
+        .page-hero h2 { font-size: 1.25rem; }
+        .page-hero p { font-size: .88rem; }
+        .page-hero .ph-ic { width: 38px; height: 38px; }
+        .page-hero .ph-date { font-size: .78rem; }
+        div.stButton > button, div.stFormSubmitButton > button, div.stDownloadButton > button { min-height: 48px; font-size: 1rem; }
+        [data-baseweb="select"] > div { min-height: 46px; }
+        .bienvenida, .chofer-hola { padding: 12px 14px; }
+    }
     </style>
 """, unsafe_allow_html=True)
 
@@ -485,6 +553,8 @@ _ICONOS_SVG = {
     "choferes": '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
     "taller": '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
     "imagen": '<rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/>',
+    "usuario": '<circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/>',
+    "bandeja": '<polyline points="22 12 16 12 14 15 10 15 8 12 2 12"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/>',
     "alerta": '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
 }
 
@@ -514,12 +584,94 @@ def config_barras(df, columnas, formato="%d", maximo=None):
 def render_banner(icono, titulo, subtitulo=""):
     """Banner naranja de encabezado de cada apartado, con la fecha de la información a la derecha."""
     sub = f"<p>{subtitulo}</p>" if subtitulo else ""
+    ruta = ""
+    if st.session_state.get('autenticado') or st.session_state.get('es_gerente'):
+        _cat, _sec = st.session_state.get('nav_categoria'), st.session_state.get('nav_seccion')
+        if _cat and _sec:
+            ruta = f'<div class="ph-crumb">{_html.escape(str(_cat))} › {_html.escape(str(_sec))}</div>'
     st.markdown(
         f'<div class="page-hero"><div class="ph-left"><div class="ph-ic">{svg_icono(icono, 24)}</div>'
-        f'<div class="ph-txt"><h2>{titulo}</h2>{sub}</div></div>'
+        f'<div class="ph-txt">{ruta}<h2>{titulo}</h2>{sub}</div></div>'
         f'<div class="ph-date">{svg_icono("calendario", 14)}Información al {datetime.now().strftime("%d/%m/%Y")}</div></div>',
         unsafe_allow_html=True
     )
+    _resumen_gerencia()
+
+
+def estado_vacio(mensaje, icono="bandeja"):
+    """Tarjeta de 'sin datos' con icono (reemplaza los avisos azules simples)."""
+    st.markdown(
+        f'<div class="estado-vacio"><div class="ev-ic">{svg_icono(icono, 22)}</div>'
+        f'<div class="ev-tx">{_html.escape(str(mensaje))}</div></div>',
+        unsafe_allow_html=True
+    )
+
+
+def _color_status_tarjeta(status):
+    v = str(status).strip().lower()
+    if v == 'pendiente':
+        return "#B45309", "#FEF3C7"
+    if v in ('entregado', 'levantado', 'realizado', 'transferido'):
+        return "#047857", "#D1FAE5"
+    if v == 'cancelado':
+        return "#B91C1C", "#FEE2E2"
+    return "#4B5563", "#E5E7EB"
+
+
+def tarjetas_solicitudes(df):
+    """Solicitudes del día como tarjetas grandes (vista de chofer en celular)."""
+    for _, r in df.iterrows():
+        def g(c):
+            v = r.get(c, "")
+            v = "" if pd.isna(v) else str(v).strip()
+            return _html.escape(v) if v and v.lower() != "nan" else "—"
+        color, fondo = _color_status_tarjeta(r.get('Status', ''))
+        motivo = g('Motivo / Comentarios')
+        bloque_motivo = f'<div class="mo">{motivo}</div>' if motivo != "—" else ""
+        st.markdown(
+            f'<div class="sol-card" style="--sc:{color};--sb:{fondo};">'
+            f'<div class="hd"><div class="cl">{g("Cliente")}</div><div class="st">{g("Status")}</div></div>'
+            f'<div class="gr">'
+            f'<div><div class="k">CUC</div><div class="v">{g("CUC")}</div></div>'
+            f'<div><div class="k">Movimiento</div><div class="v">{g("Movimiento")}</div></div>'
+            f'<div><div class="k">Modelo</div><div class="v">{g("Modelo")}</div></div>'
+            f'<div><div class="k">Serie</div><div class="v">{g("Serie")}</div></div>'
+            f'<div><div class="k">Canal</div><div class="v">{g("Canal")}</div></div>'
+            f'<div><div class="k">Año</div><div class="v">{g("Año")}</div></div>'
+            f'</div>{bloque_motivo}</div>',
+            unsafe_allow_html=True
+        )
+
+
+SECCIONES_CON_RESUMEN = {"Rendimiento de Choferes", "Estadía", "Equipos Disponibles", "Solicitudes Diarias",
+                         "Necesidades de Taller", "Inventario General"}
+
+def _resumen_gerencia():
+    """Fila de KPI al inicio de las secciones de consulta, solo para Gerencia."""
+    try:
+        if not st.session_state.get('es_gerente') or st.session_state.get('autenticado'):
+            return
+        if st.session_state.get('nav_seccion') not in SECCIONES_CON_RESUMEN:
+            return
+        inv = df_inv
+        listos = criticos = taller = 0
+        if inv is not None and not inv.empty:
+            es = inv['Estatus'].astype(str).str.strip().str.lower()
+            listos = int((inv['Ubicación'].isin(["En almacén de Comodatos", "En almacén de Publicidad", "En patios"]) & es.isin(['nuevo', 'reparado'])).sum())
+            taller = int((es == 'para reparar').sum())
+        pend = 0
+        sol = cargar_solicitudes()
+        if sol is not None and not sol.empty:
+            pend = int((sol['Status'].astype(str).str.strip().str.lower() == 'pendiente').sum())
+        c1, c2, c3 = st.columns(3)
+        with c1:
+            render_kpi("Equipos listos", listos, "En almacén o patios, Nuevo o Reparado", "#16A34A")
+        with c2:
+            render_kpi("Por reparar", taller, "Estatus Para Reparar", "#D95F00")
+        with c3:
+            render_kpi("Solicitudes pendientes", pend, "Todas las fechas", "#F59E0B")
+    except Exception:
+        pass
 
 
 try:
@@ -610,9 +762,30 @@ def porcentaje_texto(parte, total, sufijo="del total"):
     return f"{parte / total * 100:.1f}% {sufijo}" if total else ""
 
 
+ICONOS_MENU = {
+    "Dashboard Ejecutivo": ":material/dashboard:",
+    "Rendimiento de Choferes": ":material/speed:",
+    "Estadía": ":material/schedule:",
+    "Reportes Gerenciales": ":material/description:",
+    "Equipos Disponibles": ":material/inventory_2:",
+    "Solicitudes Diarias": ":material/today:",
+    "Necesidades de Taller": ":material/build:",
+    "Inventario General": ":material/warehouse:",
+    "Solicitudes": ":material/assignment:",
+    "Levantamientos": ":material/fact_check:",
+    "Registrar Entrada": ":material/move_to_inbox:",
+    "Registrar Salida": ":material/outbox:",
+    "Editar / Eliminar": ":material/edit:",
+    "Catálogo de Equipos": ":material/menu_book:",
+    "Historial de Movimientos": ":material/history:",
+    "Exportar a Excel": ":material/download:",
+}
+
 def _etiqueta_menu(opcion):
-    """El emoji inicial de la opción de menú solo para mostrar (el valor interno no cambia)."""
-    return re.sub(r'^[^\w]+', '', str(opcion)).strip()
+    """Texto de la opción de menú con su icono Material, solo para mostrar (el valor interno no cambia)."""
+    base = re.sub(r'^[^\w]+', '', str(opcion)).strip()
+    ic = ICONOS_MENU.get(base)
+    return f"{ic} {base}" if ic else base
 
 
 def _estilo_grafica(fig, titulo=None, alto=360):
@@ -2137,18 +2310,18 @@ if st.session_state['autenticado'] or st.session_state['es_gerente']:
     # Menú agrupado por categorías para reducir la carga visual
     if st.session_state['autenticado']:
         categorias_menu = {
-            "📊 Gerencia y Análisis": [
+            "Gerencia y Análisis": [
                 "Dashboard Ejecutivo",
                 "Rendimiento de Choferes",
                 "Estadía",
                 "Reportes Gerenciales"
             ],
-            "📦 Operación Diaria": [
+            "Operación Diaria": [
                 "Equipos Disponibles",
                 "Solicitudes Diarias",
                 "Necesidades de Taller"
             ],
-            "📝 Gestión y Movimientos": [
+            "Gestión y Movimientos": [
                 "Inventario General",
                 "Solicitudes",
                 "Levantamientos",
@@ -2156,7 +2329,7 @@ if st.session_state['autenticado'] or st.session_state['es_gerente']:
                 "Registrar Salida",
                 "Editar / Eliminar"
             ],
-            "⚙️ Catálogos y Bitácora": [
+            "Catálogos y Bitácora": [
                 "Catálogo de Equipos",
                 "Historial de Movimientos",
                 "Exportar a Excel"
@@ -2165,13 +2338,13 @@ if st.session_state['autenticado'] or st.session_state['es_gerente']:
     else:
         # Menú exclusivo para Gerentes (100% consulta, sin vistas de captura/edición)
         categorias_menu = {
-            "📊 Gerencia y Análisis": [
+            "Gerencia y Análisis": [
                 "Dashboard Ejecutivo",
                 "Rendimiento de Choferes",
                 "Estadía",
                 "Reportes Gerenciales"
             ],
-            "📦 Consulta Operativa": [
+            "Consulta Operativa": [
                 "Equipos Disponibles",
                 "Solicitudes Diarias",
                 "Necesidades de Taller",
@@ -2191,7 +2364,7 @@ if st.session_state['autenticado'] or st.session_state['es_gerente']:
 
     # Filtros Globales de Consulta: solo visibles (y activos) en el Dashboard Ejecutivo
     if menu == "Dashboard Ejecutivo":
-        with ph_filtros_globales.expander("🌐 Filtros Globales de Consulta", expanded=False):
+        with ph_filtros_globales.expander(":material/public: Filtros Globales de Consulta", expanded=False):
             canales_glob = ["Todos"] + [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
             df_sol_tmp = cargar_solicitudes()
             jefes_glob = ["Todos"] + sorted({
@@ -2253,7 +2426,7 @@ else:
     )
     
     st.sidebar.markdown("---")
-    st.sidebar.markdown("<p style='color: #FFFFFF; font-weight: bold; text-align: center;'>Acceso al sistema</p>", unsafe_allow_html=True)
+    st.sidebar.markdown(f'<div class="acceso-card">{svg_icono("usuario", 18)}Acceso al sistema</div>', unsafe_allow_html=True)
     
     tipo_acceso = st.sidebar.radio("Tipo de Acceso:", ["Gerencia", "Administrativo", "Chofer en Ruta"], horizontal=True)
     if not USUARIOS_AUTORIZADOS and not CHOFERES_AUTORIZADOS:
@@ -2318,6 +2491,17 @@ st.sidebar.markdown(
     </p></div>""",
     unsafe_allow_html=True
 )
+
+# Bienvenida para usuarios generales (sin sesión) en la pantalla de inicio
+if not (st.session_state['autenticado'] or st.session_state['es_chofer'] or st.session_state['es_gerente']) and menu == "Equipos Disponibles":
+    st.markdown(
+        f'<div class="bienvenida"><div class="ic">{svg_icono("usuario", 24)}</div><div>'
+        '<div class="t">Bienvenido al control de Comodatos</div>'
+        '<div class="s">Consulta equipos disponibles, estadía y necesidades de taller. Si eres gerente, administrador o chofer, '
+        'abre el menú lateral (en el celular, la flecha de arriba a la izquierda) y entra en «Acceso al sistema».</div>'
+        '</div></div>',
+        unsafe_allow_html=True
+    )
 
 # 0. DASHBOARD EJECUTIVO (GERENTES Y ADMINISTRADORES)
 if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.session_state['es_gerente']):
@@ -2408,7 +2592,14 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
         }
         .neon-kpi .trend.pos { background: rgba(57, 255, 20, 0.12); color: #39FF14; text-shadow: 0 0 6px rgba(57, 255, 20, 0.6); }
         .neon-kpi .trend.neg { background: rgba(255, 7, 58, 0.14); color: #FF073A; text-shadow: 0 0 6px rgba(255, 7, 58, 0.6); }
-        .neon-kpi .trend.neu { background: rgba(0, 245, 212, 0.12); color: #00F5D4; text-shadow: 0 0 6px rgba(0, 245, 212, 0.6); }
+        .neon-kpi .trend.neu { background: rgba(77, 124, 255, 0.14); color: #7FA0FF; text-shadow: 0 0 6px rgba(77, 124, 255, 0.6); }
+        .neon-hero h2 svg { vertical-align: -5px; margin-right: 10px; filter: drop-shadow(0 0 6px rgba(255, 127, 0, 0.9)); }
+        .estado-vacio { background: #0B0F19; border: 1px dashed #374151; color: #9CA3AF; }
+        .estado-vacio .ev-ic { background: rgba(255, 127, 0, 0.15); color: #FF7F00; }
+        @media (max-width: 640px) {
+            .neon-hero { padding: 14px 16px !important; }
+            .neon-hero h2 { font-size: 1.3rem !important; }
+        }
         /* Gráfica "Disponibilidad lista por canal": contorno naranja neón y barras azul rey neón con resplandor */
         [data-testid="stColumn"]:has(.marca-disp-canal) [data-testid="stPlotlyChart"],
         [data-testid="column"]:has(.marca-disp-canal) [data-testid="stPlotlyChart"] {
@@ -2433,7 +2624,7 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
         </style>
     """, unsafe_allow_html=True)
 
-    def render_kpi_neon(etiqueta, valor, apoyo="", neon_color="#00F5D4", neon_glow="rgba(0, 245, 212, 0.35)", tendencia="", tipo_tendencia="neu"):
+    def render_kpi_neon(etiqueta, valor, apoyo="", neon_color="#4D7CFF", neon_glow="rgba(77, 124, 255, 0.4)", tendencia="", tipo_tendencia="neu"):
         if isinstance(valor, (int, float)):
             valor = f"{int(valor):,}"
         sub = f'<div class="sub">{apoyo}</div>' if apoyo else ""
@@ -2447,7 +2638,7 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
 
     st.markdown(
         f'<div class="neon-hero">'
-        f'<div><h2>⚡ Dashboard Ejecutivo</h2>'
+        f'<div><h2>{svg_icono("rayo", 28)}Dashboard Ejecutivo</h2>'
         f'<p>Indicadores clave de disponibilidad, estadía crítica, tiempos de ciclo y cumplimiento de ruta.</p></div>'
         f'<div class="nh-date">Información al {datetime.now().strftime("%d/%m/%Y")}</div>'
         f'</div>',
@@ -2518,7 +2709,7 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
                         tipo_tendencia="pos" if diff_comp >= 0 else "neg")
     with k4:
         render_kpi_neon("Equipos en Taller", en_taller_dash, f"Ciclo promedio reparación: {ciclo_dias_txt}",
-                        neon_color="#00F5D4", neon_glow="rgba(0, 245, 212, 0.35)",
+                        neon_color="#4D7CFF", neon_glow="rgba(77, 124, 255, 0.4)",
                         tendencia=ciclo_dias_txt, tipo_tendencia="neu")
 
     st.markdown("<hr style='border-color: #1F2937 !important;'>", unsafe_allow_html=True)
@@ -2538,11 +2729,11 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             )
             mostrar_grafica(fig_n1, use_container_width=True)
         else:
-            st.info("Sin equipos disponibles con los filtros actuales.")
+            estado_vacio("Sin equipos disponibles con los filtros actuales.")
     with g_ej2:
         if not df_estadia_activa.empty:
             fig_n2 = grafica_antiguedad(df_estadia_activa, "Antigüedad de inventario sin movimiento")
-            fig_n2.update_traces(marker_color=["#00F5D4", "#3B82F6", "#FF9E00", "#FF073A"], textfont_color="#F3F4F6")
+            fig_n2.update_traces(marker_color=["#39FF14", "#4D7CFF", "#FF9E00", "#FF073A"], textfont_color="#F3F4F6")
             fig_n2.update_layout(
                 paper_bgcolor="#0B0F19", plot_bgcolor="#0B0F19",
                 font=dict(color="#E5E7EB"),
@@ -2552,7 +2743,7 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             )
             mostrar_grafica(fig_n2, use_container_width=True)
         else:
-            st.info("Sin datos de estadía.")
+            estado_vacio("Sin datos de estadía.")
 
     st.markdown('<div class="neon-sec-title">Semáforo de Solicitudes Pendientes por Canal</div>', unsafe_allow_html=True)
     if not df_sol_dash.empty:
@@ -2563,7 +2754,7 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             res_pend = res_pend.sort_values('Total Pendientes', ascending=False)
             estilo_neon_tbl = res_pend.style.set_properties(**{
                 'background-color': '#0B0F19',
-                'color': '#00F5D4',
+                'color': '#F3F4F6',
                 'border-color': '#1F2937'
             }).map(
                 lambda v: 'color: #FF073A; font-weight: bold;' if isinstance(v, (int, float)) and v > 0 else '',
@@ -2578,7 +2769,7 @@ elif menu == "Reportes Gerenciales" and (st.session_state['autenticado'] or st.s
     render_banner("exportar", "Reportes Gerenciales", "Descarga centralizada de reportes ejecutivos en Excel y PDF.")
     c_rep1, c_rep2 = st.columns(2)
     with c_rep1:
-        st.markdown("### 📦 Reporte Maestro de Inventario y Solicitudes (Excel)")
+        st.markdown("### :material/inventory_2: Reporte Maestro de Inventario y Solicitudes (Excel)")
         st.caption("Incluye inventario actual con días de estadía, levantamientos, solicitudes e historial.")
         if st.button(":material/download: Preparar Excel Ejecutivo", key="btn_rep_excel_ger"):
             buf_ger = io.BytesIO()
@@ -2590,7 +2781,7 @@ elif menu == "Reportes Gerenciales" and (st.session_state['autenticado'] or st.s
                                file_name=f"Reporte_Ejecutivo_Bepensa_{date.today():%Y%m%d}.xlsx",
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
     with c_rep2:
-        st.markdown("### 🚚 Evaluación Catorcenal de Choferes (PDF)")
+        st.markdown("### :material/local_shipping: Evaluación Catorcenal de Choferes (PDF)")
         st.caption("Genera el ranking imprimible de productividad y horas extras de la catorcena actual.")
         ref_r = referencia_catorcena()
         ini_r = inicio_catorcena(date.today(), ref_r)
@@ -2604,7 +2795,7 @@ elif menu == "Reportes Gerenciales" and (st.session_state['autenticado'] or st.s
             except Exception:
                 st.warning("Verifica que 'reportlab' esté instalado para exportar el PDF.")
         else:
-            st.info("Sin actividad registrada en la catorcena actual.")
+            estado_vacio("Sin actividad registrada en la catorcena actual.")
 
 # 1. EQUIPOS DISPONIBLES (PÚBLICO Y PRIMERA OPCIÓN PARA GENERALES)
 elif menu == "Equipos Disponibles":
@@ -2715,9 +2906,9 @@ elif menu == "Equipos Disponibles":
                         df_det_disp_estilizado = df_det_disp.style.map(colorear_ubicaciones, subset=['Ubicación']).map(colorear_anio, subset=['Año'])
                         mostrar_tabla(df_det_disp_estilizado, use_container_width=True, hide_index=True)
             else:
-                st.info(f"No hay equipos disponibles que coincidan con los filtros seleccionados para {c_d}.")
+                estado_vacio(f"No hay equipos disponibles que coincidan con los filtros seleccionados para {c_d}.")
     else:
-        st.info("No hay equipos disponibles en el inventario que cumplan con los criterios actuales.")
+        estado_vacio("No hay equipos disponibles en el inventario que cumplan con los criterios actuales.")
 
 # 2. ESTADÍA (PÚBLICO)
 elif menu == "Estadía":
@@ -2844,9 +3035,9 @@ elif menu == "Estadía":
                     mostrar_tabla(df_series_estilizado, use_container_width=True, hide_index=True)
 
         else:
-            st.info(f"No hay equipos registrados para el Canal {c_val}.")
+            estado_vacio(f"No hay equipos registrados para el Canal {c_val}.")
     else:
-        st.info("No hay datos suficientes en el inventario.")
+        estado_vacio("No hay datos suficientes en el inventario.")
     
 # 3. SOLICITUDES DIARIAS (ADMINISTRADORES Y CHOFERES CON FILTRO Y EDICIÓN RÁPIDA)
 elif menu == "Necesidades de Taller":
@@ -2870,7 +3061,7 @@ elif menu == "Necesidades de Taller":
     n_con_serie = int(_tiene_serie.sum())
 
     if pend.empty:
-        st.info("No hay solicitudes pendientes sin asignar con los filtros seleccionados.")
+        estado_vacio("No hay solicitudes pendientes sin asignar con los filtros seleccionados.")
     else:
         pend['Equipo'] = pend['Equipo'].fillna("").astype(str).str.strip().replace("", "Sin equipo")
         pend['Modelo'] = pend['Modelo'].fillna("").astype(str).str.strip().replace("", "Sin modelo")
@@ -2959,7 +3150,7 @@ elif menu == "Necesidades de Taller":
                     mostrar_tabla(df_series_nt.style.map(colorear_rango_anio, subset=['Año solicitado']).map(colorear_anio, subset=['Año']),
                                   use_container_width=True, hide_index=True)
                 else:
-                    st.info("No hay equipos Disponibles ni Para Reparar de los modelos pendientes.")
+                    estado_vacio("No hay equipos Disponibles ni Para Reparar de los modelos pendientes.")
             with st.expander("Detalle de las solicitudes pendientes sin asignar"):
                 det_nt = pend[['Fecha_Recibido', 'CUC', 'Cliente', 'Jefe_de_Venta', 'Movimiento', 'Equipo', 'Modelo', 'Año_Solicitado', 'Canal', 'Motivo']].copy()
                 det_nt = det_nt.rename(columns={'Fecha_Recibido': 'Fecha Recibido', 'Jefe_de_Venta': 'Jefe de Venta', 'Año_Solicitado': 'Año solicitado'})
@@ -2991,7 +3182,7 @@ elif menu == "Rendimiento de Choferes" and (st.session_state['autenticado'] or s
     resumen, diario, serv_periodo, sin_ruta = calcular_rendimiento(df_sol_r, inicio_sel, fin_sel, choferes_base, df_he_r)
 
     if resumen.empty or int(resumen['Asignadas'].sum()) == 0 and float(resumen['Horas extras'].sum()) == 0:
-        st.info("No hay solicitudes con Fecha Entrega y chofer (Ruta) asignados en esta catorcena.")
+        estado_vacio("No hay solicitudes con Fecha Entrega y chofer (Ruta) asignados en esta catorcena.")
     else:
         mas = resumen.iloc[0]
         menos = resumen.sort_values(['Completadas', '% Cumplimiento'], ascending=True).iloc[0]
@@ -3041,7 +3232,7 @@ elif menu == "Rendimiento de Choferes" and (st.session_state['autenticado'] or s
 
         st.markdown("### Horas extras vs. rendimiento")
         if float(resumen['Horas extras'].sum()) <= 0:
-            st.info("Todavía no hay horas extras capturadas en esta catorcena. Captúralas en el desplegable de abajo para compararlas con los servicios.")
+            estado_vacio("Todavía no hay horas extras capturadas en esta catorcena. Captúralas en el desplegable de abajo para compararlas con los servicios.")
         else:
             _col_diag = {"Revisar": "#DC2626", "Equilibrado": "#EAB308", "Eficiente": "#16A34A"}
             fig_s = go.Figure(go.Scatter(
@@ -3072,7 +3263,7 @@ elif menu == "Rendimiento de Choferes" and (st.session_state['autenticado'] or s
 
         with st.expander("Detalle por día"):
             if diario.empty:
-                st.info("Todavía no hay servicios completados en esta catorcena.")
+                estado_vacio("Todavía no hay servicios completados en esta catorcena.")
             else:
                 dv = diario.sort_values(['Día', 'Chofer']).copy()
                 dv['Día'] = dv['Día'].map(lambda x: f"{x:%d/%m/%Y}")
@@ -3129,7 +3320,7 @@ elif menu == "Rendimiento de Choferes" and (st.session_state['autenticado'] or s
     if not hay_pdf:
         st.warning("Para generar los PDF agrega la línea 'reportlab' al archivo requirements.txt del repositorio.")
     elif resumen.empty:
-        st.info("No hay datos para generar el reporte de esta catorcena.")
+        estado_vacio("No hay datos para generar el reporte de esta catorcena.")
     else:
         pdf_general = generar_pdf_rendimiento(resumen, diario, inicio_sel, fin_sel, "general")
         pdf_todas = generar_pdf_rendimiento(resumen, diario, inicio_sel, fin_sel, "individual")
@@ -3148,7 +3339,20 @@ elif menu == "Solicitudes Diarias":
     
     if st.session_state['es_chofer']:
         chofer_activo = st.session_state['nombre_chofer']
-        st.info(f"**Panel de Chofer ({chofer_activo}):** Se muestran exclusivamente las solicitudes asignadas a su nombre. Puede seleccionar una solicitud para actualizar su estatus y motivo.")
+        st.markdown(
+            f'<div class="chofer-hola"><div class="ic">{svg_icono("usuario", 26)}</div><div>'
+            f'<div class="hi">Hola, {_html.escape(str(chofer_activo))}</div>'
+            '<div class="sb">Aquí están tus solicitudes asignadas. Elige una para actualizar su estatus y motivo.</div>'
+            '</div></div>',
+            unsafe_allow_html=True
+        )
+        if st.button(":material/logout: Cerrar sesión", key="btn_logout_chofer_main"):
+            st.session_state['autenticado'] = False
+            st.session_state['es_chofer'] = False
+            st.session_state['es_gerente'] = False
+            st.session_state['usuario_actual'] = ""
+            st.session_state['nombre_chofer'] = ""
+            st.rerun()
     elif st.session_state['autenticado']:
         st.info(f"**Panel de Administrador:** Puede visualizar cualquier solicitud del día y actualizar su estatus o motivo directamente.")
     elif st.session_state['es_gerente']:
@@ -3278,15 +3482,18 @@ elif menu == "Solicitudes Diarias":
             # Mostrar la tabla general informativa del día
             df_tabla_diaria = df_filtradas_dia[['Proyecto', 'CUC', 'Cliente', 'Modelo', 'Serie', 'Año', 'Canal', 'Jefe_de_Venta', 'Supervisor', 'Ruta', 'Movimiento', 'Status', 'Observaciones']].copy()
             df_tabla_diaria = df_tabla_diaria.rename(columns={'Jefe_de_Venta': 'Jefe de Venta', 'Observaciones': 'Motivo / Comentarios'})
-            mostrar_tabla(df_tabla_diaria.style.map(colorear_status, subset=['Status']).map(colorear_anio, subset=['Año']), use_container_width=True, hide_index=True)
+            if st.session_state['es_chofer']:
+                tarjetas_solicitudes(df_tabla_diaria)
+            else:
+                mostrar_tabla(df_tabla_diaria.style.map(colorear_status, subset=['Status']).map(colorear_anio, subset=['Año']), use_container_width=True, hide_index=True)
             st.success(f"Se encontraron {len(df_tabla_diaria)} solicitudes registradas bajo los criterios seleccionados.")
         else:
             if st.session_state['es_chofer']:
-                st.info(f"No hay solicitudes asignadas a su nombre ('{st.session_state['nombre_chofer']}') para el día {fecha_consulta_str}.")
+                estado_vacio(f"No hay solicitudes asignadas a su nombre ('{st.session_state['nombre_chofer']}') para el día {fecha_consulta_str}.")
             else:
-                st.info(f"No hay solicitudes registradas que coincidan con los filtros seleccionados para el día {fecha_consulta_str}.")
+                estado_vacio(f"No hay solicitudes registradas que coincidan con los filtros seleccionados para el día {fecha_consulta_str}.")
     else:
-        st.info("El archivo de solicitudes se encuentra vacío.")
+        estado_vacio("El archivo de solicitudes se encuentra vacío.")
 
 # --- APARTADO: ESPECIFICACIONES DE EQUIPOS (MEJORADO CON FILTRO POR TIPO Y MODELO) ---
 elif menu == "Catálogo de Equipos":
@@ -4078,9 +4285,9 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                 else:
                     st.warning("No se encontraron solicitudes que coincidan con los filtros seleccionados.")
             else:
-                st.info("No hay solicitudes con estatus Entregado, Transferido, Realizado o Levantado registradas todavía.")
+                estado_vacio("No hay solicitudes con estatus Entregado, Transferido, Realizado o Levantado registradas todavía.")
         else:
-            st.info("El archivo de solicitudes está vacío.")
+            estado_vacio("El archivo de solicitudes está vacío.")
 
     elif modo_solicitud == "Importar Archivo Excel de Solicitudes":
         st.markdown("#### Subir y Sincronizar Archivo Excel (.xlsx) de Solicitudes")
@@ -4210,7 +4417,7 @@ elif menu == "Levantamientos" and st.session_state['autenticado']:
             else:
                 st.warning("No se encontraron equipos levantados que coincidan con el CUC buscado.")
         else:
-            st.info("Aún no hay equipos levantados registrados en el sistema.")
+            estado_vacio("Aún no hay equipos levantados registrados en el sistema.")
 
 # 7. REGISTRAR ENTRADA (SOLO ADMINISTRADORES)
 elif menu == "Registrar Entrada" and st.session_state['autenticado']:
@@ -4451,7 +4658,7 @@ elif menu == "Historial de Movimientos" and st.session_state['autenticado']:
     render_banner("historial", "Historial de Movimientos", "Bitácora de entradas, salidas y cambios de ubicación.")
     df_h = cargar_historial()
     if df_h.empty:
-        st.info("Aún no hay movimientos registrados en la bitácora.")
+        estado_vacio("Aún no hay movimientos registrados en la bitácora.")
     else:
         columnas_ordenadas = ["Fecha_Hora", "Usuario", "Serie", "Modelo", "Tipo_Movimiento", "Ruta", "Motivo", "Detalles"]
         df_h = df_h[[col for col in columnas_ordenadas if col in df_h.columns]]
