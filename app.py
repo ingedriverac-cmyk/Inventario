@@ -2753,7 +2753,16 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
         fig.update_yaxes(gridcolor="#1F2937", color="#D1D5DB")
         return fig
 
-    PALETA_NEON = ["#38B6FF", "#FF9E00", "#39FF14", "#B26BFF", "#FF5C8A", "#00E5C3", "#FFC400", "#4D7CFF"]
+    PALETA_CALIDA = ["#FFC83D", "#FF9F1C", "#F26B1D", "#E5383B", "#C1121F", "#FFE08A", "#FF7B54"]
+    PALETA_TEXTO_OSCURO = ["#FFC83D", "#FF9F1C", "#FF7B54", "#F26B1D", "#FFE08A", "#FFB36B", "#F4845F", "#E5383B"]
+
+    def _degradado(n, c1="#FFC83D", c2="#E5383B"):
+        """n colores que van de amarillo a rojo (los valores más altos quedan en rojo)."""
+        a = [int(c1[i:i + 2], 16) for i in (1, 3, 5)]
+        b = [int(c2[i:i + 2], 16) for i in (1, 3, 5)]
+        if n <= 1:
+            return [c1] * max(n, 1)
+        return ["#%02X%02X%02X" % tuple(round(a[k] + (b[k] - a[k]) * i / (n - 1)) for k in range(3)) for i in range(n)]
 
     def tabla_neon(df, columnas_alerta=()):
         """Tabla HTML en estilo neón (el encabezado de st.dataframe no se puede colorear)."""
@@ -2789,15 +2798,14 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
         if not df_dias_dash.empty and total_disp > 0:
             st.markdown('<span class="marca-disp-canal"></span>', unsafe_allow_html=True)
             fig_n1 = grafica_barras_conteo(df_dias_dash[cond_disp], 'Canal', 'Disponibilidad lista por canal', top=10)
-            fig_n1.update_traces(marker_color="#1F51FF", marker_line_color="#4D7CFF", marker_line_width=1.5,
-                                 textfont_color="#7FA0FF")
+            fig_n1.update_traces(marker_color=_degradado(len(fig_n1.data[0].y)), textfont_color="#E5E7EB")
             mostrar_grafica(_oscurecer(fig_n1, "#FF7F00"), use_container_width=True)
         else:
             estado_vacio("Sin equipos disponibles con los filtros actuales.")
     with g_ej2:
         if not df_estadia_activa.empty:
             fig_n2 = grafica_antiguedad(df_estadia_activa, "Antigüedad de inventario sin movimiento")
-            fig_n2.update_traces(marker_color=["#39FF14", "#4D7CFF", "#FF9E00", "#FF073A"], textfont_color="#F3F4F6")
+            fig_n2.update_traces(marker_color=["#FFC83D", "#FF9F1C", "#F26B1D", "#E5383B"], textfont_color="#F3F4F6")
             mostrar_grafica(_oscurecer(fig_n2), use_container_width=True)
         else:
             estado_vacio("Sin datos de estadía.")
@@ -2809,8 +2817,8 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             c_ub = df_dias_dash['Ubicación'].replace('', pd.NA).dropna().value_counts()
             fig_n3 = go.Figure(go.Pie(
                 labels=list(c_ub.index), values=list(c_ub.values), hole=0.58, sort=False,
-                marker=dict(colors=PALETA_NEON[:len(c_ub)], line=dict(color="#0B0F19", width=2)),
-                textinfo="percent", textfont=dict(color="#05050A", size=13),
+                marker=dict(colors=PALETA_CALIDA[:len(c_ub)], line=dict(color="#0B0F19", width=2)),
+                textinfo="percent", textposition="outside", textfont=dict(color="#E5E7EB", size=13),
                 hovertemplate="<b>%{label}</b><br>%{value} equipos (%{percent})<extra></extra>",
             ))
             _estilo_grafica(fig_n3, "Inventario por ubicación", 360)
@@ -2827,9 +2835,9 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             nombres_ch = [str(c).upper() for c in rc['Chofer']]
             fig_n4 = go.Figure()
             fig_n4.add_trace(go.Bar(y=nombres_ch, x=rc['Anterior'], name="Catorcena anterior", orientation='h',
-                                    marker_color="#7C8BC4", text=rc['Anterior'], textposition='outside', cliponaxis=False))
+                                    marker_color="#FFC83D", text=rc['Anterior'], textposition='outside', cliponaxis=False))
             fig_n4.add_trace(go.Bar(y=nombres_ch, x=rc['Completadas'], name="Catorcena actual", orientation='h',
-                                    marker_color="#FF9E00", text=rc['Completadas'], textposition='outside', cliponaxis=False))
+                                    marker_color="#F26B1D", text=rc['Completadas'], textposition='outside', cliponaxis=False))
             fig_n4.update_layout(barmode='group')
             fig_n4.update_xaxes(showgrid=True, zeroline=False, title=None,
                                 range=[0, max(float(rc[['Anterior', 'Completadas']].max().max()), 1) * 1.2])
@@ -2847,7 +2855,7 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             c_mod = df_dias_dash[cond_disp]['Modelo'].replace('', pd.NA).dropna().value_counts().head(12)
             fig_n5 = go.Figure(go.Treemap(
                 labels=[str(m).upper() for m in c_mod.index], parents=[""] * len(c_mod), values=list(c_mod.values),
-                marker=dict(colors=[PALETA_NEON[i % len(PALETA_NEON)] for i in range(len(c_mod))],
+                marker=dict(colors=[PALETA_TEXTO_OSCURO[i % len(PALETA_TEXTO_OSCURO)] for i in range(len(c_mod))],
                             line=dict(color="#0B0F19", width=3)),
                 texttemplate="<b>%{label}</b><br>%{value}", textfont=dict(color="#05050A", size=14),
                 hovertemplate="<b>%{label}</b><br>%{value} equipos listos<extra></extra>",
@@ -2864,13 +2872,13 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             pj = pend_ej[pend_ej['Jefe_de_Venta'].astype(str).str.strip().replace("nan", "").ne("")]
             tab_j = pj.groupby(['Jefe_de_Venta', 'Movimiento']).size().unstack(fill_value=0)
             tab_j = tab_j.loc[tab_j.sum(axis=1).sort_values(ascending=False).head(8).index]
-            colores_mov = {"Entrega": "#FF9E00", "Levantamiento": "#38B6FF", "Reubicación": "#B26BFF"}
+            colores_mov = {"Entrega": "#FF9F1C", "Levantamiento": "#E5383B", "Reubicación": "#FFC83D"}
             fig_n6 = go.Figure()
             for i, mov in enumerate(tab_j.columns):
                 vals = tab_j[mov]
                 fig_n6.add_trace(go.Bar(
                     x=[str(j).upper() for j in tab_j.index], y=vals, name=str(mov),
-                    marker_color=colores_mov.get(mov, PALETA_NEON[(i + 3) % len(PALETA_NEON)]),
+                    marker_color=colores_mov.get(mov, PALETA_TEXTO_OSCURO[(i + 3) % len(PALETA_TEXTO_OSCURO)]),
                     text=[str(v) if v > 0 else "" for v in vals], textposition="inside",
                     textfont=dict(color="#05050A"),
                     hovertemplate="<b>%{x}</b><br>" + str(mov) + ": %{y}<extra></extra>",
