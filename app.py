@@ -2582,6 +2582,8 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
         /* Tablas del dashboard en estilo neón (encabezado violeta oscuro, contorno naranja) */
         .neon-tbl-wrap { border: 2px solid #FF7F00; border-radius: 12px; overflow-x: auto; background: #0B0F19;
             box-shadow: 0 0 8px rgba(255, 127, 0, 0.55), 0 0 18px rgba(255, 127, 0, 0.3); margin-bottom: 14px; }
+        .neon-tbl-wrap.scroll { max-height: 380px; overflow-y: auto; }
+        .neon-tbl-wrap.scroll .neon-tbl thead th { position: sticky; top: 0; z-index: 1; }
         .neon-tbl { width: 100%; border-collapse: collapse; font-size: 0.9rem; color: #F3F4F6; }
         .neon-tbl thead th { background: #1B1030; color: #FF9E00; text-align: left; padding: 10px 12px; white-space: nowrap;
             border-bottom: 2px solid #FF7F00; font-size: 0.76rem; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; }
@@ -2732,8 +2734,10 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             return [c1] * max(n, 1)
         return ["#%02X%02X%02X" % tuple(round(a[k] + (b[k] - a[k]) * i / (n - 1)) for k in range(3)) for i in range(n)]
 
-    def tabla_neon(df, columnas_alerta=()):
-        """Tabla HTML en estilo neón (el encabezado de st.dataframe no se puede colorear)."""
+    def tabla_neon(df, columnas_alerta=(), colores_texto=None, scroll=False):
+        """Tabla HTML en estilo neón (el encabezado de st.dataframe no se puede colorear).
+        colores_texto: {columna: {valor: color}} pinta solo el texto de la celda, nunca el fondo."""
+        colores_texto = colores_texto or {}
         cabeza, filas = [], []
         for c in df.columns:
             es_num_col = pd.api.types.is_numeric_dtype(df[c])
@@ -2750,10 +2754,13 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
                 clases = ["num"] if es_num else []
                 if es_num and v > 0 and c in columnas_alerta:
                     clases.append("alerta")
-                celdas.append(f'<td class="{" ".join(clases)}">{txt}</td>')
+                estilo = ""
+                if c in colores_texto and colores_texto[c].get(str(v)):
+                    estilo = f' style="color: {colores_texto[c][str(v)]}; font-weight: 700;"'
+                celdas.append(f'<td class="{" ".join(clases)}"{estilo}>{txt}</td>')
             filas.append("<tr>" + "".join(celdas) + "</tr>")
         st.markdown(
-            '<div class="neon-tbl-wrap"><table class="neon-tbl"><thead><tr>' + "".join(cabeza) +
+            f'<div class="neon-tbl-wrap{" scroll" if scroll else ""}"><table class="neon-tbl"><thead><tr>' + "".join(cabeza) +
             "</tr></thead><tbody>" + "".join(filas) + "</tbody></table></div>",
             unsafe_allow_html=True
         )
@@ -2863,15 +2870,32 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
     # --- Tablas: semáforo de pendientes y rezago crítico ---
     t1, t2 = st.columns(2)
     with t1:
-        st.markdown('<div class="neon-sec-title">Semáforo de Solicitudes Pendientes por Canal</div>', unsafe_allow_html=True)
-        if not pend_ej.empty:
-            res_pend = pend_ej.groupby(['Canal', 'Movimiento']).size().unstack(fill_value=0)
-            res_pend['Total Pendientes'] = res_pend.sum(axis=1)
-            res_pend['Atrasadas'] = pend_ej.groupby('Canal')['_atrasada'].sum().astype(int)
-            res_pend = res_pend.sort_values('Total Pendientes', ascending=False).reset_index()
-            tabla_neon(res_pend, columnas_alerta=("Total Pendientes", "Atrasadas"))
+        st.markdown('<div class="neon-sec-title">Solicitudes Pendientes sin Asignar</div>', unsafe_allow_html=True)
+        sin_asig = pd.DataFrame()
+        if not df_sol_dash.empty:
+            _st2 = df_sol_dash['Status'].astype(str).str.strip().str.lower()
+            _mv2 = df_sol_dash['Movimiento'].astype(str).str.strip()
+            _sv2 = df_sol_dash['Serie'].fillna("").astype(str).str.strip().replace("nan", "").eq("")
+            sin_asig = df_sol_dash[(_st2 == 'pendiente') & (_mv2 == 'Entrega') & _sv2].copy()
+        if not sin_asig.empty:
+            sin_asig['_f'] = _fechas_a_datetime(sin_asig['Fecha_Recibido'])
+            sin_asig = sin_asig.sort_values('_f', na_position='last')
+            def _limpio(col, vacio=""):
+                return sin_asig[col].fillna("").astype(str).str.strip().replace("nan", "").replace("", vacio)
+            tabla_sa = pd.DataFrame({
+                'Fecha recibido': sin_asig['_f'].dt.strftime('%d/%m/%Y').fillna(""),
+                'Cliente': _limpio('Cliente'),
+                'Modelo': _limpio('Modelo'),
+                'Año solicitado': _limpio('Año_Solicitado', "Sin especificar"),
+                'Canal': _limpio('Canal'),
+                'Jefe de venta': _limpio('Jefe_de_Venta'),
+            })
+            st.markdown(f'<div style="color:#9CA3AF; font-size:0.82rem; margin:-4px 0 8px 0;">{len(tabla_sa):,} entregas pendientes sin serie asignada, de la más antigua a la más reciente</div>', unsafe_allow_html=True)
+            tabla_neon(tabla_sa, scroll=True, colores_texto={'Año solicitado': {
+                "Nuevos": "#4ADE80", "Reciente": "#A3E635", "Menor a 5 años": "#FACC15",
+                "Mayor a 5 años": "#F87171", "Sin especificar": "#9CA3AF"}})
         else:
-            st.success("No hay solicitudes pendientes con los filtros aplicados.")
+            st.success("No hay solicitudes pendientes sin asignar con los filtros aplicados.")
     with t2:
         st.markdown('<div class="neon-sec-title">Rezago Crítico: Equipos con Más Días sin Movimiento</div>', unsafe_allow_html=True)
         if not df_estadia_activa.empty:
