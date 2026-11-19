@@ -595,7 +595,6 @@ def render_banner(icono, titulo, subtitulo=""):
         f'<div class="ph-date">{svg_icono("calendario", 14)}Información al {datetime.now().strftime("%d/%m/%Y")}</div></div>',
         unsafe_allow_html=True
     )
-    _resumen_gerencia()
 
 
 def estado_vacio(mensaje, icono="bandeja"):
@@ -641,37 +640,6 @@ def tarjetas_solicitudes(df):
             f'</div>{bloque_motivo}</div>',
             unsafe_allow_html=True
         )
-
-
-SECCIONES_CON_RESUMEN = {"Rendimiento de Choferes", "Estadía", "Equipos Disponibles", "Solicitudes Diarias",
-                         "Necesidades de Taller", "Inventario General"}
-
-def _resumen_gerencia():
-    """Fila de KPI al inicio de las secciones de consulta, solo para Gerencia."""
-    try:
-        if not st.session_state.get('es_gerente') or st.session_state.get('autenticado'):
-            return
-        if st.session_state.get('nav_seccion') not in SECCIONES_CON_RESUMEN:
-            return
-        inv = df_inv
-        listos = criticos = taller = 0
-        if inv is not None and not inv.empty:
-            es = inv['Estatus'].astype(str).str.strip().str.lower()
-            listos = int((inv['Ubicación'].isin(["En almacén de Comodatos", "En almacén de Publicidad", "En patios"]) & es.isin(['nuevo', 'reparado'])).sum())
-            taller = int((es == 'para reparar').sum())
-        pend = 0
-        sol = cargar_solicitudes()
-        if sol is not None and not sol.empty:
-            pend = int((sol['Status'].astype(str).str.strip().str.lower() == 'pendiente').sum())
-        c1, c2, c3 = st.columns(3)
-        with c1:
-            render_kpi("Equipos listos", listos, "En almacén o patios, Nuevo o Reparado", "#16A34A")
-        with c2:
-            render_kpi("Por reparar", taller, "Estatus Para Reparar", "#D95F00")
-        with c3:
-            render_kpi("Solicitudes pendientes", pend, "Todas las fechas", "#F59E0B")
-    except Exception:
-        pass
 
 
 try:
@@ -2499,7 +2467,7 @@ if not (st.session_state['autenticado'] or st.session_state['es_chofer'] or st.s
     st.markdown(
         f'<div class="bienvenida"><div class="ic">{svg_icono("usuario", 24)}</div><div>'
         '<div class="t">Bienvenido al control de Comodatos</div>'
-        '<div class="s">Consulta equipos disponibles, estadía y necesidades de taller. Si eres gerente, administrador o chofer, '
+        '<div class="s">Consulta equipos disponibles, estadía, solicitudes pendientes y necesidades de taller. Si eres usuario, '
         'abre el menú lateral (en el celular, la flecha de arriba a la izquierda) y entra en «Acceso al sistema».</div>'
         '</div></div>',
         unsafe_allow_html=True
@@ -2909,12 +2877,15 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
         if not df_estadia_activa.empty:
             rez = df_estadia_activa.copy()
             rez['Días'] = pd.to_numeric(rez['Días sin movimiento'], errors='coerce')
-            rez = rez[rez['Días'] > 40].sort_values('Días', ascending=False).head(10)
+            rez = rez[rez['Días'] > 40]
             if not rez.empty:
-                rez['Días'] = rez['Días'].astype(int)
                 # Año solo para Enfriadores; Vending, Postmix e Hidro quedan en blanco
                 rez['Año'] = rez['Año'].fillna("").astype(str).replace("nan", "")
-                tabla_neon(rez[['Modelo', 'Año', 'Canal', 'Ubicación', 'Días']], columnas_alerta=("Días",))
+                rez = (rez.groupby(['Modelo', 'Año', 'Canal', 'Ubicación'], dropna=False)
+                          .agg(Cantidad=('Días', 'size'), Días_máx=('Días', 'max')).reset_index())
+                rez['Días máx.'] = rez['Días_máx'].astype(int)
+                rez = rez.sort_values(['Días máx.', 'Cantidad'], ascending=False).head(10)
+                tabla_neon(rez[['Modelo', 'Año', 'Canal', 'Cantidad', 'Ubicación', 'Días máx.']], columnas_alerta=("Días máx.",))
             else:
                 st.success("Ningún equipo supera los 40 días sin movimiento.")
         else:
