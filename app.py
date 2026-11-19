@@ -2885,6 +2885,11 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
                           .agg(Cantidad=('Días', 'size'), Días_máx=('Días', 'max')).reset_index())
                 rez['Días máx.'] = rez['Días_máx'].astype(int)
                 rez = rez.sort_values(['Días máx.', 'Cantidad'], ascending=False).head(10)
+                # Ubicación abreviada para que la tabla no se ensanche
+                _abrev_ubic = {"En almacén de Comodatos": "ALM COMODATOS", "En almacén de Publicidad": "ALM PUBLICIDAD",
+                               "En patios": "PATIOS", "En taller": "TALLER", "Uso Interno": "USO INTERNO",
+                               "En proceso de Baja": "PROC. BAJA", "Asignado a Cliente": "CLIENTE"}
+                rez['Ubicación'] = rez['Ubicación'].map(lambda u: _abrev_ubic.get(str(u).strip(), u))
                 tabla_neon(rez[['Modelo', 'Año', 'Canal', 'Cantidad', 'Ubicación', 'Días máx.']], columnas_alerta=("Días máx.",))
             else:
                 st.success("Ningún equipo supera los 40 días sin movimiento.")
