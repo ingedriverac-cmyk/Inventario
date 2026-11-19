@@ -2267,7 +2267,7 @@ filtro_global_canal = "Todos"
 filtro_global_jefe = "Todos"
 
 if st.session_state['autenticado'] or st.session_state['es_gerente']:
-    rol_etiqueta = "Admin" if st.session_state['autenticado'] else "Gerencia · Solo Lectura"
+    rol_etiqueta = "Admin" if st.session_state['autenticado'] else "Gerencia"
     st.sidebar.markdown(
         f'<div class="session-chip"><span class="dot"></span><b>{st.session_state["usuario_actual"]}</b>'
         f'<span class="role-badge">{rol_etiqueta}</span></div>',
@@ -2334,7 +2334,7 @@ if st.session_state['autenticado'] or st.session_state['es_gerente']:
 
     # Filtros Globales de Consulta: solo visibles (y activos) en el Dashboard Ejecutivo
     if menu == "Dashboard Ejecutivo":
-        with ph_filtros_globales.expander(":material/public: Filtros Globales de Consulta", expanded=False):
+        with ph_filtros_globales.expander(":material/public: Filtros Globales del Dashboard", expanded=False):
             canales_glob = ["Todos"] + [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
             df_sol_tmp = cargar_solicitudes()
             jefes_glob = ["Todos"] + sorted({
@@ -2674,6 +2674,14 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             prom_ciclo = round(ciclos.dt.total_seconds().mean() / 86400, 1)
             ciclo_dias_txt = f"{prom_ciclo} días"
 
+    enf_total = enf_reparar = enf_reparar_taller = 0
+    if not df_dias_dash.empty:
+        _es_enf = df_dias_dash['Tipo'].astype(str).str.strip().str.lower() == 'enfriador'
+        _por_rep = df_dias_dash['Estatus'].astype(str).str.strip().str.lower() == 'para reparar'
+        enf_total = int(_es_enf.sum())
+        enf_reparar = int((_es_enf & _por_rep).sum())
+        enf_reparar_taller = int((_es_enf & _por_rep & (df_dias_dash['Ubicación'] == 'En taller')).sum())
+
     en_estadia_activa = len(df_estadia_activa)
     k0, k1, k2, k3, k4 = st.columns(5)
     with k0:
@@ -2690,10 +2698,10 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
                         tendencia="Atención prioritaria" if criticos_40 > 0 else "Bajo control",
                         tipo_tendencia="neg" if criticos_40 > 0 else "pos")
     with k3:
-        render_kpi_neon("Cumplimiento Catorcena", f"{pct_cumpl_global}%", f"{comp_actual} servicios completados",
+        render_kpi_neon("Enfriadores por Reparar", enf_reparar, porcentaje_texto(enf_reparar, enf_total, "de los enfriadores"),
                         neon_color="#FF9E00", neon_glow="rgba(255, 158, 0, 0.38)",
-                        tendencia=f"{diff_comp:+d} vs catorcena ant.",
-                        tipo_tendencia="pos" if diff_comp >= 0 else "neg")
+                        tendencia=f"{enf_reparar_taller:,} ya están en taller" if enf_reparar else "Sin pendientes",
+                        tipo_tendencia="neg" if enf_reparar else "pos")
     with k4:
         render_kpi_neon("Equipos en Taller", en_taller_dash, f"Ciclo promedio reparación: {ciclo_dias_txt}",
                         neon_color="#4D7CFF", neon_glow="rgba(77, 124, 255, 0.4)",
@@ -3512,7 +3520,7 @@ elif menu == "Solicitudes Diarias":
     elif st.session_state['autenticado']:
         st.info(f"**Panel de Administrador:** Puede visualizar cualquier solicitud del día y actualizar su estatus o motivo directamente.")
     elif st.session_state['es_gerente']:
-        st.info(f"**Panel de Gerencia (Solo Lectura):** Consulta ejecutiva de las solicitudes programadas del día.")
+        st.info(f"**Panel de Gerencia:** Consulta ejecutiva de las solicitudes programadas del día.")
     
     st.markdown("---")
     
