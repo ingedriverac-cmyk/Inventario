@@ -461,6 +461,22 @@ st.markdown("""
     .sol-card .v { font-size: .95rem; font-weight: 600; color: var(--texto); text-transform: uppercase; word-break: break-word; }
     .sol-card .mo { margin-top: 10px; font-size: .88rem; color: #374151; background: #F5F7FA; border-radius: 8px; padding: 8px 10px; }
 
+
+    /* Filtros de Canal: mismo color pastel que el desplegable "Filtros Avanzados y Búsqueda Rápida" (no aplica al filtro del Dashboard) */
+    [data-testid="stMain"] [class*="st-key-filtro_canal"] [data-baseweb="select"] > div,
+    [data-testid="stMain"] [class*="st-key-filtro_canal"] [role="group"],
+    [data-testid="stMain"] [class*="st-key-nt_canal"] [data-baseweb="select"] > div,
+    [data-testid="stMain"] [class*="st-key-nt_canal"] [role="group"] {
+        background-color: #FFE6CC !important; border: 1px solid #F3D3B0 !important; }
+    [data-testid="stMain"] [class*="st-key-filtro_canal"] [data-baseweb="select"] > div:hover,
+    [data-testid="stMain"] [class*="st-key-nt_canal"] [data-baseweb="select"] > div:hover { background-color: #FFDDB8 !important; }
+    [data-testid="stMain"] [class*="st-key-filtro_canal"] input, [data-testid="stMain"] [class*="st-key-nt_canal"] input {
+        background-color: transparent !important; color: #7C2D12 !important; font-weight: 600; }
+    [data-testid="stMain"] [class*="st-key-filtro_canal"] [data-baseweb="select"] div,
+    [data-testid="stMain"] [class*="st-key-nt_canal"] [data-baseweb="select"] div { color: #7C2D12; }
+    [data-testid="stMain"] [class*="st-key-filtro_canal"] [data-baseweb="select"] svg,
+    [data-testid="stMain"] [class*="st-key-nt_canal"] [data-baseweb="select"] svg { fill: #7C2D12; color: #7C2D12; }
+
     /* Celular: banners compactos y botones fáciles de tocar */
     @media (max-width: 640px) {
         .page-hero { padding: 16px 18px; border-radius: 12px; flex-direction: column; align-items: flex-start; gap: 10px; }
@@ -2837,10 +2853,12 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
         if not df_dias_dash.empty and total_disp > 0:
             c_mod = df_dias_dash[cond_disp]['Modelo'].replace('', pd.NA).dropna().value_counts().head(12)
             fig_n5 = go.Figure(go.Treemap(
-                labels=[str(m).upper() for m in c_mod.index], parents=[""] * len(c_mod), values=list(c_mod.values),
+                labels=[str(m) for m in c_mod.index], parents=[""] * len(c_mod), values=list(c_mod.values),
                 marker=dict(colors=[PALETA_TEXTO_OSCURO[i % len(PALETA_TEXTO_OSCURO)] for i in range(len(c_mod))],
                             line=dict(color="#0B0F19", width=3)),
-                texttemplate="<b>%{label}</b><br>%{value}", textfont=dict(color="#05050A", size=14),
+                texttemplate="%{label}<br><span style='font-size:22px'>%{value}</span>",
+                textfont=dict(color="#1F1300", size=13, family="Segoe UI, Roboto, Helvetica Neue, Arial, sans-serif"),
+                textposition="middle center",
                 hovertemplate="<b>%{label}</b><br>%{value} equipos listos<extra></extra>",
                 tiling=dict(pad=2),
             ))
@@ -2969,7 +2987,7 @@ elif menu == "Equipos Disponibles":
     
     opciones_disp_filtro = canales_validos_kpi
 
-    canal_disp_seleccionado = st.selectbox("Seleccione el Canal a visualizar:", opciones_disp_filtro)
+    canal_disp_seleccionado = st.selectbox("Seleccione el Canal a visualizar:", opciones_disp_filtro, key="filtro_canal_disp")
     st.markdown("---")
 
     if not df_inv.empty:
@@ -3124,7 +3142,7 @@ elif menu == "Estadía":
     st.markdown("---")
     
     opciones_estadia_filtro = [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales", "Cedis"]]
-    canal_estadia_seleccionado = st.selectbox("Seleccione el Canal a visualizar:", opciones_estadia_filtro)
+    canal_estadia_seleccionado = st.selectbox("Seleccione el Canal a visualizar:", opciones_estadia_filtro, key="filtro_canal_estadia")
     st.markdown("---")
     
     df_con_dias = calcular_dias_sin_movimiento(df_inv)
@@ -3806,7 +3824,7 @@ elif menu == "Inventario General" and (st.session_state['autenticado'] or st.ses
             filtro_tipo = st.selectbox("Filtrar por Tipo:", ["Todos"] + TIPOS_EQUIPO)
         with f_col2:
             filtro_imagen = st.selectbox("Filtrar por Imagen:", ["Todos"] + OPCIONES_IMAGEN)
-            filtro_canal = st.selectbox("Filtrar por Canal:", ["Todos"] + [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales"]])
+            filtro_canal = st.selectbox("Filtrar por Canal:", ["Todos"] + [c for c in OPCIONES_CANALES_SOL if c not in ["Otro", "Uso Interno", "Eventos Especiales"]], key="filtro_canal_inv")
         with f_col3:
             filtro_ubicacion = st.selectbox("Filtrar por Ubicación:", ["Todos"] + UBICACIONES)
             filtro_estatus = st.selectbox("Filtrar por Estatus:", ["Todos"] + ESTATUS)
@@ -4065,7 +4083,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
         st.markdown("#### Buscar Solicitud en el Sistema")
         
         with st.form("form_buscar_canal"):
-            b_canal = st.selectbox("Filtrar por Canal:", ["Todos"] + OPCIONES_CANALES_SOL)
+            b_canal = st.selectbox("Filtrar por Canal:", ["Todos"] + OPCIONES_CANALES_SOL, key="filtro_canal_busqueda_sol")
             b_cuc_busqueda = st.text_input("O busque por CUC exacto (Opcional):").strip()
             b_chofer = st.selectbox("Filtrar por Chofer:", ["Todos", "Sin chofer"] + lista_choferes(df_sol))
             b_status, b_desde, b_hasta = filtro_solicitudes_status_fecha("sol_busq", ["Pendiente", "Entregado", "Transferido", "Realizado", "Levantado", "Cancelado"])
