@@ -477,6 +477,19 @@ st.markdown("""
     [data-testid="stMain"] [class*="st-key-filtro_canal"] [data-baseweb="select"] svg,
     [data-testid="stMain"] [class*="st-key-nt_canal"] [data-baseweb="select"] svg { fill: #7C2D12; color: #7C2D12; }
 
+
+    /* Ranking de la catorcena (Rendimiento de Choferes) */
+    .rk-wrap { overflow-x: auto; border: 1px solid var(--borde); border-radius: 8px; background: #FFFFFF; margin-bottom: 8px; }
+    .rk-tbl { width: 100%; border-collapse: collapse; font-size: 0.88rem; }
+    .rk-tbl th { background: #F3F4F6; color: #374151; text-align: left; padding: 8px 10px; white-space: nowrap;
+        border-bottom: 1px solid var(--borde); font-size: 0.76rem; font-weight: 700; }
+    .rk-tbl td { padding: 7px 10px; border-bottom: 1px solid #F0F1F3; white-space: nowrap; text-transform: uppercase; vertical-align: middle; }
+    .rk-bar { position: relative; min-width: 112px; height: 22px; background: #E5E7EB; border-radius: 6px; overflow: hidden; }
+    .rk-fill { position: absolute; left: 0; top: 0; bottom: 0; }
+    .rk-bar span { position: relative; z-index: 1; display: block; text-align: center; font-weight: 700; font-size: 0.8rem; line-height: 22px; color: #1F2937; }
+    .rk-bar.rk-bad span { color: #FFFFFF; }
+    .rk-over { color: #B91C1C; font-size: 0.68rem; font-weight: 700; margin-top: 2px; text-transform: none; }
+
     /* Celular: banners compactos y botones fáciles de tocar */
     @media (max-width: 640px) {
         .page-hero { padding: 16px 18px; border-radius: 12px; flex-direction: column; align-items: flex-start; gap: 10px; }
@@ -497,6 +510,7 @@ st.markdown("""
 # ---------------------------------------------------------------------------
 UMBRAL_ALERTA_DIAS = 40
 UBICACIONES_SIN_ESTADIA = ['Uso Interno', 'En proceso de Baja', 'Asignado a Cliente']
+LIMITE_HORAS_EXTRAS = 12   # límite permitido de horas extras por catorcena
 FUENTE_GRAFICAS = "Source Sans 3, Segoe UI, Roboto, Arial, sans-serif"
 
 COLOR_UBICACION = {
@@ -596,6 +610,141 @@ def config_barras(df, columnas, formato="%d", maximo=None):
     for c in cols_ok:
         cfg[c] = st.column_config.ProgressColumn(c, format=formato, min_value=0, max_value=tope)
     return cfg
+
+def tabla_ranking_html(resumen, columnas, limite):
+    """Ranking de la catorcena. Horas extras: barra con tope en el límite; si se pasa, barra roja y cuántas horas de más."""
+    cabeza = "".join(f"<th>{_html.escape(str(c))}</th>" for c in columnas)
+    max_c, min_c = resumen['Completadas'].max(), resumen['Completadas'].min()
+    filas = []
+    for _, r in resumen.iterrows():
+        tds = []
+        for c in columnas:
+            v = r[c]
+            if c == 'Completadas':
+                est = ""
+                if max_c != min_c:
+                    if v == max_c:
+                        est = ' style="background:#dcfce7;color:#166534;font-weight:700;"'
+                    elif v == min_c:
+                        est = ' style="background:#fee2e2;color:#991b1b;font-weight:700;"'
+                tds.append(f"<td{est}>{int(v)}</td>")
+            elif c == '% Cumplimiento':
+                pct = max(0.0, min(float(v), 100.0))
+                tds.append(f'<td><div class="rk-bar"><div class="rk-fill" style="width:{pct:.1f}%;background:#FFB066"></div>'
+                           f'<span>{float(v):.1f}%</span></div></td>')
+            elif c == 'Horas extras':
+                h = float(v)
+                sobre = h > limite
+                pct = 100.0 if sobre else max(0.0, min(h / limite * 100, 100.0))
+                color = "#E5383B" if sobre else "#FFB066"
+                extra = f'<div class="rk-over">+{h - limite:.1f} sobre el límite</div>' if sobre else ""
+                tds.append(f'<td><div class="rk-bar{" rk-bad" if sobre else ""}"><div class="rk-fill" style="width:{pct:.1f}%;background:{color}"></div>'
+                           f'<span>{h:.1f} h</span></div>{extra}</td>')
+            elif c == 'Promedio por día':
+                tds.append(f"<td>{float(v):.1f}</td>")
+            elif c == 'Variación':
+                n = int(v)
+                if n:
+                    tds.append(f'<td style="color:{"#166534" if n > 0 else "#991b1b"};font-weight:700;">{n:+d}</td>')
+                else:
+                    tds.append("<td>0</td>")
+            elif c == 'Chofer':
+                tds.append(f"<td>{_html.escape(str(v))}</td>")
+            else:
+                tds.append(f"<td>{int(v)}</td>")
+        filas.append("<tr>" + "".join(tds) + "</tr>")
+    st.markdown(f'<div class="rk-wrap"><table class="rk-tbl"><thead><tr>{cabeza}</tr></thead><tbody>{"".join(filas)}</tbody></table></div>',
+                unsafe_allow_html=True)
+
+
+# ---- Nombres de jefes de venta: una sola grafía por persona ----
+def _limpiar_nombre(v):
+    t = re.sub(r"\s+", " ", str(v)).strip()
+    return "" if t.lower() in ("nan", "none", "nat") else t
+
+def _norm_nombre(v):
+    """Clave para comparar nombres sin importar mayúsculas, acentos, puntos ni espacios de más."""
+    import unicodedata
+    t = unicodedata.normalize("NFKD", str(v))
+    t = "".join(ch for ch in t if not unicodedata.combining(ch)).casefold()
+    return re.sub(r"\s+", " ", re.sub(r"[^a-z0-9 ]", " ", t)).strip()
+
+def _canon_jefes(*series):
+    """{clave: nombre} con la mejor grafía de cada persona: con mayúsculas/minúsculas normales, la más frecuente y con acentos."""
+    from collections import Counter
+    cont = {}
+    for ser in series:
+        for v in ser.dropna().astype(str):
+            n = _limpiar_nombre(v)
+            if n:
+                cont.setdefault(_norm_nombre(n), Counter())[n] += 1
+    def _orden(kv):
+        nom, veces = kv
+        mixto = nom != nom.upper() and nom != nom.lower()          # prefiere «Juan Pérez» sobre «JUAN PEREZ» o «juan perez»
+        return (-mixto, -veces, -int(any(ord(ch) > 127 for ch in nom)), -len(nom), nom)
+    return {k: sorted(c.items(), key=_orden)[0][0] for k, c in cont.items()}
+
+def unificar_jefes_serie(ser):
+    """Junta las variantes que solo cambian en mayúsculas, acentos o espacios (p. ej. «juan  perez» y «Juan Pérez»)."""
+    mapa = _canon_jefes(ser)
+    return ser.map(lambda v: mapa.get(_norm_nombre(v), _limpiar_nombre(v)) if _limpiar_nombre(v) else "")
+
+def catalogo_jefes():
+    try:
+        mapa = _canon_jefes(cargar_solicitudes()['Jefe_de_Venta'], cargar_levantamientos()['Jefe_de_Venta'])
+    except Exception:
+        return []
+    return sorted(mapa.values(), key=_norm_nombre)
+
+def jefes_parecidos(nombre, catalogo):
+    """Nombres del catálogo que podrían ser la misma persona (apellido de más o de menos, orden distinto, errores de ortografía)."""
+    import difflib
+    n = _norm_nombre(nombre)
+    tn = set(n.split())
+    res = []
+    for e in catalogo:
+        ne = _norm_nombre(e)
+        if ne == n or not ne or not n:
+            continue
+        te = set(ne.split())
+        if tn <= te or te <= tn or difflib.SequenceMatcher(None, n, ne).ratio() >= 0.84:
+            res.append(e)
+    return res
+
+def selector_jefe(etiqueta, key, valor_actual=""):
+    """Lista de jefes ya registrados (con búsqueda al escribir). Si es nuevo, se escribe y queda agregado."""
+    cat = catalogo_jefes()
+    actual = _limpiar_nombre(valor_actual)
+    opciones, idx = list(cat), None
+    if actual:
+        existente = next((e for e in cat if _norm_nombre(e) == _norm_nombre(actual)), None)
+        if existente:
+            idx = opciones.index(existente)
+        else:
+            opciones, idx = [actual] + opciones, 0
+    try:
+        return _limpiar_nombre(st.selectbox(etiqueta, opciones, index=idx, key=key, accept_new_options=True,
+                                            placeholder="Elige de la lista o escribe un nombre nuevo") or "")
+    except TypeError:   # versión de Streamlit sin accept_new_options
+        return _limpiar_nombre(st.text_input(etiqueta, value=actual, key=key))
+
+def resolver_jefe(valor, form_key, bloquear=True):
+    """(nombre_final, aviso). Si ya existe con otra escritura se usa la grafía registrada; si se parece a otro,
+    pide confirmar guardando de nuevo."""
+    nombre = _limpiar_nombre(valor)
+    if not nombre:
+        return "", None
+    cat = catalogo_jefes()
+    for e in cat:
+        if _norm_nombre(e) == _norm_nombre(nombre):
+            return e, None
+    parecidos = jefes_parecidos(nombre, cat)
+    clave = f"_jefe_conf_{form_key}"
+    if bloquear and parecidos and st.session_state.get(clave) != _norm_nombre(nombre):
+        st.session_state[clave] = _norm_nombre(nombre)
+        return None, (f"«{nombre}» se parece a: {', '.join(parecidos[:4])}. Si es la misma persona, elígela en la lista de "
+                      f"«Jefe de Venta». Si es otra persona, presiona Guardar de nuevo para confirmarlo.")
+    return nombre, None
 
 def render_banner(icono, titulo, subtitulo=""):
     """Banner naranja de encabezado de cada apartado, con la fecha de la información a la derecha."""
@@ -1625,6 +1774,7 @@ def cargar_levantamientos():
         df_lev = pd.DataFrame(columns=COLUMNAS_LEVANTAMIENTOS)
     
     df_lev = limpiar_y_mapear_columnas(df_lev, COLUMNAS_LEVANTAMIENTOS)
+    df_lev["Jefe_de_Venta"] = unificar_jefes_serie(df_lev["Jefe_de_Venta"])
     return df_lev
 
 def cargar_solicitudes():
@@ -1642,6 +1792,7 @@ def cargar_solicitudes():
     df_sol["Año"] = anios_de_df(df_sol, "Equipo")
     df_sol["Año_Solicitado"] = df_sol["Año_Solicitado"].map(normalizar_rango_solicitado)
     df_sol = df_sol.fillna("")
+    df_sol["Jefe_de_Venta"] = unificar_jefes_serie(df_sol["Jefe_de_Venta"])
     return df_sol
 
 def guardar_datos(df):
@@ -1997,9 +2148,14 @@ def calcular_rendimiento(df_sol, inicio, fin, choferes_base, df_he):
     r['% de horas extras'] = (r['Horas extras'] / tot_h * 100).round(1) if tot_h > 0 else 0.0
     r['Servicios por hora extra'] = (r['Completadas'] / r['Horas extras'].where(lambda x: x > 0)).round(2)
     r['Horas extras por servicio'] = (r['Horas extras'] / r['Completadas'].where(lambda x: x > 0)).round(2)
+    r['Horas sobre el límite'] = (r['Horas extras'] - LIMITE_HORAS_EXTRAS).clip(lower=0).round(1)
     brecha = r['% de horas extras'] - r['% de servicios']
     if tot_h > 0:
-        r['Diagnóstico'] = brecha.map(lambda b: "Revisar" if b >= 10 else ("Eficiente" if b <= -10 else "Equilibrado"))
+        # Revisar: su parte de horas extras supera a su parte de servicios, o rebasó el límite permitido por catorcena
+        r['Diagnóstico'] = [
+            "Revisar" if (b >= 10 or h > LIMITE_HORAS_EXTRAS) else ("Eficiente" if b <= -10 else "Equilibrado")
+            for b, h in zip(brecha, r['Horas extras'])
+        ]
     else:
         r['Diagnóstico'] = "Sin horas extras"
     r = r.sort_values(['Completadas', '% Cumplimiento', 'Promedio por día'], ascending=False)
@@ -2103,9 +2259,12 @@ def generar_pdf_rendimiento(resumen, diario, inicio, fin, modo="general", chofer
                                 f"{f['% de horas extras']:g}%", sph, hps, str(f['Diagnóstico'])])
             th = _tabla(filas_h, [4.2*cm, 2.6*cm, 2.8*cm, 2.2*cm, 2.8*cm, 3.6*cm, 3.6*cm, 3.2*cm], alinear_derecha_desde=1)
             colores_d = {"Revisar": colors.HexColor("#FEE2E2"), "Eficiente": colors.HexColor("#DCFCE7"), "Equilibrado": colors.HexColor("#FEF9C3")}
+            _hrs_lista = resumen['Horas extras'].tolist()
             th.setStyle(TableStyle([("BACKGROUND", (7, i), (7, i), colores_d.get(filas_h[i][7], colors.white)) for i in range(1, len(filas_h))]
+                                   + [("TEXTCOLOR", (3, i), (3, i), colors.HexColor("#B91C1C")) for i in range(1, len(filas_h)) if _hrs_lista[i - 1] > LIMITE_HORAS_EXTRAS]
                                    + [("ALIGN", (0, 1), (0, -1), "LEFT")]))
-            elementos += [th, Paragraph("Revisar: su parte de las horas extras del equipo supera en 10 puntos o más su parte de los servicios. "
+            elementos += [th, Paragraph("Revisar: su parte de las horas extras del equipo supera en 10 puntos o más su parte de los servicios, "
+                                        f"o rebasó el límite permitido de {LIMITE_HORAS_EXTRAS} horas extras por catorcena (en rojo). "
                                         "Eficiente: ocurre lo contrario. Equilibrado: están parejas.", e_nota)]
         elementos += [Spacer(1, 6), Paragraph(notas, e_nota)]
         doc.build(elementos)
@@ -2143,6 +2302,7 @@ def generar_pdf_rendimiento(resumen, diario, inicio, fin, modo="general", chofer
                           f"{sph} (equipo: {prom_sph:.2f})", str(f['Diagnóstico'])]],
                         [2.6*cm, 3.6*cm, 3.6*cm, 4.0*cm, 3.6*cm], alinear_derecha_desde=0, tam=9.5)
             elementos.append(th)
+            elementos.append(Paragraph(f"Límite permitido: {LIMITE_HORAS_EXTRAS} horas extras por catorcena.", e_nota))
         elementos.append(Paragraph("Servicios completados por tipo", e_h2))
         total = max(int(f['Completadas']), 1)
         filas_t = [["Tipo de servicio", "Cantidad", "% del total", "Promedio del equipo"]]
@@ -2584,14 +2744,6 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
         @media (max-width: 640px) {
             .neon-hero { padding: 14px 16px !important; }
             .neon-hero h2 { font-size: 1.3rem !important; }
-        }
-        /* Gráfica "Disponibilidad lista por canal": contorno naranja neón y barras azul rey neón con resplandor */
-        [data-testid="stColumn"]:has(.marca-disp-canal) [data-testid="stPlotlyChart"],
-        [data-testid="column"]:has(.marca-disp-canal) [data-testid="stPlotlyChart"] {
-            border: 2px solid #FF7F00;
-            border-radius: 12px;
-            box-shadow: 0 0 8px rgba(255, 127, 0, 0.75), 0 0 22px rgba(255, 127, 0, 0.4), inset 0 0 12px rgba(255, 127, 0, 0.18);
-            overflow: hidden;
         }
         /* Resto de gráficas del dashboard: borde tenue para que combinen con el tema oscuro */
         [data-testid="stPlotlyChart"] { border: 1px solid #1F2937; border-radius: 12px; overflow: hidden; }
@@ -3376,21 +3528,16 @@ elif menu == "Rendimiento de Choferes" and (st.session_state['autenticado'] or s
         with k_r3:
             render_kpi("Menos servicios", str(menos['Chofer']).upper(), f"{int(menos['Completadas'])} completados", "#E60012")
         with k_r4:
-            render_kpi("Horas extras", f"{float(resumen['Horas extras'].sum()):g}", "Capturadas en la catorcena", "#FF7F00")
+            _n_exc = int((resumen['Horas extras'] > LIMITE_HORAS_EXTRAS).sum())
+            render_kpi("Horas extras", f"{float(resumen['Horas extras'].sum()):g}",
+                       f"{_n_exc} chofer(es) sobre el límite de {LIMITE_HORAS_EXTRAS} h" if _n_exc else "Capturadas en la catorcena", "#FF7F00")
 
         st.markdown("### Ranking de la catorcena")
         cols_vista = ['Posición', 'Chofer', 'Asignadas', 'Completadas', 'Entregas', 'Levantamientos', 'Reubicaciones', 'Documentales',
                       'Canceladas', 'Pendientes', '% Cumplimiento', 'Días con actividad', 'Promedio por día', 'Horas extras', 'Anterior', 'Variación']
-        _max_c, _min_c = resumen['Completadas'].max(), resumen['Completadas'].min()
-        estilo_rank = resumen[cols_vista].style.map(
-            lambda v: 'background-color: #dcfce7; color: #166534; font-weight: bold;' if v == _max_c and _max_c != _min_c else
-                      ('background-color: #fee2e2; color: #991b1b; font-weight: bold;' if v == _min_c and _max_c != _min_c else ''),
-            subset=['Completadas']).map(
-            lambda v: 'color: #166534; font-weight: bold;' if v > 0 else ('color: #991b1b; font-weight: bold;' if v < 0 else ''),
-            subset=['Variación'])
-        cfg_rank = config_barras(resumen, ['% Cumplimiento'], formato="%.1f%%", maximo=100)
-        cfg_rank.update(config_barras(resumen, ['Horas extras', 'Promedio por día'], formato="%.1f"))
-        mostrar_tabla(estilo_rank, use_container_width=True, hide_index=True, column_config=cfg_rank)
+        tabla_ranking_html(resumen, cols_vista, LIMITE_HORAS_EXTRAS)
+        st.caption(f"Horas extras: la barra se llena al llegar al límite permitido de {LIMITE_HORAS_EXTRAS} horas por catorcena; "
+                   "si se pasa, la barra se pinta de rojo y se indica cuántas horas de más.")
         if sin_ruta:
             st.caption(f"{sin_ruta} solicitud(es) de esta catorcena no tienen chofer (Ruta) asignado y no se cuentan.")
 
@@ -3424,23 +3571,30 @@ elif menu == "Rendimiento de Choferes" and (st.session_state['autenticado'] or s
             fig_s.add_hline(y=float(resumen['Completadas'].mean()), line_dash="dash", line_color="#9CA3AF")
             fig_s.add_vline(x=float(resumen['Horas extras'].mean()), line_dash="dash", line_color="#9CA3AF")
             fig_s = _estilo_grafica(fig_s, "Horas extras contra servicios completados (las líneas son el promedio del equipo)", 380)
-            fig_s.update_xaxes(title_text="Horas extras")
+            fig_s.update_xaxes(title_text="Horas extras", range=[0, max(float(LIMITE_HORAS_EXTRAS), float(resumen['Horas extras'].max())) * 1.15])
+            fig_s.add_vline(x=LIMITE_HORAS_EXTRAS, line_dash="dot", line_color="#DC2626",
+                            annotation_text=f"Límite {LIMITE_HORAS_EXTRAS} h", annotation_position="top")
             fig_s.update_yaxes(title_text="Servicios completados")
             fig_s.add_annotation(xref="paper", yref="paper", x=1, y=0, text="Más horas extras, menos servicios", showarrow=False,
                                  xanchor="right", yanchor="bottom", font=dict(color="#991b1b", size=11))
             fig_s.add_annotation(xref="paper", yref="paper", x=0, y=1, text="Menos horas extras, más servicios", showarrow=False,
                                  xanchor="left", yanchor="top", font=dict(color="#166534", size=11))
             mostrar_grafica(fig_s, use_container_width=True)
-            cmp_cols = ['Chofer', 'Completadas', '% de servicios', 'Horas extras', '% de horas extras',
+            cmp_cols = ['Chofer', 'Completadas', '% de servicios', 'Horas extras', 'Horas sobre el límite', '% de horas extras',
                         'Servicios por hora extra', 'Horas extras por servicio', 'Diagnóstico']
-            estilo_cmp = resumen[cmp_cols].style.format(na_rep="—", subset=['Servicios por hora extra', 'Horas extras por servicio']).map(
+            _entero = lambda v: f"{int(v + 0.5)}"   # sin decimales (redondeo normal: 8.5 → 9)
+            estilo_cmp = resumen[cmp_cols].style.format({
+                'Horas extras': _entero, 'Horas sobre el límite': _entero, 'Horas extras por servicio': _entero,
+                'Servicios por hora extra': "{:.2f}"}, na_rep="—").map(
+                lambda v: 'color: #991b1b; font-weight: bold;' if v > 0 else '', subset=['Horas sobre el límite']).map(
                 lambda v: {"Revisar": 'background-color: #fee2e2; color: #991b1b; font-weight: bold;',
                            "Eficiente": 'background-color: #dcfce7; color: #166534; font-weight: bold;',
                            "Equilibrado": 'background-color: #fef9c3; color: #854d0e; font-weight: bold;'}.get(v, ''),
                 subset=['Diagnóstico'])
             mostrar_tabla(estilo_cmp, use_container_width=True, hide_index=True,
                           column_config=config_barras(resumen, ['% de servicios', '% de horas extras'], formato="%.1f%%", maximo=100))
-            st.caption("Revisar: su parte de las horas extras del equipo supera en 10 puntos o más su parte de los servicios. "
+            st.caption("Revisar: su parte de las horas extras del equipo supera en 10 puntos o más su parte de los servicios, "
+                       f"o rebasó el límite permitido de {LIMITE_HORAS_EXTRAS} horas extras por catorcena. "
                        "Eficiente: ocurre lo contrario. Equilibrado: están parejas.")
 
         with st.expander("Detalle por día"):
@@ -3924,7 +4078,8 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
             "Registrar Nueva Solicitud", 
             "Actualizar o Eliminar Solicitudes",
             "Historial de Solicitudes OK",
-            "Importar Archivo Excel de Solicitudes"
+            "Importar Archivo Excel de Solicitudes",
+            "Unificar Jefes de Venta"
         ], 
         horizontal=True
     )
@@ -3996,7 +4151,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
             with col_a2:
                 ruta_sol = st.text_input("Chofer / Ruta (Opcional):").strip()
             with col_a3:
-                jefe_sol = st.text_input("Jefe de Venta:").strip()
+                jefe_sol = selector_jefe("Jefe de Venta:", "jefe_nueva_sol")
             col_b1, col_b2 = st.columns(2)
             with col_b1:
                 supervisor = st.text_input("Supervisor (Opcional):").strip()
@@ -4026,6 +4181,9 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                 elif st.session_state.get("widget_multi_series") and not series_lista:
                     st.error("Activaste 'Capturar varias series', pero no escribiste ninguna serie.")
                     st.stop()
+                elif (_r_jefe := resolver_jefe(jefe_sol, "nueva_sol"))[1] is not None:
+                    st.warning(_r_jefe[1])
+                    st.stop()
                 elif status_sol.lower() in ["entregado", "realizado", "transferido", "levantado"] and not incluir_fecha_entregado:
                     st.error(f"No se guardaron los cambios: Seleccionó el estatus '{status_sol}' pero no activó ni asignó la Fecha Entrega. La solicitud no puede avanzar de estatus sin su respectiva fecha.")
                     st.stop()
@@ -4035,7 +4193,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                     
                     filas_nuevas = [{
                         "Fecha_Entregado": fecha_e_str, "Status": status_sol, "Fecha_Recibido": fecha_r_str,
-                        "Proyecto": proyecto, "CUC": cuc, "Cliente": cliente_sol, "Jefe_de_Venta": jefe_sol,
+                        "Proyecto": proyecto, "CUC": cuc, "Cliente": cliente_sol, "Jefe_de_Venta": _r_jefe[0],
                         "Supervisor": supervisor, "Movimiento": movimiento_final, "Equipo": equipo_tipo,
                         "Modelo": modelo_sol, "Serie": ser, "Año_Solicitado": anio_solicitado, "Canal": canal_sol, "Ruta": ruta_sol,
                         "Motivo": motivo_sol, "Observaciones": observaciones
@@ -4324,7 +4482,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                         with col_ed2:
                             titulo_paso(2, "Cliente y equipo", "#B45309")
                             cliente_edit = st.text_input("Nombre de Cliente:", value=str(row_sel.get('Cliente', '')), key=f"cli_{idx_seleccionado}").strip()
-                            jefe_edit = st.text_input("Jefe de Venta:", value=str(row_sel.get('Jefe_de_Venta', '')), key=f"jefe_{idx_seleccionado}").strip()
+                            jefe_edit = selector_jefe("Jefe de Venta:", f"jefe_{idx_seleccionado}", str(row_sel.get('Jefe_de_Venta', '')))
                             supervisor_edit = st.text_input("Supervisor:", value=str(row_sel.get('Supervisor', '')), key=f"sup_{idx_seleccionado}").strip()
                             
                             idx_eq = TIPOS_EQUIPO.index(row_sel['Equipo']) if row_sel['Equipo'] in TIPOS_EQUIPO else 0
@@ -4366,6 +4524,8 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                                 st.error("Por favor, ingresa al menos el CUC, el Modelo y el Cliente.")
                             elif status_edit.lower() in ["entregado", "realizado", "transferido", "levantado"] and not incluir_fecha_entregado_edit:
                                 st.error(f"No se guardaron los cambios: Seleccionó el estatus '{status_edit}' pero no activó ni asignó la Fecha Entrega.")
+                            elif (_r_jefe_e := resolver_jefe(jefe_edit, f"edit_{idx_seleccionado}"))[1] is not None:
+                                st.warning(_r_jefe_e[1])
                             else:
                                 f_rec_str = str(row_sel.get('Fecha_Recibido', ''))
                                 f_ent_str = f_entregado_edit.strftime("%Y-%m-%d") if incluir_fecha_entregado_edit else ""
@@ -4376,7 +4536,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                                 df_sol.loc[idx_seleccionado, 'Proyecto'] = proyecto_edit
                                 df_sol.loc[idx_seleccionado, 'CUC'] = cuc_edit
                                 df_sol.loc[idx_seleccionado, 'Cliente'] = cliente_edit
-                                df_sol.loc[idx_seleccionado, 'Jefe_de_Venta'] = jefe_edit
+                                df_sol.loc[idx_seleccionado, 'Jefe_de_Venta'] = _r_jefe_e[0]
                                 df_sol.loc[idx_seleccionado, 'Supervisor'] = supervisor_edit
                                 df_sol.loc[idx_seleccionado, 'Movimiento'] = movimiento_edit
                                 df_sol.loc[idx_seleccionado, 'Equipo'] = equipo_edit
@@ -4471,6 +4631,50 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
         else:
             estado_vacio("El archivo de solicitudes está vacío.")
 
+    elif modo_solicitud == "Unificar Jefes de Venta":
+        st.markdown("Junta en un solo nombre las variantes de un mismo jefe de venta (por ejemplo «Juan Pérez» y «Juan Pérez López»). "
+                    "El cambio se aplica a todas las solicitudes y levantamientos.")
+        df_lev_u = cargar_levantamientos()
+        conteo = pd.concat([df_sol['Jefe_de_Venta'], df_lev_u['Jefe_de_Venta']]).fillna("").astype(str).str.strip()
+        conteo = conteo[(conteo != "") & (conteo.str.lower() != "nan")].value_counts()
+        if conteo.empty:
+            estado_vacio("Todavía no hay jefes de venta registrados.")
+        else:
+            nombres_j = sorted(conteo.index, key=_norm_nombre)
+            grupos, usados = [], set()
+            for n_ in nombres_j:
+                if n_ in usados:
+                    continue
+                par = [x for x in jefes_parecidos(n_, nombres_j) if x not in usados]
+                if par:
+                    grupos.append([n_] + par)
+                    usados.update([n_] + par)
+            titulo_paso(1, "Posibles duplicados detectados", "#B45309")
+            if grupos:
+                for g_ in grupos:
+                    st.markdown("- " + "  ·  ".join(f"**{x}** ({conteo[x]})" for x in g_))
+            else:
+                st.success("No se detectaron nombres parecidos.")
+            titulo_paso(2, "Unificar", "#111827")
+            variantes = st.multiselect("Nombres que son la misma persona:", nombres_j,
+                                       format_func=lambda x: f"{x} ({conteo[x]})", key="uni_jefes_variantes")
+            destino = st.selectbox("Nombre correcto:", variantes, index=None, accept_new_options=True,
+                                   placeholder="Elige uno de los seleccionados o escribe el nombre correcto", key="uni_jefes_destino")
+            if st.button(":material/merge: Unificar nombres", key="btn_unificar_jefes"):
+                destino_l = _limpiar_nombre(destino or "")
+                if len(variantes) < 1 or not destino_l:
+                    st.error("Selecciona al menos un nombre y el nombre correcto.")
+                else:
+                    df_sol_u = df_sol.copy()
+                    for df_x in (df_sol_u, df_lev_u):
+                        df_x['Jefe_de_Venta'] = df_x['Jefe_de_Venta'].where(~df_x['Jefe_de_Venta'].isin(variantes), destino_l)
+                    ok_s = guardar_solicitudes_seguro(df_sol_u)
+                    guardar_levantamientos(df_lev_u)
+                    if ok_s is not False:
+                        st.success(f"Listo: {len(variantes)} nombre(s) quedaron como «{destino_l}».")
+                        time.sleep(1.2)
+                        st.rerun()
+
     elif modo_solicitud == "Importar Archivo Excel de Solicitudes":
         st.markdown("#### Subir y Sincronizar Archivo Excel (.xlsx) de Solicitudes")
         st.markdown("Selecciona o arrastra tu archivo Excel actualizado con las solicitudes.")
@@ -4539,7 +4743,7 @@ elif menu == "Levantamientos" and st.session_state['autenticado']:
                 motivo = st.text_input("Motivo del Levantamiento:").strip()
                 ubicacion = st.selectbox("Ubicación (ej. En patios):", UBICACIONES, index=3)
                 ruta = st.text_input("Ruta:").strip()
-                jefe_venta = st.text_input("Jefe de Venta:").strip()
+                jefe_venta = selector_jefe("Jefe de Venta:", "jefe_levantamiento")
                 solicitado = st.selectbox("Solicitado vía:", ["Whatsapp", "Correo", "Solicitud"])
                 
             submit_lev = st.form_submit_button("Guardar Levantamiento e Ingresar al Sistema")
@@ -4555,7 +4759,7 @@ elif menu == "Levantamientos" and st.session_state['autenticado']:
                         "Fecha": fecha_str, "CUC": cuc_lev, "Cliente": cliente, "Modelo": modelo,
                         "Serie": serie, "Tipo": tipo, "Imagen": imagen, "Canal": canal,
                         "Status": status_lev, "Motivo": motivo, "Ubicación": ubicacion,
-                        "Ruta": ruta, "Jefe_de_Venta": jefe_venta, "Solicitado": solicitado
+                        "Ruta": ruta, "Jefe_de_Venta": resolver_jefe(jefe_venta, "levantamiento", bloquear=False)[0], "Solicitado": solicitado
                     }])
                     df_lev = pd.concat([df_lev, nuevo_lev], ignore_index=True)
                     guardar_levantamientos(df_lev)
