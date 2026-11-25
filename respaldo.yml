@@ -1,0 +1,41 @@
+name: Respaldo diario de la base de datos
+
+on:
+  schedule:
+    - cron: "0 9 * * *"      # 09:00 UTC = 4:00 a. m. en Cancún
+  workflow_dispatch:          # también se puede lanzar a mano desde la pestaña Actions
+
+jobs:
+  respaldo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verificar que el repositorio sea privado
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PRIVADO=$(gh api repos/${{ github.repository }} --jq .private)
+          if [ "$PRIVADO" != "true" ]; then
+            echo "::error::El repositorio es público: no se genera el respaldo porque los datos quedarían expuestos."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install pandas SQLAlchemy psycopg2-binary
+
+      - name: Generar respaldo
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: python respaldo_db.py respaldos
+
+      - name: Guardar respaldo (se conserva 30 días)
+        uses: actions/upload-artifact@v4
+        with:
+          name: respaldo-comodatos
+          path: respaldos/*.zip
+          retention-days: 30
