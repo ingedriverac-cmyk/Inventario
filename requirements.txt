@@ -1,16 +1,13 @@
-# Versiones con las que se probó esta versión de la app (Python 3.12).
-# En Streamlit Cloud: Manage app > Settings > Python version = 3.12.
-# Para actualizar una librería, cambia el número aquí y prueba primero en el entorno de prueba.
-streamlit==1.67.0
-pandas==3.0.6
-numpy==2.5.4
-matplotlib==3.11.2
-plotly==7.1.0
-requests==2.34.2
-openpyxl==3.1.5
-xlrd==2.0.2
-pillow==13.0.0.post1
-jinja2==3.1.6
-SQLAlchemy==2.1.9
-psycopg2-binary==2.9.13
-reportlab==5.0.1
+streamlit
+pandas
+matplotlib
+requests
+openpyxl
+numpy
+pillow
+plotly
+xlrd
+jinja2
+SQLAlchemy
+psycopg2-binary
+reportlab
