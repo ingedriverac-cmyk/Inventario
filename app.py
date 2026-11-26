@@ -490,6 +490,34 @@ st.markdown("""
     .rk-bar.rk-bad span { color: #FFFFFF; }
     .rk-over { color: #B91C1C; font-size: 0.68rem; font-weight: 700; margin-top: 2px; text-transform: none; }
 
+
+    /* Entorno de prueba (secret: entorno = "prueba") */
+    .entorno-prueba { background: #6D28D9; color: #FFFFFF; border-radius: 8px; padding: 8px 10px; text-align: center;
+        font-weight: 800; letter-spacing: 0.06em; margin-bottom: 8px; }
+    .entorno-prueba span { display: block; font-weight: 500; font-size: 0.72rem; letter-spacing: 0; }
+    .franja-prueba { background: #6D28D9; color: #FFFFFF; text-align: center; padding: 6px 10px; border-radius: 8px;
+        font-weight: 700; font-size: 0.85rem; margin-bottom: 10px; }
+
+
+    /* Celular: tarjetas en dos columnas, tablas compactas y primera columna fija al desplazar */
+    @media (max-width: 640px) {
+        [data-testid="stHorizontalBlock"]:has(.kpi, .neon-kpi) { flex-wrap: wrap; gap: 0.5rem; }
+        [data-testid="stHorizontalBlock"]:has(.kpi, .neon-kpi) > [data-testid="stColumn"],
+        [data-testid="stHorizontalBlock"]:has(.kpi, .neon-kpi) > [data-testid="column"] {
+            flex: 1 1 calc(50% - 0.5rem) !important; min-width: calc(50% - 0.5rem) !important; width: auto !important; }
+        [data-testid="stHorizontalBlock"]:has(.kpi, .neon-kpi) > [data-testid="stColumn"]:last-child:nth-child(odd),
+        [data-testid="stHorizontalBlock"]:has(.kpi, .neon-kpi) > [data-testid="column"]:last-child:nth-child(odd) { flex-basis: 100% !important; }
+        .kpi, .neon-kpi { padding: 12px 12px !important; }
+        .kpi .val, .neon-kpi .val { font-size: 1.45rem !important; }
+        .neon-tbl td, .neon-tbl th, .rk-tbl td, .rk-tbl th { padding: 6px 7px; font-size: 0.78rem; }
+        .rk-tbl th:nth-child(2), .rk-tbl td:nth-child(2) { position: sticky; left: 0; background: #FFFFFF; z-index: 2; box-shadow: 2px 0 0 #E5E7EB; }
+        .neon-tbl th:first-child, .neon-tbl td:first-child { position: sticky; left: 0; z-index: 2; background: #0B0F19; box-shadow: 2px 0 0 #1F2937; }
+        .neon-tbl thead th:first-child { background: #1B1030; }
+        .neon-tbl tbody tr:nth-child(even) td:first-child { background: #0F1424; }
+        .page-hero .ph-date.old { background: rgba(127, 29, 29, 0.55); }
+    }
+    .page-hero .ph-date.old { background: rgba(127, 29, 29, 0.55); border: 1px solid #FCA5A5; }
+
     /* Celular: banners compactos y botones fáciles de tocar */
     @media (max-width: 640px) {
         .page-hero { padding: 16px 18px; border-radius: 12px; flex-direction: column; align-items: flex-start; gap: 10px; }
@@ -565,6 +593,7 @@ def render_kpi(etiqueta, valor, apoyo="", color="#1F2937", tendencia="", tipo_te
 _ICONOS_SVG = {
     "equipos": '<path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/>',
     "estadia": '<polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>',
+    "ajustes": '<line x1="21" x2="14" y1="4" y2="4"/><line x1="10" x2="3" y1="4" y2="4"/><line x1="21" x2="12" y1="12" y2="12"/><line x1="8" x2="3" y1="12" y2="12"/><line x1="21" x2="16" y1="20" y2="20"/><line x1="12" x2="3" y1="20" y2="20"/><line x1="14" x2="14" y1="2" y2="6"/><line x1="8" x2="8" y1="10" y2="14"/><line x1="16" x2="16" y1="18" y2="22"/>',
     "calendario": '<path d="M8 2v4"/><path d="M16 2v4"/><rect width="18" height="18" x="3" y="4" rx="2"/><path d="M3 10h18"/>',
     "especificaciones": '<rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M12 11h4"/><path d="M12 16h4"/><path d="M8 11h.01"/><path d="M8 16h.01"/>',
     "inventario": '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>',
@@ -637,9 +666,9 @@ def tabla_ranking_html(resumen, columnas, limite):
                 sobre = h > limite
                 pct = 100.0 if sobre else max(0.0, min(h / limite * 100, 100.0))
                 color = "#E5383B" if sobre else "#FFB066"
-                extra = f'<div class="rk-over">+{h - limite:.1f} sobre el límite</div>' if sobre else ""
+                extra = f'<div class="rk-over">+{h - limite:g} sobre el límite</div>' if sobre else ""
                 tds.append(f'<td><div class="rk-bar{" rk-bad" if sobre else ""}"><div class="rk-fill" style="width:{pct:.1f}%;background:{color}"></div>'
-                           f'<span>{h:.1f} h</span></div>{extra}</td>')
+                           f'<span>{h:g} h</span></div>{extra}</td>')
             elif c == 'Promedio por día':
                 tds.append(f"<td>{float(v):.1f}</td>")
             elif c == 'Variación':
@@ -674,27 +703,44 @@ def _canon_jefes(*series):
     from collections import Counter
     cont = {}
     for ser in series:
-        for v in ser.dropna().astype(str):
+        for v, veces in ser.fillna("").astype(str).value_counts().items():
             n = _limpiar_nombre(v)
             if n:
-                cont.setdefault(_norm_nombre(n), Counter())[n] += 1
+                cont.setdefault(_norm_nombre(n), Counter())[n] += int(veces)
+
     def _orden(kv):
         nom, veces = kv
         mixto = nom != nom.upper() and nom != nom.lower()          # prefiere «Juan Pérez» sobre «JUAN PEREZ» o «juan perez»
         return (-mixto, -veces, -int(any(ord(ch) > 127 for ch in nom)), -len(nom), nom)
     return {k: sorted(c.items(), key=_orden)[0][0] for k, c in cont.items()}
 
+def _aplicar_mapa_nombres(ser, mapa):
+    """Cambia cada valor distinto una sola vez y lo reparte a todas las filas."""
+    vals = ser.fillna("").astype(str)
+    distintos = {v: (mapa.get(_norm_nombre(v), _limpiar_nombre(v)) if _limpiar_nombre(v) else "") for v in vals.unique()}
+    return vals.map(distintos)
+
 def unificar_jefes_serie(ser):
     """Junta las variantes que solo cambian en mayúsculas, acentos o espacios (p. ej. «juan  perez» y «Juan Pérez»)."""
-    mapa = _canon_jefes(ser)
-    return ser.map(lambda v: mapa.get(_norm_nombre(v), _limpiar_nombre(v)) if _limpiar_nombre(v) else "")
+    return _aplicar_mapa_nombres(ser, _canon_jefes(ser))
 
-def catalogo_jefes():
-    try:
-        mapa = _canon_jefes(cargar_solicitudes()['Jefe_de_Venta'], cargar_levantamientos()['Jefe_de_Venta'])
-    except Exception:
-        return []
-    return sorted(mapa.values(), key=_norm_nombre)
+def unificar_rutas_serie(ser):
+    """Igual que con los jefes, pero si el nombre coincide con un chofer autorizado se usa su nombre exacto."""
+    mapa = _canon_jefes(ser)
+    for chofer in CHOFERES_AUTORIZADOS:
+        mapa[_norm_nombre(chofer)] = chofer
+    return _aplicar_mapa_nombres(ser, mapa)
+
+def catalogo_jefes(campo="Jefe_de_Venta"):
+    series = []
+    for cargar in (cargar_solicitudes, cargar_levantamientos):
+        try:
+            df_c = cargar()
+            if campo in df_c.columns:
+                series.append(df_c[campo])
+        except Exception:
+            pass
+    return sorted(_canon_jefes(*series).values(), key=_norm_nombre)
 
 def jefes_parecidos(nombre, catalogo):
     """Nombres del catálogo que podrían ser la misma persona (apellido de más o de menos, orden distinto, errores de ortografía)."""
@@ -707,13 +753,32 @@ def jefes_parecidos(nombre, catalogo):
         if ne == n or not ne or not n:
             continue
         te = set(ne.split())
-        if tn <= te or te <= tn or difflib.SequenceMatcher(None, n, ne).ratio() >= 0.84:
+        if tn <= te or te <= tn:
+            res.append(e)
+            continue
+        sm = difflib.SequenceMatcher(None, n, ne)
+        if sm.real_quick_ratio() >= 0.84 and sm.quick_ratio() >= 0.84 and sm.ratio() >= 0.84:
             res.append(e)
     return res
 
-def selector_jefe(etiqueta, key, valor_actual=""):
-    """Lista de jefes ya registrados (con búsqueda al escribir). Si es nuevo, se escribe y queda agregado."""
-    cat = catalogo_jefes()
+def selector_ruta(etiqueta, key, valor_actual=""):
+    """Solo choferes autorizados (nombre exacto), para que el ranking no se divida por errores de escritura."""
+    choferes = sorted(CHOFERES_AUTORIZADOS.keys(), key=_norm_nombre)
+    actual = _limpiar_nombre(valor_actual)
+    opciones, idx = list(choferes), None
+    if actual:
+        existente = next((c for c in choferes if _norm_nombre(c) == _norm_nombre(actual)), None)
+        if existente:
+            idx = opciones.index(existente)
+        else:   # valor anterior que no está en la lista: se conserva hasta que lo cambien
+            opciones, idx = [actual] + opciones, 0
+    if not opciones:
+        return _limpiar_nombre(st.text_input(etiqueta, value=actual, key=key))
+    return _limpiar_nombre(st.selectbox(etiqueta, opciones, index=idx, key=key, placeholder="Elige un chofer") or "")
+
+def selector_jefe(etiqueta, key, valor_actual="", campo="Jefe_de_Venta"):
+    """Lista de nombres ya registrados (con búsqueda al escribir). Si es nuevo, se escribe y queda agregado."""
+    cat = catalogo_jefes(campo)
     actual = _limpiar_nombre(valor_actual)
     opciones, idx = list(cat), None
     if actual:
@@ -728,13 +793,13 @@ def selector_jefe(etiqueta, key, valor_actual=""):
     except TypeError:   # versión de Streamlit sin accept_new_options
         return _limpiar_nombre(st.text_input(etiqueta, value=actual, key=key))
 
-def resolver_jefe(valor, form_key, bloquear=True):
+def resolver_jefe(valor, form_key, bloquear=True, campo="Jefe_de_Venta"):
     """(nombre_final, aviso). Si ya existe con otra escritura se usa la grafía registrada; si se parece a otro,
     pide confirmar guardando de nuevo."""
     nombre = _limpiar_nombre(valor)
     if not nombre:
         return "", None
-    cat = catalogo_jefes()
+    cat = catalogo_jefes(campo)
     for e in cat:
         if _norm_nombre(e) == _norm_nombre(nombre):
             return e, None
@@ -742,13 +807,77 @@ def resolver_jefe(valor, form_key, bloquear=True):
     clave = f"_jefe_conf_{form_key}"
     if bloquear and parecidos and st.session_state.get(clave) != _norm_nombre(nombre):
         st.session_state[clave] = _norm_nombre(nombre)
-        return None, (f"«{nombre}» se parece a: {', '.join(parecidos[:4])}. Si es la misma persona, elígela en la lista de "
-                      f"«Jefe de Venta». Si es otra persona, presiona Guardar de nuevo para confirmarlo.")
+        return None, (f"«{nombre}» se parece a: {', '.join(parecidos[:4])}. Si es la misma persona, elígela en la lista del campo. "
+                      f"Si es otra persona, presiona Guardar de nuevo para confirmarlo.")
     return nombre, None
+
+def pendientes_sin_asignar(df_sol):
+    """Entregas pendientes que todavía no tienen serie asignada (base de Necesidades de Taller)."""
+    if df_sol is None or df_sol.empty:
+        return pd.DataFrame(columns=COLUMNAS_SOLICITUDES)
+    p = df_sol[df_sol['Status'].astype(str).str.strip().str.lower() == 'pendiente'].copy()
+    p = p[p['Movimiento'].astype(str).str.strip() == "Entrega"]
+    sin_serie = ~p['Serie'].fillna("").astype(str).str.strip().replace("nan", "").ne("")
+    p = p[sin_serie].copy()
+    p['Equipo'] = p['Equipo'].fillna("").astype(str).str.strip().replace("", "Sin equipo")
+    p['Modelo'] = p['Modelo'].fillna("").astype(str).str.strip().replace("", "Sin modelo")
+    p['Año_Solicitado'] = p['Año_Solicitado'].fillna("").astype(str).str.strip().replace("", "Sin especificar")
+    return p
+
+def calcular_necesidad_taller(pend, inv, canal="Todos"):
+    """Pendientes por modelo y año solicitado contra lo disponible y lo que está Para Reparar. Devuelve (tabla, inventario considerado, máscaras de disponibles y por reparar)."""
+    inv_nt = inv[inv['Canal'] != "Cedis"].copy() if not inv.empty else pd.DataFrame(columns=ESQUEMA_COLUMNAS)
+    if canal != "Todos" and not inv_nt.empty:
+        inv_nt = inv_nt[inv_nt['Canal'] == canal]
+    disp_mr, disp_m, rep_mr, rep_m = {}, {}, {}, {}
+    es_disp = es_rep = None
+    if not inv_nt.empty:
+        inv_nt['_m'] = inv_nt['Modelo'].astype(str).str.strip().str.upper()
+        inv_nt['_r'] = inv_nt['Año'].map(rango_anio_solicitado)
+        est_nt = inv_nt['Estatus'].astype(str).str.strip().str.lower()
+        es_disp = inv_nt['Ubicación'].isin(["En almacén de Comodatos", "En almacén de Publicidad", "En patios"]) & est_nt.isin(["nuevo", "reparado"])
+        es_rep = est_nt == "para reparar"
+        disp_mr = inv_nt[es_disp].groupby(['_m', '_r']).size().to_dict()
+        disp_m = inv_nt[es_disp].groupby('_m').size().to_dict()
+        rep_mr = inv_nt[es_rep].groupby(['_m', '_r']).size().to_dict()
+        rep_m = inv_nt[es_rep].groupby('_m').size().to_dict()
+
+    necesidad = pend.groupby(['Equipo', 'Modelo', 'Año_Solicitado']).size().reset_index(name='Pendientes')
+    def _existencia(fila, por_mr, por_m):
+        m_ = str(fila['Modelo']).strip().upper()
+        if fila['Año_Solicitado'] in RANGOS_ANIO_SOLICITADO and str(fila['Equipo']).lower().startswith("enfriador"):
+            return por_mr.get((m_, fila['Año_Solicitado']), 0)
+        return por_m.get(m_, 0)
+    necesidad['Disponibles'] = necesidad.apply(lambda r: _existencia(r, disp_mr, disp_m), axis=1)
+    necesidad['Faltante'] = (necesidad['Pendientes'] - necesidad['Disponibles']).clip(lower=0)
+    necesidad['Para Reparar'] = necesidad.apply(lambda r: _existencia(r, rep_mr, rep_m), axis=1)
+    necesidad['A reparar (sugerido)'] = necesidad[['Faltante', 'Para Reparar']].min(axis=1)
+    _orden_r = {r: i for i, r in enumerate(RANGOS_ANIO_SOLICITADO)}
+    necesidad['_orden'] = necesidad['Año_Solicitado'].map(lambda r: _orden_r.get(r, 99))
+    necesidad = necesidad.sort_values(['Modelo', '_orden', 'Equipo']).drop(columns='_orden').reset_index(drop=True)
+    necesidad = necesidad.rename(columns={'Año_Solicitado': 'Año solicitado'})
+    return necesidad, inv_nt, es_disp, es_rep
+
+def aviso_series_pendientes(df_sol, series):
+    """Texto de aviso si alguna serie ya tiene una solicitud pendiente (evita duplicarla), o None."""
+    if df_sol is None or df_sol.empty:
+        return None
+    pend = df_sol[df_sol['Status'].astype(str).str.strip().str.lower() == 'pendiente']
+    avisos = []
+    for ser in series:
+        clave = _limpiar_nombre(ser).casefold()
+        if not clave:
+            continue
+        coincide = pend[pend['Serie'].astype(str).map(lambda v: _limpiar_nombre(v).casefold()) == clave]
+        if not coincide.empty:
+            r = coincide.iloc[0]
+            avisos.append(f"la serie {ser} ya tiene una solicitud pendiente ({r.get('Movimiento', '')} · CUC {r.get('CUC', '')} · {r.get('Cliente', '')})")
+    return ("Atención: " + "; ".join(avisos) + ".") if avisos else None
 
 def render_banner(icono, titulo, subtitulo=""):
     """Banner naranja de encabezado de cada apartado, con la fecha de la información a la derecha."""
     sub = f"<p>{subtitulo}</p>" if subtitulo else ""
+    _txt_act, _viejo_act = texto_actualizacion()
     ruta = ""
     if st.session_state.get('autenticado') or st.session_state.get('es_gerente'):
         _cat, _sec = st.session_state.get('nav_categoria'), st.session_state.get('nav_seccion')
@@ -757,7 +886,7 @@ def render_banner(icono, titulo, subtitulo=""):
     st.markdown(
         f'<div class="page-hero"><div class="ph-left"><div class="ph-ic">{svg_icono(icono, 24)}</div>'
         f'<div class="ph-txt">{ruta}<h2>{titulo}</h2>{sub}</div></div>'
-        f'<div class="ph-date">{svg_icono("calendario", 14)}Información al {datetime.now().strftime("%d/%m/%Y")}</div></div>',
+        f'<div class="ph-date{" old" if _viejo_act else ""}">{svg_icono("calendario", 14)}{_txt_act}</div></div>',
         unsafe_allow_html=True
     )
 
@@ -899,7 +1028,6 @@ ICONOS_MENU = {
     "Dashboard Ejecutivo": ":material/dashboard:",
     "Rendimiento de Choferes": ":material/speed:",
     "Estadía": ":material/schedule:",
-    "Reportes Gerenciales": ":material/description:",
     "Equipos Disponibles": ":material/inventory_2:",
     "Solicitudes Diarias": ":material/today:",
     "Necesidades de Taller": ":material/build:",
@@ -912,6 +1040,7 @@ ICONOS_MENU = {
     "Catálogo de Equipos": ":material/menu_book:",
     "Historial de Movimientos": ":material/history:",
     "Exportar a Excel": ":material/download:",
+    "Configuración": ":material/tune:",
 }
 
 def _etiqueta_menu(opcion):
@@ -936,7 +1065,8 @@ def _estilo_grafica(fig, titulo=None, alto=360):
 
 COLOR_BARRA = "#2FA8F5"   # azul cielo, alegre a la vista (reemplaza al azul oscuro #003B5C en las barras)
 
-def grafica_estadia(df, eje, titulo, umbral=UMBRAL_ALERTA_DIAS):
+def grafica_estadia(df, eje, titulo, umbral=None):
+    umbral = UMBRAL_ALERTA_DIAS if umbral is None else umbral
     """Barras horizontales de promedio de días con semáforo y línea de límite."""
     d = df.sort_values('Promedio de Días', ascending=True).reset_index(drop=True)
     colores = ['#DC2626' if v > umbral else '#F59E0B' if v > umbral * 0.75 else COLOR_BARRA
@@ -961,7 +1091,7 @@ def grafica_estadia(df, eje, titulo, umbral=UMBRAL_ALERTA_DIAS):
 
 def mostrar_grafica_estadia(df, eje, titulo):
     mostrar_grafica(grafica_estadia(df, eje, titulo), use_container_width=True)
-    st.caption("Rojo: más de 40 días. Ámbar: más de 30 días. Azul: dentro de lo esperado.")
+    st.caption(f"Rojo: más de {UMBRAL_ALERTA_DIAS} días. Ámbar: más de {int(UMBRAL_ALERTA_DIAS * 0.75)} días. Azul: dentro de lo esperado.")
 
 
 def config_col_estadia(df):
@@ -1005,9 +1135,10 @@ def grafica_dona(df, columna, titulo, mapa_color=None):
 
 def grafica_antiguedad(df, titulo="Antigüedad sin movimiento"):
     dias = pd.to_numeric(df['Días sin movimiento'], errors='coerce').dropna()
-    etiquetas = ["0 a 15 días", "16 a 30 días", "31 a 40 días", "más de 40 días"]
+    u = UMBRAL_ALERTA_DIAS
+    etiquetas = ["0 a 15 días", "16 a 30 días", f"31 a {u} días", f"más de {u} días"]
     valores = [int(dias.between(0, 15).sum()), int(dias.between(16, 30).sum()),
-               int(dias.between(31, 40).sum()), int((dias > 40).sum())]
+               int(dias.between(31, u).sum()), int((dias > u).sum())]
     fig = go.Figure(go.Bar(
         x=etiquetas, y=valores, marker_color=[COLOR_BARRA, '#8FD0FA', '#F59E0B', '#DC2626'],
         text=valores, textposition='outside', cliponaxis=False,
@@ -1068,7 +1199,54 @@ def _credencial_valida(tabla, usuario, clave):
 WEB_APP_URL = _leer_secreto("WEB_APP_URL", "")
 USUARIOS_AUTORIZADOS = _leer_credenciales("usuarios_admin")
 CHOFERES_AUTORIZADOS = _leer_credenciales("usuarios_chofer")
-GERENTES_AUTORIZADOS = {"Gerentes": "Gerencia2026", **_leer_credenciales("usuarios_gerente")}
+GERENTES_AUTORIZADOS = _leer_credenciales("usuarios_gerente")   # ya no hay contraseña por defecto en el código
+
+ENTORNO = str(_leer_secreto("entorno", "produccion")).strip().lower()   # "prueba" muestra un aviso en toda la app
+
+def _minutos_secreto(clave, defecto):
+    try:
+        return max(5, int(float(_leer_secreto(clave, defecto))))
+    except (TypeError, ValueError):
+        return defecto
+
+SESION_MINUTOS = {"admin": _minutos_secreto("sesion_minutos_admin", 60), "chofer": _minutos_secreto("sesion_minutos_chofer", 120)}
+MAX_INTENTOS_LOGIN = 5          # por usuario
+MAX_INTENTOS_LOGIN_TIPO = 40    # por tipo de acceso (frena adivinar usuarios distintos)
+VENTANA_LOGIN_MIN = 15
+
+@st.cache_resource(show_spinner=False)
+def _registro_intentos():
+    return {}
+
+def _fallos_recientes(clave):
+    reg = _registro_intentos()
+    ahora = time.time()
+    lista = [t for t in reg.get(clave, []) if ahora - t < VENTANA_LOGIN_MIN * 60]
+    reg[clave] = lista
+    return lista
+
+def login_bloqueado(tipo, usuario):
+    """Minutos que faltan para poder intentar de nuevo (0 si no está bloqueado)."""
+    ahora = time.time()
+    for clave, limite in (((tipo, str(usuario).strip().lower()), MAX_INTENTOS_LOGIN), ((tipo, "*"), MAX_INTENTOS_LOGIN_TIPO)):
+        lista = _fallos_recientes(clave)
+        if len(lista) >= limite:
+            return max(1, int((lista[0] + VENTANA_LOGIN_MIN * 60 - ahora) // 60) + 1)
+    return 0
+
+def registrar_fallo(tipo, usuario):
+    reg, ahora = _registro_intentos(), time.time()
+    for clave in ((tipo, str(usuario).strip().lower()), (tipo, "*")):
+        reg.setdefault(clave, []).append(ahora)
+
+def limpiar_fallos(tipo, usuario):
+    _registro_intentos().pop((tipo, str(usuario).strip().lower()), None)
+
+def _cerrar_sesion():
+    for k, v in (('autenticado', False), ('es_chofer', False), ('es_gerente', False), ('usuario_actual', ""), ('nombre_chofer', "")):
+        st.session_state[k] = v
+    for k in [k for k in st.session_state if str(k).startswith(("_vista_", "_bloqueo_", "_jefe_conf_"))] + ['_ultima_actividad']:
+        st.session_state.pop(k, None)
 
 OPCIONES_PROYECTOS = [
     "Normal", "Cambio", "Documental", "Fisico", "Prospera", 
@@ -1379,6 +1557,27 @@ def db_resumen():
         res["imagenes_modelos"] = con.execute(text("SELECT count(*) FROM imagenes_modelos")).scalar()
         return res
 
+def generar_respaldo_zip():
+    """ZIP con un CSV por tabla y las imágenes de los modelos (solo con la base de datos conectada)."""
+    import zipfile
+    from sqlalchemy import text
+    buf = io.BytesIO()
+    resumen = []
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for nombre in _tablas_db():
+            df_t = db_tabla(nombre)
+            z.writestr(f"{nombre}.csv", df_t.to_csv(index=False))
+            resumen.append(f"{nombre}: {len(df_t)} filas")
+        n_img = 0
+        with _motor().connect() as con:
+            for nombre_img, contenido in con.execute(text("SELECT nombre, contenido FROM imagenes_modelos")).fetchall():
+                z.writestr(f"imagenes_modelos/{nombre_img}", bytes(contenido))
+                n_img += 1
+        resumen.append(f"imagenes_modelos: {n_img} archivos")
+        z.writestr("LEEME.txt", "Respaldo de la app de Comodatos\n"
+                                f"Generado: {datetime.now():%Y-%m-%d %H:%M:%S}\n\n" + "\n".join(resumen) + "\n")
+    return buf.getvalue()
+
 def guardar_imagen_db(modelo, jpeg_bytes):
     """Guarda (o reemplaza) la imagen de un modelo de forma permanente en la base de datos."""
     import psycopg2
@@ -1499,12 +1698,47 @@ def _sincronizar_por_posicion(nombre, df, columnas):
             _insertar_filas(cur, nombre, columnas, nuevas)
     _invalidar_tabla(nombre)
 
+def _hash_tabla(df, columnas):
+    if df is None or len(df) == 0:
+        return 0
+    d = df.reindex(columns=columnas).fillna("").astype(str)
+    return hash(pd.util.hash_pandas_object(d, index=False).values.tobytes())
+
+def guardia_cambios_externos(nombre, df, columnas):
+    """Avisa si otra persona modificó la tabla desde la última pantalla de esta sesión. Mientras tanto no se permite guardar:
+    las filas se identifican por su posición y, si alguien agregó o borró registros, se podría editar el registro equivocado."""
+    clave = f"_vista_{nombre}"
+    h = _hash_tabla(df, columnas)
+    previo = st.session_state.get(clave)
+    st.session_state[clave] = h
+    cambio = previo is not None and previo != h
+    st.session_state[f"_bloqueo_{nombre}"] = cambio
+    if cambio:
+        st.warning("Otra persona modificó esta información mientras la tenías abierta. La pantalla ya se actualizó: "
+                   "revisa los datos y vuelve a seleccionar el registro antes de guardar.")
+    return cambio
+
+def _verificar_bloqueo(nombre):
+    if st.session_state.get(f"_bloqueo_{nombre}"):
+        st.error("No se guardó: otra persona modificó esta información justo antes de tu cambio. "
+                 "Presiona cualquier botón para actualizar la pantalla, revisa el registro y vuelve a intentarlo.")
+        st.stop()
+
+def _marcar_vista(nombre, df, columnas):
+    """Tras guardar, esta sesión ya conoce la versión nueva de la tabla (no es un cambio de otra persona)."""
+    _MEMO_RUN.pop(nombre, None)
+    st.session_state[f"_vista_{nombre}"] = _hash_tabla(df, columnas)
+    st.session_state[f"_bloqueo_{nombre}"] = False
+    registrar_actualizacion(nombre)
+
 def _guardar_db(nombre, df, columnas, clave=None):
+    _verificar_bloqueo(nombre)
     try:
         if clave:
             _sincronizar_por_clave(nombre, df, columnas, clave)
         else:
             _sincronizar_por_posicion(nombre, df, columnas)
+        _marcar_vista(nombre, df, columnas)
         return True
     except Exception as e:
         st.error(f"No se pudo guardar en la base de datos: {type(e).__name__}: {str(e).splitlines()[0][:200] if str(e) else ''}")
@@ -1553,7 +1787,17 @@ def limpiar_fechas_movimiento(serie):
     except Exception:
         return serie.apply(_fecha_estricta).astype(str)
 
+_MEMO_RUN = {}   # se reinicia en cada ejecución del script; evita volver a procesar la misma tabla varias veces
+
+def _memo(nombre, construir):
+    if nombre not in _MEMO_RUN:
+        _MEMO_RUN[nombre] = construir()
+    return _MEMO_RUN[nombre].copy()
+
 def cargar_datos():
+    return _memo("inventario", _cargar_datos_sin_memo)
+
+def _cargar_datos_sin_memo():
     df = db_tabla("inventario") if db_activa() else _leer_inventario_archivos()
     df = limpiar_y_mapear_columnas(df, ESQUEMA_COLUMNAS).fillna("")
     df["Año"] = anios_de_df(df, "Tipo")
@@ -1763,6 +2007,9 @@ def cargar_historial():
     return df_h
 
 def cargar_levantamientos():
+    return _memo("levantamientos", _cargar_levantamientos_sin_memo)
+
+def _cargar_levantamientos_sin_memo():
     if db_activa():
         df_lev = db_tabla("levantamientos")
     elif os.path.exists(LEVANTAMIENTOS_FILE):
@@ -1775,9 +2022,13 @@ def cargar_levantamientos():
     
     df_lev = limpiar_y_mapear_columnas(df_lev, COLUMNAS_LEVANTAMIENTOS)
     df_lev["Jefe_de_Venta"] = unificar_jefes_serie(df_lev["Jefe_de_Venta"])
+    df_lev["Ruta"] = unificar_rutas_serie(df_lev["Ruta"])
     return df_lev
 
 def cargar_solicitudes():
+    return _memo("solicitudes", _cargar_solicitudes_sin_memo)
+
+def _cargar_solicitudes_sin_memo():
     if db_activa():
         df_sol = db_tabla("solicitudes")
     elif os.path.exists(SOLICITUDES_FILE):
@@ -1793,9 +2044,12 @@ def cargar_solicitudes():
     df_sol["Año_Solicitado"] = df_sol["Año_Solicitado"].map(normalizar_rango_solicitado)
     df_sol = df_sol.fillna("")
     df_sol["Jefe_de_Venta"] = unificar_jefes_serie(df_sol["Jefe_de_Venta"])
+    df_sol["Supervisor"] = unificar_jefes_serie(df_sol["Supervisor"])
+    df_sol["Ruta"] = unificar_rutas_serie(df_sol["Ruta"])
     return df_sol
 
 def guardar_datos(df):
+    _MEMO_RUN.pop("inventario", None)
     if 'Serie' in df.columns:
         df = df.copy()
         df['Año'] = anios_de_df(df, 'Tipo')
@@ -1806,6 +2060,7 @@ def guardar_datos(df):
         return
     try:
         df.to_csv(INVENTARIO_FILE, index=False)
+        registrar_actualizacion("inventario")
     except PermissionError:
         st.error(f"Error de permiso: El archivo '{INVENTARIO_FILE}' está abierto en Excel u otro programa. Ciérralo para guardar.")
         return
@@ -1818,8 +2073,10 @@ def guardar_datos(df):
 def guardar_levantamientos(df_lev):
     if db_activa():
         return _guardar_db("levantamientos", df_lev, COLUMNAS_LEVANTAMIENTOS)
+    _verificar_bloqueo("levantamientos")
     try:
         df_lev.to_csv(LEVANTAMIENTOS_FILE, index=False)
+        _marcar_vista("levantamientos", df_lev, COLUMNAS_LEVANTAMIENTOS)
         return True
     except PermissionError:
         st.error(f"Error: No se pudo guardar porque el archivo '{LEVANTAMIENTOS_FILE}' está abierto en Excel. Ciérralo para guardar.")
@@ -1833,8 +2090,10 @@ def guardar_solicitudes_seguro(df_sol):
             df_sol['Año_Solicitado'] = df_sol['Año_Solicitado'].map(normalizar_rango_solicitado)
     if db_activa():
         return _guardar_db("solicitudes", df_sol, COLUMNAS_SOLICITUDES)
+    _verificar_bloqueo("solicitudes")
     try:
         df_sol.to_csv(SOLICITUDES_FILE, index=False)
+        _marcar_vista("solicitudes", df_sol, COLUMNAS_SOLICITUDES)
         return True
     except PermissionError:
         st.error(f"Error: No se pudo guardar porque el archivo '{SOLICITUDES_FILE}' está abierto en Excel. Por favor, ciérralo e inténtalo de nuevo.")
@@ -2073,6 +2332,70 @@ def guardar_config(clave, valor):
     df = pd.concat([df, pd.DataFrame([{"Clave": clave, "Valor": str(valor)}])], ignore_index=True)
     return _guardar_tabla_simple("configuracion", CONFIG_FILE, COLUMNAS_CONFIG, df)
 
+# ---- Parámetros que el administrador puede cambiar (apartado Configuración) ----
+PARAMETROS_ORIGINALES = {"limite_horas_extras": 12, "umbral_rezago_dias": 40, "brecha_diagnostico": 10,
+                         "edad_verde": 3, "edad_amarillo": 7}
+
+def _cfg_entero(clave, defecto, minimo, maximo):
+    try:
+        v = int(float(leer_config(clave, defecto)))
+    except (TypeError, ValueError):
+        return defecto
+    return min(max(v, minimo), maximo)
+
+LIMITE_HORAS_EXTRAS = _cfg_entero("limite_horas_extras", 12, 1, 100)    # horas extras permitidas por catorcena
+UMBRAL_ALERTA_DIAS = _cfg_entero("umbral_rezago_dias", 40, 31, 365)     # días sin movimiento para rezago crítico
+BRECHA_DIAGNOSTICO = _cfg_entero("brecha_diagnostico", 10, 5, 50)       # puntos para «Revisar» / «Eficiente»
+EDAD_VERDE = _cfg_entero("edad_verde", 3, 1, 15)                        # enfriadores en verde hasta X años
+EDAD_AMARILLO = max(_cfg_entero("edad_amarillo", 7, 2, 30), EDAD_VERDE + 1)
+
+# ---- Fecha y hora del último cambio guardado ----
+try:
+    from zoneinfo import ZoneInfo
+    ZONA_LOCAL = ZoneInfo("America/Cancun")
+except Exception:
+    from datetime import timezone as _tz
+    ZONA_LOCAL = _tz(timedelta(hours=-5))
+
+def _ahora_local():
+    return datetime.now(ZONA_LOCAL)
+
+def registrar_actualizacion(nombre):
+    """Guarda cuándo ocurrió el último cambio (como máximo una vez por minuto)."""
+    if nombre in ("configuracion", "historial"):
+        return
+    try:
+        ahora = _ahora_local()
+        previo = leer_config("ultima_actualizacion", "")
+        try:
+            ult = datetime.strptime(previo, "%Y-%m-%d %H:%M").replace(tzinfo=ZONA_LOCAL)
+        except ValueError:
+            ult = None
+        if ult is None or (ahora - ult).total_seconds() >= 60:
+            guardar_config("ultima_actualizacion", ahora.strftime("%Y-%m-%d %H:%M"))
+    except Exception:
+        pass
+
+def texto_actualizacion():
+    """(texto, antiguo) para los encabezados: fecha y hora del último cambio guardado."""
+    ahora = _ahora_local().replace(tzinfo=None)
+    dt = None
+    try:
+        dt = datetime.strptime(leer_config("ultima_actualizacion", ""), "%Y-%m-%d %H:%M")
+    except ValueError:
+        try:   # todavía no hay registro: se usa el último movimiento de la bitácora
+            f = pd.to_datetime(cargar_historial()["Fecha_Hora"], errors="coerce", dayfirst=True).max()
+            dt = None if pd.isna(f) else f.to_pydatetime()
+        except Exception:
+            dt = None
+    if dt is None:
+        return "Sin registro de actualización", True
+    dias = (ahora.date() - dt.date()).days
+    texto = f"Datos al {dt:%d/%m/%Y %H:%M}"
+    if dias >= 1:
+        texto += f" · hace {dias} día{'s' if dias != 1 else ''}"
+    return texto, dias >= 1
+
 def referencia_catorcena():
     """Fecha (siempre un miércoles) desde la que se cuentan las catorcenas de 14 días."""
     try:
@@ -2153,7 +2476,7 @@ def calcular_rendimiento(df_sol, inicio, fin, choferes_base, df_he):
     if tot_h > 0:
         # Revisar: su parte de horas extras supera a su parte de servicios, o rebasó el límite permitido por catorcena
         r['Diagnóstico'] = [
-            "Revisar" if (b >= 10 or h > LIMITE_HORAS_EXTRAS) else ("Eficiente" if b <= -10 else "Equilibrado")
+            "Revisar" if (b >= BRECHA_DIAGNOSTICO or h > LIMITE_HORAS_EXTRAS) else ("Eficiente" if b <= -BRECHA_DIAGNOSTICO else "Equilibrado")
             for b, h in zip(brecha, r['Horas extras'])
         ]
     else:
@@ -2263,7 +2586,7 @@ def generar_pdf_rendimiento(resumen, diario, inicio, fin, modo="general", chofer
             th.setStyle(TableStyle([("BACKGROUND", (7, i), (7, i), colores_d.get(filas_h[i][7], colors.white)) for i in range(1, len(filas_h))]
                                    + [("TEXTCOLOR", (3, i), (3, i), colors.HexColor("#B91C1C")) for i in range(1, len(filas_h)) if _hrs_lista[i - 1] > LIMITE_HORAS_EXTRAS]
                                    + [("ALIGN", (0, 1), (0, -1), "LEFT")]))
-            elementos += [th, Paragraph("Revisar: su parte de las horas extras del equipo supera en 10 puntos o más su parte de los servicios, "
+            elementos += [th, Paragraph(f"Revisar: su parte de las horas extras del equipo supera en {BRECHA_DIAGNOSTICO} puntos o más su parte de los servicios, "
                                         f"o rebasó el límite permitido de {LIMITE_HORAS_EXTRAS} horas extras por catorcena (en rojo). "
                                         "Eficiente: ocurre lo contrario. Equilibrado: están parejas.", e_nota)]
         elementos += [Spacer(1, 6), Paragraph(notas, e_nota)]
@@ -2328,21 +2651,10 @@ def generar_pdf_rendimiento(resumen, diario, inicio, fin, modo="general", chofer
 def calcular_dias_sin_movimiento(df):
     if df.empty:
         return df
-    
     df_calc = df.copy()
-    fecha_actual = datetime.now().date()
-    
-    dias_lista = []
-    for fecha_str in df_calc['Ultimo_Movimiento']:
-        try:
-            val_limpia = str(fecha_str).strip()
-            f_mov = datetime.strptime(val_limpia, "%Y-%m-%d").date()
-            dias = (fecha_actual - f_mov).days
-            dias_lista.append(max(0, dias))
-        except Exception:
-            dias_lista.append(0)
-        
-    df_calc['Días sin movimiento'] = dias_lista
+    fechas = pd.to_datetime(df_calc['Ultimo_Movimiento'].astype(str).str.strip(), format="%Y-%m-%d", errors="coerce")
+    dias = (pd.Timestamp(datetime.now().date()) - fechas).dt.days
+    df_calc['Días sin movimiento'] = dias.clip(lower=0).fillna(0).astype(int)
     return df_calc
 
 def colorear_ubicaciones(val):
@@ -2366,13 +2678,13 @@ def _edad_anio(val):
         return None
 
 def colorear_anio(val):
-    """Verde: 3 años o menos. Amarillo: más de 3 y hasta 7. Rojo: más de 7 (contando desde el año actual)."""
+    """Verde: hasta EDAD_VERDE años. Amarillo: hasta EDAD_AMARILLO. Rojo: más (contando desde el año actual)."""
     edad = _edad_anio(val)
     if edad is None:
         return ''
-    if edad <= 3:
+    if edad <= EDAD_VERDE:
         return 'background-color: #dcfce7; color: #166534; font-weight: bold;'
-    if edad <= 7:
+    if edad <= EDAD_AMARILLO:
         return 'background-color: #fef9c3; color: #854d0e; font-weight: bold;'
     return 'background-color: #fee2e2; color: #991b1b; font-weight: bold;'
 
@@ -2380,7 +2692,7 @@ def color_anio_hex(val):
     edad = _edad_anio(val)
     if edad is None:
         return '#9CA3AF'
-    return '#16A34A' if edad <= 3 else ('#EAB308' if edad <= 7 else '#DC2626')
+    return '#16A34A' if edad <= EDAD_VERDE else ('#EAB308' if edad <= EDAD_AMARILLO else '#DC2626')
 
 def grafica_anios(df, titulo):
     conteo = df['Año'].fillna("").astype(str).replace("", "Sin año").value_counts()
@@ -2421,7 +2733,7 @@ def grafica_rangos(df, columna, titulo):
 
 def colorear_dias(val):
     try:
-        if float(val) > 40:
+        if float(val) > UMBRAL_ALERTA_DIAS:
             return 'background-color: #fee2e2; color: #991b1b; font-weight: bold;'
     except (ValueError, TypeError):
         pass
@@ -2435,8 +2747,21 @@ for _k, _def in [('autenticado', False), ('es_chofer', False), ('es_gerente', Fa
     if _k not in st.session_state:
         st.session_state[_k] = _def
 
+if st.session_state['autenticado'] or st.session_state['es_gerente'] or st.session_state['es_chofer']:
+    _ahora_s = time.time()
+    _limite_s = SESION_MINUTOS["chofer" if st.session_state['es_chofer'] else "admin"] * 60
+    if _ahora_s - st.session_state.get('_ultima_actividad', _ahora_s) > _limite_s:
+        _cerrar_sesion()
+        st.session_state['_sesion_expirada'] = True
+    else:
+        st.session_state['_ultima_actividad'] = _ahora_s
+
 st.sidebar.markdown('<div class="side-brand"><div class="t">Capacidades</div><div class="s">Control de inventario</div></div>', unsafe_allow_html=True)
 st.sidebar.markdown("---")
+if ENTORNO == "prueba":
+    st.sidebar.markdown('<div class="entorno-prueba">ENTORNO DE PRUEBA<span>Los cambios no afectan los datos reales</span></div>', unsafe_allow_html=True)
+if st.session_state.pop('_sesion_expirada', False):
+    st.sidebar.warning("Tu sesión se cerró por inactividad. Vuelve a ingresar.")
 
 # --- FILTRO GLOBAL GERENCIAL / OPERATIVO ---
 filtro_global_canal = "Todos"
@@ -2459,8 +2784,7 @@ if st.session_state['autenticado'] or st.session_state['es_gerente']:
             "Gerencia y Análisis": [
                 "Dashboard Ejecutivo",
                 "Rendimiento de Choferes",
-                "Estadía",
-                "Reportes Gerenciales"
+                "Estadía"
             ],
             "Operación Diaria": [
                 "Equipos Disponibles",
@@ -2478,7 +2802,8 @@ if st.session_state['autenticado'] or st.session_state['es_gerente']:
             "Catálogos y Bitácora": [
                 "Catálogo de Equipos",
                 "Historial de Movimientos",
-                "Exportar a Excel"
+                "Exportar a Excel",
+                "Configuración"
             ]
         }
     else:
@@ -2488,7 +2813,7 @@ if st.session_state['autenticado'] or st.session_state['es_gerente']:
                 "Dashboard Ejecutivo",
                 "Rendimiento de Choferes",
                 "Estadía",
-                "Reportes Gerenciales"
+                "Exportar a Excel"
             ],
             "Consulta Operativa": [
                 "Equipos Disponibles",
@@ -2528,11 +2853,7 @@ if st.session_state['autenticado'] or st.session_state['es_gerente']:
             st.session_state["_keep_glob_jefe"] = filtro_global_jefe
 
     if st.sidebar.button("Cerrar sesión"):
-        st.session_state['autenticado'] = False
-        st.session_state['es_chofer'] = False
-        st.session_state['es_gerente'] = False
-        st.session_state['usuario_actual'] = ""
-        st.session_state['nombre_chofer'] = ""
+        _cerrar_sesion()
         st.rerun()
 
 elif st.session_state['es_chofer']:
@@ -2548,11 +2869,7 @@ elif st.session_state['es_chofer']:
         label_visibility="collapsed"
     )
     if st.sidebar.button("Cerrar sesión"):
-        st.session_state['autenticado'] = False
-        st.session_state['es_chofer'] = False
-        st.session_state['es_gerente'] = False
-        st.session_state['usuario_actual'] = ""
-        st.session_state['nombre_chofer'] = ""
+        _cerrar_sesion()
         st.rerun()
 
 else:
@@ -2575,8 +2892,10 @@ else:
     st.sidebar.markdown(f'<div class="acceso-card">{svg_icono("usuario", 18)}Acceso al sistema</div>', unsafe_allow_html=True)
     
     tipo_acceso = st.sidebar.radio("Tipo de Acceso:", ["Gerencia", "Administrativo", "Chofer en Ruta"], horizontal=True)
-    if not USUARIOS_AUTORIZADOS and not CHOFERES_AUTORIZADOS:
+    if not USUARIOS_AUTORIZADOS and not CHOFERES_AUTORIZADOS and not GERENTES_AUTORIZADOS:
         st.sidebar.warning("Credenciales no configuradas. Revise el archivo .streamlit/secrets.toml.")
+    elif tipo_acceso == "Gerencia" and not GERENTES_AUTORIZADOS:
+        st.sidebar.warning("No hay credenciales de gerencia configuradas. Agrega la sección [usuarios_gerente] en Secrets.")
     
     if tipo_acceso == "Gerencia":
         with st.sidebar.form("form_login_gerente"):
@@ -2585,12 +2904,19 @@ else:
             btn_login_ger = st.form_submit_button("Ingresar como Gerente")
             
             if btn_login_ger:
-                if _credencial_valida(GERENTES_AUTORIZADOS, ger_input, pass_ger):
+                _min_bloq = login_bloqueado("gerente", ger_input)
+                if _min_bloq:
+                    st.error(f"Demasiados intentos fallidos. Intenta de nuevo en {_min_bloq} minuto(s).")
+                elif _credencial_valida(GERENTES_AUTORIZADOS, ger_input, pass_ger):
+                    limpiar_fallos("gerente", ger_input)
+                    st.session_state['_ultima_actividad'] = time.time()
                     st.session_state['es_gerente'] = True
                     st.session_state['usuario_actual'] = ger_input
                     st.success("¡Bienvenido a Vista Gerencial!")
                     st.rerun()
                 else:
+                    registrar_fallo("gerente", ger_input)
+                    time.sleep(1)
                     st.error("Usuario o contraseña de gerencia incorrectos.")
     elif tipo_acceso == "Administrativo":
         with st.sidebar.form("form_login_admin"):
@@ -2599,12 +2925,19 @@ else:
             btn_login = st.form_submit_button("Iniciar Sesión Admin")
             
             if btn_login:
-                if _credencial_valida(USUARIOS_AUTORIZADOS, user_input, pass_input):
+                _min_bloq = login_bloqueado("admin", user_input)
+                if _min_bloq:
+                    st.error(f"Demasiados intentos fallidos. Intenta de nuevo en {_min_bloq} minuto(s).")
+                elif _credencial_valida(USUARIOS_AUTORIZADOS, user_input, pass_input):
+                    limpiar_fallos("admin", user_input)
+                    st.session_state['_ultima_actividad'] = time.time()
                     st.session_state['autenticado'] = True
                     st.session_state['usuario_actual'] = user_input
                     st.success("¡Acceso administrativo concedido!")
                     st.rerun()
                 else:
+                    registrar_fallo("admin", user_input)
+                    time.sleep(1)
                     st.error("Usuario o contraseña incorrectos.")
     else:
         with st.sidebar.form("form_login_chofer"):
@@ -2613,13 +2946,20 @@ else:
             btn_login_ch = st.form_submit_button("Iniciar Sesión Chofer")
             
             if btn_login_ch:
-                if _credencial_valida(CHOFERES_AUTORIZADOS, chofer_input, pass_chofer):
+                _min_bloq = login_bloqueado("chofer", chofer_input)
+                if _min_bloq:
+                    st.error(f"Demasiados intentos fallidos. Intenta de nuevo en {_min_bloq} minuto(s).")
+                elif _credencial_valida(CHOFERES_AUTORIZADOS, chofer_input, pass_chofer):
+                    limpiar_fallos("chofer", chofer_input)
+                    st.session_state['_ultima_actividad'] = time.time()
                     st.session_state['es_chofer'] = True
                     st.session_state['nombre_chofer'] = chofer_input
                     st.session_state['usuario_actual'] = f"Chofer ({chofer_input})"
                     st.success(f"¡Bienvenido, {chofer_input}!")
                     st.rerun()
                 else:
+                    registrar_fallo("chofer", chofer_input)
+                    time.sleep(1)
                     st.error("Usuario o contraseña de chofer incorrectos.")
 
 # Aplicar filtro global de Canal al dataframe de inventario si está activo
@@ -2637,6 +2977,13 @@ st.sidebar.markdown(
     </p></div>""",
     unsafe_allow_html=True
 )
+
+if st.session_state.get("_ultimo_menu") != menu:
+    for _kv in [k for k in st.session_state if str(k).startswith(("_vista_", "_bloqueo_"))]:
+        del st.session_state[_kv]
+    st.session_state["_ultimo_menu"] = menu
+if ENTORNO == "prueba":
+    st.markdown('<div class="franja-prueba">ENTORNO DE PRUEBA · Los cambios no afectan los datos reales</div>', unsafe_allow_html=True)
 
 # Bienvenida para usuarios generales (sin sesión) en la pantalla de inicio
 if not (st.session_state['autenticado'] or st.session_state['es_chofer'] or st.session_state['es_gerente']) and menu == "Equipos Disponibles":
@@ -2685,6 +3032,7 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             margin: 0 !important;
             font-size: 0.98rem;
         }
+        .neon-hero .nh-date.old { color: #FF8A8A; border-color: #FF5C5C; background: rgba(255, 92, 92, 0.12); text-shadow: none; box-shadow: none; }
         .neon-hero .nh-date {
             background: rgba(255, 127, 0, 0.12);
             border: 2px solid #FF7F00;
@@ -2786,11 +3134,12 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
             unsafe_allow_html=True
         )
 
+    _txt_d, _viejo_d = texto_actualizacion()
     st.markdown(
         f'<div class="neon-hero">'
         f'<div><h2>{svg_icono("rayo", 28)}Dashboard Ejecutivo</h2>'
         f'<p>Disponibilidad, estadía, taller, solicitudes y desempeño de choferes en un solo vistazo.</p></div>'
-        f'<div class="nh-date">Información al {datetime.now().strftime("%d/%m/%Y")}</div>'
+        f'<div class="nh-date{" old" if _viejo_d else ""}">{_txt_d}</div>'
         f'</div>',
         unsafe_allow_html=True
     )
@@ -2814,7 +3163,7 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
     total_inv = len(df_dias_dash)
 
     df_estadia_activa = df_dias_dash[~df_dias_dash['Ubicación'].isin(UBICACIONES_SIN_ESTADIA)] if not df_dias_dash.empty else pd.DataFrame()
-    criticos_40 = int((pd.to_numeric(df_estadia_activa['Días sin movimiento'], errors='coerce') > 40).sum()) if not df_estadia_activa.empty else 0
+    criticos_40 = int((pd.to_numeric(df_estadia_activa['Días sin movimiento'], errors='coerce') > UMBRAL_ALERTA_DIAS).sum()) if not df_estadia_activa.empty else 0
     en_taller_dash = int((df_dias_dash['Ubicación'] == 'En taller').sum()) if not df_dias_dash.empty else 0
 
     # Cumplimiento de la catorcena actual vs anterior
@@ -2861,7 +3210,7 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
                         neon_color="#39FF14", neon_glow="rgba(57, 255, 20, 0.35)",
                         tendencia="Operativos", tipo_tendencia="pos")
     with k2:
-        render_kpi_neon("Rezago Crítico (>40 días)", criticos_40, "En almacén o patios sin movimiento",
+        render_kpi_neon(f"Rezago Crítico (>{UMBRAL_ALERTA_DIAS} días)", criticos_40, "En almacén o patios sin movimiento",
                         neon_color="#FF073A", neon_glow="rgba(255, 7, 58, 0.38)",
                         tendencia="Atención prioritaria" if criticos_40 > 0 else "Bajo control",
                         tipo_tendencia="neg" if criticos_40 > 0 else "pos")
@@ -3079,7 +3428,7 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
         if not df_estadia_activa.empty:
             rez = df_estadia_activa.copy()
             rez['Días'] = pd.to_numeric(rez['Días sin movimiento'], errors='coerce')
-            rez = rez[rez['Días'] > 40]
+            rez = rez[rez['Días'] > UMBRAL_ALERTA_DIAS]
             if not rez.empty:
                 # Año solo para Enfriadores; Vending, Postmix e Hidro quedan en blanco
                 rez['Año'] = rez['Año'].fillna("").astype(str).replace("nan", "")
@@ -3094,42 +3443,9 @@ if menu == "Dashboard Ejecutivo" and (st.session_state['autenticado'] or st.sess
                 rez['Ubicación'] = rez['Ubicación'].map(lambda u: _abrev_ubic.get(str(u).strip(), u))
                 tabla_neon(rez[['Modelo', 'Año', 'Canal', 'Cantidad', 'Ubicación', 'Días máx.']], columnas_alerta=("Días máx.",))
             else:
-                st.success("Ningún equipo supera los 40 días sin movimiento.")
+                st.success(f"Ningún equipo supera los {UMBRAL_ALERTA_DIAS} días sin movimiento.")
         else:
             st.success("Sin datos de estadía.")
-
-# 0.5 REPORTES GERENCIALES CENTRALIZADOS (GERENTES Y ADMINISTRADORES)
-elif menu == "Reportes Gerenciales" and (st.session_state['autenticado'] or st.session_state['es_gerente']):
-    render_banner("exportar", "Reportes Gerenciales", "Descarga centralizada de reportes ejecutivos en Excel y PDF.")
-    c_rep1, c_rep2 = st.columns(2)
-    with c_rep1:
-        st.markdown("### :material/inventory_2: Reporte Maestro de Inventario y Solicitudes (Excel)")
-        st.caption("Incluye inventario actual con días de estadía, levantamientos, solicitudes e historial.")
-        if st.button(":material/download: Preparar Excel Ejecutivo", key="btn_rep_excel_ger"):
-            buf_ger = io.BytesIO()
-            with pd.ExcelWriter(buf_ger, engine="openpyxl") as writer:
-                calcular_dias_sin_movimiento(df_inv).to_excel(writer, sheet_name="Inventario", index=False)
-                cargar_solicitudes().to_excel(writer, sheet_name="Solicitudes", index=False)
-                cargar_levantamientos().to_excel(writer, sheet_name="Levantamientos", index=False)
-            st.download_button(":material/download: Descargar Excel Ejecutivo", buf_ger.getvalue(),
-                               file_name=f"Reporte_Ejecutivo_Bepensa_{date.today():%Y%m%d}.xlsx",
-                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    with c_rep2:
-        st.markdown("### :material/local_shipping: Evaluación Catorcenal de Choferes (PDF)")
-        st.caption("Genera el ranking imprimible de productividad y horas extras de la catorcena actual.")
-        ref_r = referencia_catorcena()
-        ini_r = inicio_catorcena(date.today(), ref_r)
-        fin_r = ini_r + timedelta(days=13)
-        res_r, dia_r, _, _ = calcular_rendimiento(cargar_solicitudes(), ini_r, fin_r, list(CHOFERES_AUTORIZADOS.keys()), cargar_horas_extras())
-        if not res_r.empty:
-            try:
-                pdf_ger = generar_pdf_rendimiento(res_r, dia_r, ini_r, fin_r, "general")
-                st.download_button(":material/download: Descargar PDF de Choferes", pdf_ger,
-                                   file_name=f"Rendimiento_Choferes_{ini_r:%Y%m%d}.pdf", mime="application/pdf")
-            except Exception:
-                st.warning("Verifica que 'reportlab' esté instalado para exportar el PDF.")
-        else:
-            estado_vacio("Sin actividad registrada en la catorcena actual.")
 
 # 1. EQUIPOS DISPONIBLES (PÚBLICO Y PRIMERA OPCIÓN PARA GENERALES)
 elif menu == "Equipos Disponibles":
@@ -3226,7 +3542,7 @@ elif menu == "Equipos Disponibles":
                     df_por_anio['Año'] = df_por_anio['Año'].fillna("").astype(str).replace("", "Sin año")
                     df_por_anio = df_por_anio.groupby(['Tipo', 'Modelo', 'Año', 'Imagen', 'Estatus']).size().reset_index(name='Cantidad Disponible')
                     mostrar_tabla(df_por_anio.style.map(colorear_anio, subset=['Año']), use_container_width=True, hide_index=True)
-                    st.caption("Año de fabricación según la serie. Verde: hasta 3 años. Amarillo: más de 3 y hasta 7. Rojo: más de 7.")
+                    st.caption(f"Año de fabricación según la serie. Verde: hasta {EDAD_VERDE} años. Amarillo: más de {EDAD_VERDE} y hasta {EDAD_AMARILLO}. Rojo: más de {EDAD_AMARILLO}.")
                 else:
                     mostrar_grafica(grafica_barras_conteo(df_tabla_filtrada, 'Modelo', f"Equipos disponibles por modelo en {c_d}", top=12), use_container_width=True)
                     df_por_modelo = df_tabla_filtrada.groupby(['Tipo', 'Modelo', 'Imagen', 'Estatus']).size().reset_index(name='Cantidad Disponible')
@@ -3246,7 +3562,7 @@ elif menu == "Equipos Disponibles":
 
 # 2. ESTADÍA (PÚBLICO)
 elif menu == "Estadía":
-    render_banner("estadia", "Estadía y Saturación", "Promedio de días sin movimiento y saturación de inventario. Las barras en <b>rojo</b> superan los <b>40 días</b>; las <b>ámbar</b> se acercan al límite.")
+    render_banner("estadia", "Estadía y Saturación", f"Promedio de días sin movimiento y saturación de inventario. Las barras en <b>rojo</b> superan los <b>{UMBRAL_ALERTA_DIAS} días</b>; las <b>ámbar</b> se acercan al límite.")
     if not df_inv.empty:
         st.markdown("### Mapa de saturación por ubicación")
         st.caption("Haz clic en un bloque para ver el detalle por canal, modelo e imagen.")
@@ -3334,7 +3650,7 @@ elif menu == "Estadía":
                 mostrar_grafica_estadia(df_prom, 'Ubicación', f"Estadía promedio por ubicación, canal {c_val}")
                 
                 df_c_tabla = df_prom.copy()
-                df_c_tabla['Estado de Alerta'] = df_c_tabla['Promedio de Días'].apply(lambda x: "Alerta: supera los 40 días" if x > 40 else "Normal")
+                df_c_tabla['Estado de Alerta'] = df_c_tabla['Promedio de Días'].apply(lambda x: f"Alerta: supera los {UMBRAL_ALERTA_DIAS} días" if x > UMBRAL_ALERTA_DIAS else "Normal")
                 df_c_tabla['Promedio de Días'] = df_c_tabla['Promedio de Días'].round(1)
                 mostrar_tabla(df_c_tabla, use_container_width=True, hide_index=True, column_config=config_col_estadia(df_c_tabla))
 
@@ -3354,7 +3670,7 @@ elif menu == "Estadía":
                 df_modelo_imagen = df_modelo_imagen.sort_values(by='Promedio de Días', ascending=False)
                 
                 df_m_tabla = df_modelo_imagen.copy()
-                df_m_tabla['Estado de Alerta'] = df_m_tabla['Promedio de Días'].apply(lambda x: "Alerta: supera los 40 días" if x > 40 else "Normal")
+                df_m_tabla['Estado de Alerta'] = df_m_tabla['Promedio de Días'].apply(lambda x: f"Alerta: supera los {UMBRAL_ALERTA_DIAS} días" if x > UMBRAL_ALERTA_DIAS else "Normal")
                 df_m_tabla['Promedio de Días'] = df_m_tabla['Promedio de Días'].round(1)
                 mostrar_tabla(df_m_tabla, use_container_width=True, hide_index=True, column_config=config_col_estadia(df_m_tabla))
 
@@ -3401,36 +3717,7 @@ elif menu == "Necesidades de Taller":
         pend['Modelo'] = pend['Modelo'].fillna("").astype(str).str.strip().replace("", "Sin modelo")
         pend['Año_Solicitado'] = pend['Año_Solicitado'].fillna("").astype(str).str.strip().replace("", "Sin especificar")
 
-        # Existencias del inventario para compararlas con lo que se necesita
-        inv_nt = df_inv[df_inv['Canal'] != "Cedis"].copy() if not df_inv.empty else pd.DataFrame(columns=ESQUEMA_COLUMNAS)
-        if canal_nt != "Todos" and not inv_nt.empty:
-            inv_nt = inv_nt[inv_nt['Canal'] == canal_nt]
-        disp_mr, disp_m, rep_mr, rep_m = {}, {}, {}, {}
-        if not inv_nt.empty:
-            inv_nt['_m'] = inv_nt['Modelo'].astype(str).str.strip().str.upper()
-            inv_nt['_r'] = inv_nt['Año'].map(rango_anio_solicitado)
-            est_nt = inv_nt['Estatus'].astype(str).str.strip().str.lower()
-            es_disp = inv_nt['Ubicación'].isin(["En almacén de Comodatos", "En almacén de Publicidad", "En patios"]) & est_nt.isin(["nuevo", "reparado"])
-            es_rep = est_nt == "para reparar"
-            disp_mr = inv_nt[es_disp].groupby(['_m', '_r']).size().to_dict()
-            disp_m = inv_nt[es_disp].groupby('_m').size().to_dict()
-            rep_mr = inv_nt[es_rep].groupby(['_m', '_r']).size().to_dict()
-            rep_m = inv_nt[es_rep].groupby('_m').size().to_dict()
-
-        necesidad = pend.groupby(['Equipo', 'Modelo', 'Año_Solicitado']).size().reset_index(name='Pendientes')
-        def _existencia(fila, por_mr, por_m):
-            m_ = str(fila['Modelo']).strip().upper()
-            if fila['Año_Solicitado'] in RANGOS_ANIO_SOLICITADO and str(fila['Equipo']).lower().startswith("enfriador"):
-                return por_mr.get((m_, fila['Año_Solicitado']), 0)
-            return por_m.get(m_, 0)
-        necesidad['Disponibles'] = necesidad.apply(lambda r: _existencia(r, disp_mr, disp_m), axis=1)
-        necesidad['Faltante'] = (necesidad['Pendientes'] - necesidad['Disponibles']).clip(lower=0)
-        necesidad['Para Reparar'] = necesidad.apply(lambda r: _existencia(r, rep_mr, rep_m), axis=1)
-        necesidad['A reparar (sugerido)'] = necesidad[['Faltante', 'Para Reparar']].min(axis=1)
-        _orden_r = {r: i for i, r in enumerate(RANGOS_ANIO_SOLICITADO)}
-        necesidad['_orden'] = necesidad['Año_Solicitado'].map(lambda r: _orden_r.get(r, 99))
-        necesidad = necesidad.sort_values(['Modelo', '_orden', 'Equipo']).drop(columns='_orden').reset_index(drop=True)
-        necesidad = necesidad.rename(columns={'Año_Solicitado': 'Año solicitado'})
+        necesidad, inv_nt, es_disp, es_rep = calcular_necesidad_taller(pend, df_inv, canal_nt)
 
         k_nt1, k_nt2, k_nt3 = st.columns(3)
         with k_nt1:
@@ -3453,12 +3740,7 @@ elif menu == "Necesidades de Taller":
                 subset=['A reparar (sugerido)']),
             use_container_width=True, hide_index=True)
         st.caption("Rangos: Nuevos = Año presente, Reciente = 1 o 2 años, Menor a 5 años = de 3 a 5 años y Mayor a 5 años = 6 o más años.")
-        _buf_nt = io.BytesIO()
-        with pd.ExcelWriter(_buf_nt, engine="openpyxl") as _w_nt:
-            necesidad.to_excel(_w_nt, index=False, sheet_name="Necesidades de Taller")
-        st.download_button(":material/download: Descargar para Taller (Excel)", _buf_nt.getvalue(),
-                           file_name="necesidades_taller.xlsx",
-                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+        st.caption("Para descargar esta tabla en Excel ve a «Exportar a Excel» › Necesidades de Taller.")
 
         if st.session_state['autenticado'] or st.session_state['es_gerente']:
             with st.expander("Series de los equipos Disponibles y Para Reparar"):
@@ -3593,7 +3875,7 @@ elif menu == "Rendimiento de Choferes" and (st.session_state['autenticado'] or s
                 subset=['Diagnóstico'])
             mostrar_tabla(estilo_cmp, use_container_width=True, hide_index=True,
                           column_config=config_barras(resumen, ['% de servicios', '% de horas extras'], formato="%.1f%%", maximo=100))
-            st.caption("Revisar: su parte de las horas extras del equipo supera en 10 puntos o más su parte de los servicios, "
+            st.caption(f"Revisar: su parte de las horas extras del equipo supera en {BRECHA_DIAGNOSTICO} puntos o más su parte de los servicios, "
                        f"o rebasó el límite permitido de {LIMITE_HORAS_EXTRAS} horas extras por catorcena. "
                        "Eficiente: ocurre lo contrario. Equilibrado: están parejas.")
 
@@ -3625,12 +3907,12 @@ elif menu == "Rendimiento de Choferes" and (st.session_state['autenticado'] or s
                 for ch_ in nombres_he:
                     h_prev, o_prev = he_prev.get(ch_.lower(), ("0", ""))
                     try:
-                        h_prev_f = float(h_prev)
+                        h_prev_f = int(float(h_prev) + 0.5)   # horas completas
                     except (ValueError, TypeError):
-                        h_prev_f = 0.0
+                        h_prev_f = 0
                     x1, x2, x3 = st.columns([2, 1, 3])
                     x1.markdown(f"**{ch_}**")
-                    horas_in = x2.number_input("Horas extras", min_value=0.0, max_value=300.0, step=0.5, value=h_prev_f,
+                    horas_in = x2.number_input("Horas extras", min_value=0, max_value=300, step=1, value=h_prev_f, format="%d",
                                                key=f"he_h_{inicio_sel.isoformat()}_{ch_}", label_visibility="collapsed")
                     obs_in = x3.text_input("Observaciones", value=str(o_prev), key=f"he_o_{inicio_sel.isoformat()}_{ch_}",
                                            placeholder="Observaciones (opcional)", label_visibility="collapsed")
@@ -3646,29 +3928,7 @@ elif menu == "Rendimiento de Choferes" and (st.session_state['autenticado'] or s
                     time.sleep(1.2)
                     st.rerun()
 
-    # ----- Reportes imprimibles -----
-    st.markdown("### Reportes para imprimir")
-    try:
-        import reportlab  # noqa: F401
-        hay_pdf = True
-    except ImportError:
-        hay_pdf = False
-    if not hay_pdf:
-        st.warning("Para generar los PDF agrega la línea 'reportlab' al archivo requirements.txt del repositorio.")
-    elif resumen.empty:
-        estado_vacio("No hay datos para generar el reporte de esta catorcena.")
-    else:
-        pdf_general = generar_pdf_rendimiento(resumen, diario, inicio_sel, fin_sel, "general")
-        pdf_todas = generar_pdf_rendimiento(resumen, diario, inicio_sel, fin_sel, "individual")
-        d1, d2, d3 = st.columns(3)
-        with d1:
-            st.download_button(":material/download: Reporte general (PDF)", pdf_general, file_name=f"rendimiento_choferes_{inicio_sel:%Y%m%d}.pdf", mime="application/pdf")
-        with d2:
-            st.download_button(":material/download: Hojas de todos los choferes (PDF)", pdf_todas, file_name=f"hojas_choferes_{inicio_sel:%Y%m%d}.pdf", mime="application/pdf")
-        with d3:
-            ch_pdf = st.selectbox("Hoja individual de:", list(resumen['Chofer']), key="rc_pdf_chofer", label_visibility="collapsed")
-            pdf_uno = generar_pdf_rendimiento(resumen, diario, inicio_sel, fin_sel, "individual", [ch_pdf])
-            st.download_button(":material/download: Hoja individual (PDF)", pdf_uno, file_name=f"hoja_{str(ch_pdf).lower().replace(' ', '_')}_{inicio_sel:%Y%m%d}.pdf", mime="application/pdf")
+    st.caption("Los PDF para imprimir (reporte general y hojas por chofer) están en «Exportar a Excel» › Rendimiento de Choferes.")
 
 elif menu == "Solicitudes Diarias":
     render_banner("calendario", "Solicitudes Diarias", "Seguimiento de solicitudes por fecha.")
@@ -3683,11 +3943,7 @@ elif menu == "Solicitudes Diarias":
             unsafe_allow_html=True
         )
         if st.button(":material/logout: Cerrar sesión", key="btn_logout_chofer_main"):
-            st.session_state['autenticado'] = False
-            st.session_state['es_chofer'] = False
-            st.session_state['es_gerente'] = False
-            st.session_state['usuario_actual'] = ""
-            st.session_state['nombre_chofer'] = ""
+            _cerrar_sesion()
             st.rerun()
     elif st.session_state['autenticado']:
         st.info(f"**Panel de Administrador:** Puede visualizar cualquier solicitud del día y actualizar su estatus o motivo directamente.")
@@ -3697,6 +3953,8 @@ elif menu == "Solicitudes Diarias":
     st.markdown("---")
     
     df_sol_diarias = cargar_solicitudes()
+    if st.session_state['autenticado'] or st.session_state['es_chofer']:
+        guardia_cambios_externos("solicitudes", df_sol_diarias, COLUMNAS_SOLICITUDES)
     
     if not df_sol_diarias.empty:
         def limpiar_fecha_str(val):
@@ -3938,8 +4196,6 @@ elif menu == "Catálogo de Equipos":
         _df_tabla = df_specs[_cols_tabla].copy()
         _df_tabla.insert(1, 'Imagen', df_specs['_con_img'].map({True: "Sí", False: "—"}))
         mostrar_tabla(_df_tabla, use_container_width=True, hide_index=True)
-        st.download_button(":material/download: Descargar tabla (CSV)", _df_tabla.to_csv(index=False).encode("utf-8-sig"),
-                           file_name="especificaciones_equipos.csv", mime="text/csv")
     else:
         POR_PAGINA = 9
         _paginas = max(1, -(-len(df_specs) // POR_PAGINA))
@@ -4079,13 +4335,14 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
             "Actualizar o Eliminar Solicitudes",
             "Historial de Solicitudes OK",
             "Importar Archivo Excel de Solicitudes",
-            "Unificar Jefes de Venta"
+            "Unificar Nombres"
         ], 
         horizontal=True
     )
     st.markdown("---")
     
     df_sol = cargar_solicitudes()
+    guardia_cambios_externos("solicitudes", df_sol, COLUMNAS_SOLICITUDES)
     
     if modo_solicitud == "Registrar Nueva Solicitud":
         titulo_paso(1, "Tipo de solicitud", "#111827")
@@ -4149,12 +4406,12 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
             with col_a1:
                 canal_sol = st.selectbox("Canal:", OPCIONES_CANALES_SOL)
             with col_a2:
-                ruta_sol = st.text_input("Chofer / Ruta (Opcional):").strip()
+                ruta_sol = selector_ruta("Chofer / Ruta (Opcional):", "ruta_nueva_sol")
             with col_a3:
                 jefe_sol = selector_jefe("Jefe de Venta:", "jefe_nueva_sol")
             col_b1, col_b2 = st.columns(2)
             with col_b1:
-                supervisor = st.text_input("Supervisor (Opcional):").strip()
+                supervisor = selector_jefe("Supervisor (Opcional):", "sup_nueva_sol", campo="Supervisor")
             with col_b2:
                 motivo_sol = st.text_input("Motivo:").strip()
             observaciones = st.text_area("Observaciones (Obligatorio si Canal es 'Otro'):").strip()
@@ -4184,17 +4441,26 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                 elif (_r_jefe := resolver_jefe(jefe_sol, "nueva_sol"))[1] is not None:
                     st.warning(_r_jefe[1])
                     st.stop()
+                elif (_r_sup := resolver_jefe(supervisor, "nueva_sol_sup", campo="Supervisor"))[1] is not None:
+                    st.warning(_r_sup[1])
+                    st.stop()
+                elif (_aviso_dup := aviso_series_pendientes(df_sol, series_lista)) and \
+                        st.session_state.get("_dup_conf_nueva") != "|".join(sorted(_limpiar_nombre(x).casefold() for x in series_lista)):
+                    st.session_state["_dup_conf_nueva"] = "|".join(sorted(_limpiar_nombre(x).casefold() for x in series_lista))
+                    st.warning(_aviso_dup + " Si es correcto, presiona Guardar de nuevo para confirmarlo.")
+                    st.stop()
                 elif status_sol.lower() in ["entregado", "realizado", "transferido", "levantado"] and not incluir_fecha_entregado:
                     st.error(f"No se guardaron los cambios: Seleccionó el estatus '{status_sol}' pero no activó ni asignó la Fecha Entrega. La solicitud no puede avanzar de estatus sin su respectiva fecha.")
                     st.stop()
                 else:
+                    st.session_state.pop("_dup_conf_nueva", None)
                     fecha_e_str = fecha_entregado.strftime("%Y-%m-%d") if incluir_fecha_entregado else ""
                     fecha_r_str = fecha_recibido.strftime("%Y-%m-%d")
                     
                     filas_nuevas = [{
                         "Fecha_Entregado": fecha_e_str, "Status": status_sol, "Fecha_Recibido": fecha_r_str,
                         "Proyecto": proyecto, "CUC": cuc, "Cliente": cliente_sol, "Jefe_de_Venta": _r_jefe[0],
-                        "Supervisor": supervisor, "Movimiento": movimiento_final, "Equipo": equipo_tipo,
+                        "Supervisor": _r_sup[0], "Movimiento": movimiento_final, "Equipo": equipo_tipo,
                         "Modelo": modelo_sol, "Serie": ser, "Año_Solicitado": anio_solicitado, "Canal": canal_sol, "Ruta": ruta_sol,
                         "Motivo": motivo_sol, "Observaciones": observaciones
                     } for ser in series_lista]
@@ -4483,7 +4749,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                             titulo_paso(2, "Cliente y equipo", "#B45309")
                             cliente_edit = st.text_input("Nombre de Cliente:", value=str(row_sel.get('Cliente', '')), key=f"cli_{idx_seleccionado}").strip()
                             jefe_edit = selector_jefe("Jefe de Venta:", f"jefe_{idx_seleccionado}", str(row_sel.get('Jefe_de_Venta', '')))
-                            supervisor_edit = st.text_input("Supervisor:", value=str(row_sel.get('Supervisor', '')), key=f"sup_{idx_seleccionado}").strip()
+                            supervisor_edit = selector_jefe("Supervisor:", f"sup_{idx_seleccionado}", str(row_sel.get('Supervisor', '')), campo="Supervisor")
                             
                             idx_eq = TIPOS_EQUIPO.index(row_sel['Equipo']) if row_sel['Equipo'] in TIPOS_EQUIPO else 0
                             equipo_edit = st.selectbox("Equipo:", TIPOS_EQUIPO, index=idx_eq, key=f"eq_{idx_seleccionado}")
@@ -4501,7 +4767,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                             idx_canal = OPCIONES_CANALES_SOL.index(row_sel['Canal']) if row_sel['Canal'] in OPCIONES_CANALES_SOL else 0
                             canal_edit = st.selectbox("Canal:", OPCIONES_CANALES_SOL, index=idx_canal, key=f"can_{idx_seleccionado}")
                             
-                            ruta_edit = st.text_input("Ruta:", value=str(row_sel.get('Ruta', '')), key=f"rut_{idx_seleccionado}").strip()
+                            ruta_edit = selector_ruta("Ruta:", f"rut_{idx_seleccionado}", str(row_sel.get('Ruta', '')))
                             motivo_edit = st.text_input("Motivo:", value=str(row_sel.get('Motivo', '')), key=f"mot_{idx_seleccionado}").strip()
 
                         observaciones_edit = st.text_area("Observaciones:", value=str(row_sel.get('Observaciones', '')), key=f"obs_{idx_seleccionado}").strip()
@@ -4526,6 +4792,8 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                                 st.error(f"No se guardaron los cambios: Seleccionó el estatus '{status_edit}' pero no activó ni asignó la Fecha Entrega.")
                             elif (_r_jefe_e := resolver_jefe(jefe_edit, f"edit_{idx_seleccionado}"))[1] is not None:
                                 st.warning(_r_jefe_e[1])
+                            elif (_r_sup_e := resolver_jefe(supervisor_edit, f"edit_sup_{idx_seleccionado}", campo="Supervisor"))[1] is not None:
+                                st.warning(_r_sup_e[1])
                             else:
                                 f_rec_str = str(row_sel.get('Fecha_Recibido', ''))
                                 f_ent_str = f_entregado_edit.strftime("%Y-%m-%d") if incluir_fecha_entregado_edit else ""
@@ -4537,7 +4805,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                                 df_sol.loc[idx_seleccionado, 'CUC'] = cuc_edit
                                 df_sol.loc[idx_seleccionado, 'Cliente'] = cliente_edit
                                 df_sol.loc[idx_seleccionado, 'Jefe_de_Venta'] = _r_jefe_e[0]
-                                df_sol.loc[idx_seleccionado, 'Supervisor'] = supervisor_edit
+                                df_sol.loc[idx_seleccionado, 'Supervisor'] = _r_sup_e[0]
                                 df_sol.loc[idx_seleccionado, 'Movimiento'] = movimiento_edit
                                 df_sol.loc[idx_seleccionado, 'Equipo'] = equipo_edit
                                 df_sol.loc[idx_seleccionado, 'Modelo'] = modelo_edit
@@ -4631,14 +4899,16 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
         else:
             estado_vacio("El archivo de solicitudes está vacío.")
 
-    elif modo_solicitud == "Unificar Jefes de Venta":
-        st.markdown("Junta en un solo nombre las variantes de un mismo jefe de venta (por ejemplo «Juan Pérez» y «Juan Pérez López»). "
+    elif modo_solicitud == "Unificar Nombres":
+        st.markdown("Junta en un solo nombre las variantes de una misma persona (por ejemplo «Juan Pérez» y «Juan Pérez López»). "
                     "El cambio se aplica a todas las solicitudes y levantamientos.")
+        campo_u = st.radio("Campo a unificar:", ["Jefe de Venta", "Supervisor", "Ruta (chofer)"], horizontal=True, key="uni_campo")
+        col_u = {"Jefe de Venta": "Jefe_de_Venta", "Supervisor": "Supervisor", "Ruta (chofer)": "Ruta"}[campo_u]
         df_lev_u = cargar_levantamientos()
-        conteo = pd.concat([df_sol['Jefe_de_Venta'], df_lev_u['Jefe_de_Venta']]).fillna("").astype(str).str.strip()
+        conteo = pd.concat([df_sol[col_u]] + ([df_lev_u[col_u]] if col_u in df_lev_u.columns else [])).fillna("").astype(str).str.strip()
         conteo = conteo[(conteo != "") & (conteo.str.lower() != "nan")].value_counts()
         if conteo.empty:
-            estado_vacio("Todavía no hay jefes de venta registrados.")
+            estado_vacio(f"Todavía no hay datos de «{campo_u}» registrados.")
         else:
             nombres_j = sorted(conteo.index, key=_norm_nombre)
             grupos, usados = [], set()
@@ -4657,17 +4927,19 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
                 st.success("No se detectaron nombres parecidos.")
             titulo_paso(2, "Unificar", "#111827")
             variantes = st.multiselect("Nombres que son la misma persona:", nombres_j,
-                                       format_func=lambda x: f"{x} ({conteo[x]})", key="uni_jefes_variantes")
-            destino = st.selectbox("Nombre correcto:", variantes, index=None, accept_new_options=True,
-                                   placeholder="Elige uno de los seleccionados o escribe el nombre correcto", key="uni_jefes_destino")
-            if st.button(":material/merge: Unificar nombres", key="btn_unificar_jefes"):
+                                       format_func=lambda x: f"{x} ({conteo[x]})", key=f"uni_variantes_{col_u}")
+            _opc_dest = list(dict.fromkeys(list(variantes) + (sorted(CHOFERES_AUTORIZADOS) if col_u == "Ruta" else [])))
+            destino = st.selectbox("Nombre correcto:", _opc_dest, index=None, accept_new_options=True,
+                                   placeholder="Elige uno de los seleccionados o escribe el nombre correcto", key=f"uni_destino_{col_u}")
+            if st.button(":material/merge: Unificar nombres", key="btn_unificar_nombres"):
                 destino_l = _limpiar_nombre(destino or "")
                 if len(variantes) < 1 or not destino_l:
                     st.error("Selecciona al menos un nombre y el nombre correcto.")
                 else:
                     df_sol_u = df_sol.copy()
                     for df_x in (df_sol_u, df_lev_u):
-                        df_x['Jefe_de_Venta'] = df_x['Jefe_de_Venta'].where(~df_x['Jefe_de_Venta'].isin(variantes), destino_l)
+                        if col_u in df_x.columns:
+                            df_x[col_u] = df_x[col_u].where(~df_x[col_u].isin(variantes), destino_l)
                     ok_s = guardar_solicitudes_seguro(df_sol_u)
                     guardar_levantamientos(df_lev_u)
                     if ok_s is not False:
@@ -4697,6 +4969,7 @@ elif menu == "Solicitudes" and st.session_state['autenticado']:
 # 6. LEVANTAMIENTOS (SOLO ADMINISTRADORES)
 elif menu == "Levantamientos" and st.session_state['autenticado']:
     render_banner("levantamientos", "Levantamientos", "Gestión de equipos recolectados.")
+    guardia_cambios_externos("levantamientos", cargar_levantamientos(), COLUMNAS_LEVANTAMIENTOS)
     
     modo_levantamiento = st.radio(
         "Selecciona una acción:", 
@@ -4742,7 +5015,7 @@ elif menu == "Levantamientos" and st.session_state['autenticado']:
                 status_lev = st.selectbox("Estatus del Equipo:", ESTATUS)
                 motivo = st.text_input("Motivo del Levantamiento:").strip()
                 ubicacion = st.selectbox("Ubicación (ej. En patios):", UBICACIONES, index=3)
-                ruta = st.text_input("Ruta:").strip()
+                ruta = selector_ruta("Ruta:", "ruta_levantamiento")
                 jefe_venta = selector_jefe("Jefe de Venta:", "jefe_levantamiento")
                 solicitado = st.selectbox("Solicitado vía:", ["Whatsapp", "Correo", "Solicitud"])
                 
@@ -5051,9 +5324,170 @@ elif menu == "Historial de Movimientos" and st.session_state['autenticado']:
         mostrar_tabla(df_h.sort_values(by="Fecha_Hora", ascending=False), use_container_width=True, hide_index=True)
 
 # 11. EXPORTAR A EXCEL (SOLO ADMINISTRADORES)
-elif menu == "Exportar a Excel" and st.session_state['autenticado']:
-    render_banner("exportar", "Exportar a Excel", "Exportar e importar la base de datos completa.")
-    if db_activa():
+elif menu == "Configuración" and st.session_state['autenticado']:
+    render_banner("ajustes", "Configuración", "Parámetros de la app y revisión de la calidad de los datos.")
+    sub_conf = st.radio("Selecciona una opción:", ["Parámetros", "Calidad de datos"], horizontal=True, key="sub_configuracion")
+    st.markdown("---")
+
+    if sub_conf == "Parámetros":
+        titulo_paso(1, "Valores que usa la app", "#111827")
+        st.caption("Los cambios se aplican en cuanto los guardas, para todos los usuarios.")
+        with st.form("form_parametros"):
+            pc1, pc2 = st.columns(2)
+            p_lim = pc1.number_input("Límite de horas extras por catorcena", min_value=1, max_value=100, value=int(LIMITE_HORAS_EXTRAS), step=1,
+                                     help="Se usa en Rendimiento de Choferes: barra roja y diagnóstico «Revisar».")
+            p_umb = pc2.number_input("Días sin movimiento para rezago crítico", min_value=31, max_value=365, value=int(UMBRAL_ALERTA_DIAS), step=1,
+                                     help="Se usa en el Dashboard, Estadía y los reportes. El ámbar empieza al 75 % de este valor.")
+            p_bre = pc1.number_input("Diferencia en puntos para «Revisar» o «Eficiente»", min_value=5, max_value=50, value=int(BRECHA_DIAGNOSTICO), step=1,
+                                     help="Compara el % de horas extras del chofer contra su % de servicios.")
+            p_ver = pc2.number_input("Enfriadores en verde hasta (años)", min_value=1, max_value=15, value=int(EDAD_VERDE), step=1)
+            p_ama = pc1.number_input("Enfriadores en amarillo hasta (años)", min_value=2, max_value=30, value=int(EDAD_AMARILLO), step=1,
+                                     help="Más de este valor se pinta en rojo.")
+            guardar_param = st.form_submit_button(":material/save: Guardar parámetros")
+        if guardar_param:
+            if p_ama <= p_ver:
+                st.error("El límite de amarillo debe ser mayor que el de verde.")
+            else:
+                for _clave, _valor in (("limite_horas_extras", p_lim), ("umbral_rezago_dias", p_umb), ("brecha_diagnostico", p_bre),
+                                       ("edad_verde", p_ver), ("edad_amarillo", p_ama)):
+                    guardar_config(_clave, int(_valor))
+                st.success("Parámetros guardados.")
+                time.sleep(1.0)
+                st.rerun()
+        if st.button(":material/restart_alt: Restablecer valores originales", key="btn_param_reset"):
+            for _clave, _valor in PARAMETROS_ORIGINALES.items():
+                guardar_config(_clave, _valor)
+            st.success("Se restablecieron los valores originales.")
+            time.sleep(1.0)
+            st.rerun()
+        st.caption(f"Tiempo de sesión: administrador y gerente {SESION_MINUTOS['admin']} min, chofer {SESION_MINUTOS['chofer']} min de inactividad "
+                   "(se cambia en Secrets con sesion_minutos_admin y sesion_minutos_chofer).")
+
+    else:
+        df_cal_sol, df_cal_lev, df_cal_inv = cargar_solicitudes(), cargar_levantamientos(), df_inv
+        _vacio = lambda v: v.fillna("").astype(str).str.strip().replace("nan", "").eq("")
+        _pend = df_cal_sol[df_cal_sol['Status'].astype(str).str.strip().str.lower() == 'pendiente'] if not df_cal_sol.empty else df_cal_sol
+
+        # 1) series con más de una solicitud pendiente
+        dup_ser = pd.DataFrame()
+        if not _pend.empty:
+            _p = _pend[~_vacio(_pend['Serie'])].copy()
+            _p['_k'] = _p['Serie'].astype(str).str.strip().str.casefold()
+            dup_ser = (_p.groupby('_k').agg(Serie=('Serie', 'first'), Solicitudes=('Serie', 'size'),
+                                            CUC=('CUC', lambda x: ", ".join(sorted({str(v) for v in x}))),
+                                            Clientes=('Cliente', lambda x: " / ".join(sorted({str(v) for v in x}))))
+                         .reset_index(drop=True))
+            dup_ser = dup_ser[dup_ser['Solicitudes'] > 1].sort_values('Solicitudes', ascending=False)
+        # 2) pendientes atrasadas
+        atrasadas_df = pd.DataFrame()
+        if not _pend.empty:
+            _f = _fechas_a_datetime(_pend['Fecha_Entregado'])
+            _dias_atraso = (pd.Timestamp(date.today()) - _f).dt.days
+            atrasadas_df = _pend[_dias_atraso > 0].assign(Días_de_atraso=_dias_atraso[_dias_atraso > 0].astype(int)).sort_values('Días_de_atraso', ascending=False)
+        # 3) pendientes con datos faltantes
+        faltantes_sol = pd.DataFrame()
+        if not _pend.empty:
+            _falta = _vacio(_pend['Jefe_de_Venta']) | _vacio(_pend['Canal']) | _vacio(_pend['Modelo'])
+            faltantes_sol = _pend[_falta]
+        # 4) CUC con más de un nombre de cliente
+        _cli = pd.concat([df_cal_sol[['CUC', 'Cliente']], df_cal_lev[['CUC', 'Cliente']]]) if not df_cal_lev.empty else df_cal_sol[['CUC', 'Cliente']]
+        _cli = _cli.fillna("").astype(str)
+        _cli = _cli[(_cli['CUC'].str.strip() != "") & (_cli['Cliente'].str.strip() != "")].copy()
+        _cli['_n'] = _cli['Cliente'].map(_norm_nombre)
+        _g = _cli.groupby('CUC')['_n'].nunique()
+        cuc_conflicto = _cli[_cli['CUC'].isin(_g[_g > 1].index)]
+        # 5) equipos con datos incompletos
+        inc_inv = pd.DataFrame()
+        if not df_cal_inv.empty:
+            _inc = pd.Series(False, index=df_cal_inv.index)
+            for _c in ("Tipo", "Modelo", "Canal", "Ubicación", "Estatus"):
+                _inc |= _vacio(df_cal_inv[_c])
+            inc_inv = df_cal_inv[_inc]
+        # 6) nombres parecidos
+        n_parecidos = {}
+        for _etq, _col in (("Jefe de Venta", "Jefe_de_Venta"), ("Supervisor", "Supervisor"), ("Ruta (chofer)", "Ruta")):
+            _nom = [n for n in pd.concat([df_cal_sol[_col]] + ([df_cal_lev[_col]] if _col in df_cal_lev.columns else [])).fillna("").astype(str).str.strip().unique() if n and n.lower() != "nan"]
+            _usados, _grupos = set(), 0
+            for _n in _nom:
+                if _n in _usados:
+                    continue
+                _par = [x for x in jefes_parecidos(_n, _nom) if x not in _usados]
+                if _par:
+                    _grupos += 1
+                    _usados.update([_n] + _par)
+            n_parecidos[_etq] = _grupos
+
+        k1, k2, k3, k4 = st.columns(4)
+        with k1:
+            render_kpi("Series con solicitudes repetidas", len(dup_ser), "Más de una solicitud pendiente", "#DC2626" if len(dup_ser) else "#16A34A")
+        with k2:
+            render_kpi("Pendientes atrasadas", len(atrasadas_df), "Su fecha programada ya pasó", "#D95F00" if len(atrasadas_df) else "#16A34A")
+        with k3:
+            render_kpi("CUC con varios nombres", int(_g[_g > 1].shape[0]), "Un mismo cliente escrito distinto", "#D95F00" if len(cuc_conflicto) else "#16A34A")
+        with k4:
+            render_kpi("Equipos con datos incompletos", len(inc_inv), "Sin tipo, modelo, canal, ubicación o estatus", "#D95F00" if len(inc_inv) else "#16A34A")
+
+        with st.expander(f"Series con más de una solicitud pendiente ({len(dup_ser)})", expanded=len(dup_ser) > 0):
+            if dup_ser.empty:
+                estado_vacio("No hay series con solicitudes pendientes repetidas.")
+            else:
+                mostrar_tabla(mayus(dup_ser), use_container_width=True, hide_index=True)
+        with st.expander(f"Pendientes atrasadas ({len(atrasadas_df)})"):
+            if atrasadas_df.empty:
+                estado_vacio("No hay solicitudes pendientes con fecha vencida.")
+            else:
+                cols_at = [c for c in ['Fecha_Entregado', 'Cliente', 'Modelo', 'Canal', 'Jefe_de_Venta', 'Ruta', 'Días_de_atraso'] if c in atrasadas_df.columns]
+                mostrar_tabla(mayus(atrasadas_df[cols_at]), use_container_width=True, hide_index=True)
+        with st.expander(f"Pendientes sin jefe de venta, canal o modelo ({len(faltantes_sol)})"):
+            if faltantes_sol.empty:
+                estado_vacio("Todas las solicitudes pendientes tienen jefe de venta, canal y modelo.")
+            else:
+                mostrar_tabla(mayus(faltantes_sol[['Fecha_Recibido', 'Cliente', 'Modelo', 'Canal', 'Jefe_de_Venta']]), use_container_width=True, hide_index=True)
+        with st.expander(f"Equipos del inventario con datos incompletos ({len(inc_inv)})"):
+            if inc_inv.empty:
+                estado_vacio("Todos los equipos tienen tipo, modelo, canal, ubicación y estatus.")
+            else:
+                mostrar_tabla(mayus(inc_inv[['Serie', 'Tipo', 'Modelo', 'Canal', 'Ubicación', 'Estatus']]), use_container_width=True, hide_index=True)
+        with st.expander(f"Clientes: CUC con más de un nombre ({int(_g[_g > 1].shape[0])})", expanded=len(cuc_conflicto) > 0):
+            if cuc_conflicto.empty:
+                estado_vacio("Cada CUC tiene un solo nombre de cliente.")
+            else:
+                resumen_cuc = (cuc_conflicto.groupby('CUC').agg(Nombres=('Cliente', lambda x: " / ".join(sorted({v.strip() for v in x}))),
+                                                              Registros=('Cliente', 'size')).reset_index())
+                mostrar_tabla(mayus(resumen_cuc), use_container_width=True, hide_index=True)
+                cuc_sel = st.selectbox("CUC a corregir:", list(resumen_cuc['CUC']), key="cal_cuc_sel", index=None, placeholder="Elige un CUC")
+                if cuc_sel:
+                    opciones_nom = sorted({v.strip() for v in cuc_conflicto[cuc_conflicto['CUC'] == cuc_sel]['Cliente']})
+                    nombre_ok = st.selectbox("Nombre correcto:", opciones_nom, key="cal_cuc_nombre", index=None, accept_new_options=True,
+                                             placeholder="Elige uno o escribe el nombre correcto")
+                    if st.button(":material/merge: Unificar nombre de este CUC", key="btn_unif_cuc"):
+                        nombre_ok = _limpiar_nombre(nombre_ok or "")
+                        if not nombre_ok:
+                            st.error("Elige o escribe el nombre correcto.")
+                        else:
+                            df_s2, df_l2 = cargar_solicitudes(), cargar_levantamientos()
+                            for _df in (df_s2, df_l2):
+                                if 'CUC' in _df.columns:
+                                    _df.loc[_df['CUC'].astype(str).str.strip() == str(cuc_sel).strip(), 'Cliente'] = nombre_ok
+                            ok_s = guardar_solicitudes_seguro(df_s2)
+                            guardar_levantamientos(df_l2)
+                            if ok_s is not False:
+                                st.success(f"Listo: el CUC {cuc_sel} quedó como «{nombre_ok}».")
+                                time.sleep(1.2)
+                                st.rerun()
+        with st.expander("Nombres parecidos (jefes de venta, supervisores y choferes)"):
+            for _etq, _n in n_parecidos.items():
+                st.markdown(f"- **{_etq}:** " + (f"{_n} posible(s) duplicado(s)" if _n else "sin nombres parecidos"))
+            if any(n_parecidos.values()):
+                st.caption("Corrígelos en Gestión y Movimientos › Solicitudes › Unificar Nombres.")
+
+elif menu == "Exportar a Excel" and (st.session_state['autenticado'] or st.session_state['es_gerente']):
+    render_banner("exportar", "Exportar a Excel",
+                  "Reportes para descargar o imprimir, respaldo e importación de la base de datos." if st.session_state['autenticado']
+                  else "Reportes para descargar o imprimir.")
+    if not st.session_state['autenticado']:
+        pass
+    elif db_activa():
         try:
             _res_db = db_resumen()
             st.success("Base de datos conectada (PostgreSQL). Registros guardados: " +
@@ -5063,10 +5497,97 @@ elif menu == "Exportar a Excel" and st.session_state['autenticado']:
     else:
         st.warning("Base de datos no configurada: la app está usando archivos temporales. Agrega DATABASE_URL en Secrets para que los datos queden guardados de forma permanente.")
     
-    sub_pestana = st.radio("Selecciona una opción:", ["Exportar a Excel", "Importar Base de Datos Completa"], horizontal=True)
+    if st.session_state['autenticado']:
+        sub_pestana = st.radio("Selecciona una opción:", ["Reportes para exportar o imprimir", "Exportar Base de Datos Completa (Excel)", "Respaldo completo (ZIP)", "Importar Base de Datos Completa"], horizontal=True)
+    else:
+        sub_pestana = "Reportes para exportar o imprimir"
     st.markdown("---")
-    
-    if sub_pestana == "Exportar a Excel":
+
+    if sub_pestana == "Reportes para exportar o imprimir":
+        _XLSX = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+        # 1. Reporte maestro
+        with st.container(border=True):
+            st.markdown("### :material/inventory_2: Reporte Maestro de Inventario y Solicitudes (Excel)")
+            st.caption("Incluye el inventario actual con días de estadía, las solicitudes y los levantamientos.")
+            if st.button(":material/download: Preparar Excel", key="btn_exp_maestro"):
+                buf_m = io.BytesIO()
+                with pd.ExcelWriter(buf_m, engine="openpyxl") as writer:
+                    calcular_dias_sin_movimiento(df_inv).to_excel(writer, sheet_name="Inventario", index=False)
+                    cargar_solicitudes().to_excel(writer, sheet_name="Solicitudes", index=False)
+                    cargar_levantamientos().to_excel(writer, sheet_name="Levantamientos", index=False)
+                st.download_button(":material/download: Descargar Reporte Maestro", buf_m.getvalue(),
+                                   file_name=f"Reporte_Maestro_Bepensa_{date.today():%Y%m%d}.xlsx", mime=_XLSX)
+
+        # 2. Necesidades de taller
+        with st.container(border=True):
+            st.markdown("### :material/build: Necesidades de Taller (Excel)")
+            st.caption("Entregas pendientes sin serie asignada, por modelo y año solicitado, con lo disponible y los equipos a reparar sugeridos.")
+            _pend_all = pendientes_sin_asignar(cargar_solicitudes())
+            _canales_exp = ["Todos"] + sorted({str(c).strip() for c in _pend_all['Canal'].dropna() if str(c).strip() and str(c).strip().lower() != 'nan'})
+            canal_exp = st.selectbox("Canal:", _canales_exp, key="filtro_canal_exp_taller")
+            _pend_exp = _pend_all if canal_exp == "Todos" else _pend_all[_pend_all['Canal'].astype(str).str.strip() == canal_exp]
+            if _pend_exp.empty:
+                estado_vacio("No hay solicitudes pendientes sin asignar con el canal seleccionado.")
+            else:
+                _nec_exp = calcular_necesidad_taller(_pend_exp, df_inv, canal_exp)[0]
+                _buf_nt = io.BytesIO()
+                with pd.ExcelWriter(_buf_nt, engine="openpyxl") as _w_nt:
+                    _nec_exp.to_excel(_w_nt, index=False, sheet_name="Necesidades de Taller")
+                st.download_button(":material/download: Descargar Necesidades de Taller", _buf_nt.getvalue(),
+                                   file_name=f"necesidades_taller_{date.today():%Y%m%d}.xlsx", mime=_XLSX)
+
+        # 3. Rendimiento de choferes (PDF)
+        with st.container(border=True):
+            st.markdown("### :material/local_shipping: Rendimiento de Choferes (PDF para imprimir)")
+            st.caption(f"Ranking de la catorcena con horas extras contra el límite de {LIMITE_HORAS_EXTRAS} h, y hojas por chofer.")
+            try:
+                import reportlab  # noqa: F401
+                _hay_pdf = True
+            except ImportError:
+                _hay_pdf = False
+            _inicio_act = inicio_catorcena(date.today(), referencia_catorcena())
+            ini_e = st.selectbox("Catorcena:", [_inicio_act - timedelta(days=14 * i) for i in range(0, 27)], key="exp_catorcena",
+                                 format_func=lambda i: f"{i:%d/%m/%Y} al {i + timedelta(days=13):%d/%m/%Y}" + (" (actual)" if i == _inicio_act else ""))
+            fin_e = ini_e + timedelta(days=13)
+            if not _hay_pdf:
+                st.warning("Para generar los PDF agrega la línea 'reportlab' al archivo requirements.txt del repositorio.")
+            else:
+                res_e, dia_e, _, _ = calcular_rendimiento(cargar_solicitudes(), ini_e, fin_e, list(CHOFERES_AUTORIZADOS.keys()), cargar_horas_extras())
+                if res_e.empty or (int(res_e['Asignadas'].sum()) == 0 and float(res_e['Horas extras'].sum()) == 0):
+                    estado_vacio("No hay datos para generar el reporte de esta catorcena.")
+                else:
+                    e1, e2, e3 = st.columns(3)
+                    with e1:
+                        st.download_button(":material/download: Reporte general (PDF)", generar_pdf_rendimiento(res_e, dia_e, ini_e, fin_e, "general"),
+                                           file_name=f"rendimiento_choferes_{ini_e:%Y%m%d}.pdf", mime="application/pdf")
+                    with e2:
+                        st.download_button(":material/download: Hojas de todos los choferes (PDF)", generar_pdf_rendimiento(res_e, dia_e, ini_e, fin_e, "individual"),
+                                           file_name=f"hojas_choferes_{ini_e:%Y%m%d}.pdf", mime="application/pdf")
+                    with e3:
+                        ch_e = st.selectbox("Hoja individual de:", list(res_e['Chofer']), key="exp_pdf_chofer", label_visibility="collapsed")
+                        st.download_button(":material/download: Hoja individual (PDF)", generar_pdf_rendimiento(res_e, dia_e, ini_e, fin_e, "individual", [ch_e]),
+                                           file_name=f"hoja_{str(ch_e).lower().replace(' ', '_')}_{ini_e:%Y%m%d}.pdf", mime="application/pdf")
+
+        # 4. Catálogo de equipos
+        with st.container(border=True):
+            st.markdown("### :material/menu_book: Catálogo de Equipos (Excel)")
+            st.caption("Todos los modelos con sus especificaciones y si tienen imagen.")
+            _df_cat = cargar_especificaciones().copy()
+            for _c in COLUMNAS_ESPECIFICACIONES:
+                if _c not in _df_cat.columns:
+                    _df_cat[_c] = ""
+            _idx_img_e = indice_imagenes()
+            _df_cat_out = _df_cat[COLUMNAS_ESPECIFICACIONES].copy()
+            _df_cat_out.insert(1, 'Imagen', _df_cat['Modelo'].astype(str).str.strip().apply(lambda m: "Sí" if _clave_modelo(m) in _idx_img_e else "—"))
+            _buf_cat = io.BytesIO()
+            with pd.ExcelWriter(_buf_cat, engine="openpyxl") as _w_cat:
+                _df_cat_out.to_excel(_w_cat, index=False, sheet_name="Catálogo de Equipos")
+            st.download_button(":material/download: Descargar Catálogo de Equipos", _buf_cat.getvalue(),
+                               file_name="catalogo_equipos.xlsx", mime=_XLSX)
+
+    elif sub_pestana == "Exportar Base de Datos Completa (Excel)":
+        st.markdown("### :material/database: Base de Datos Completa (Excel)")
         st.markdown("Genera un archivo completo con el inventario actual, levantamientos, solicitudes y la bitácora de movimientos en pestañas separadas.")
         if st.button(":material/download: Generar Archivo Excel"):
             output_file = "Reporte_Inventario_Capacidades_Bepensa.xlsx"
@@ -5098,6 +5619,18 @@ elif menu == "Exportar a Excel" and st.session_state['autenticado']:
                 )
             st.success("¡Archivo Excel generado correctamente con todas las pestañas!")
             
+    elif sub_pestana == "Respaldo completo (ZIP)":
+        st.markdown("### :material/shield: Respaldo completo (ZIP)")
+        st.markdown("Un archivo ZIP con un CSV por tabla (inventario, solicitudes, levantamientos, historial, especificaciones, horas extras y configuración) "
+                    "y las imágenes de los modelos. Descárgalo antes de cambios grandes, como unificar nombres o importar archivos.")
+        if not db_activa():
+            st.info("El respaldo ZIP está disponible cuando la app trabaja con la base de datos de Neon.")
+        elif st.button(":material/download: Preparar respaldo", key="btn_resp_zip"):
+            with st.spinner("Preparando el respaldo..."):
+                _zip_resp = generar_respaldo_zip()
+            st.download_button(":material/download: Descargar respaldo (ZIP)", _zip_resp,
+                               file_name=f"respaldo_comodatos_{datetime.now():%Y%m%d_%H%M}.zip", mime="application/zip")
+
     elif sub_pestana == "Importar Base de Datos Completa":
         st.markdown("Sube tu archivo Excel y **selecciona manualmente qué pestaña de tu archivo corresponde a cada apartado** de la aplicación.")
         
