@@ -1,13 +1,16 @@
-streamlit
-pandas
-matplotlib
-requests
-openpyxl
-numpy
-pillow
-plotly
-xlrd
-jinja2
-SQLAlchemy
-psycopg2-binary
-reportlab
+# Rangos de versiones: pip instala la más nueva compatible con el Python de Streamlit Cloud,
+# pero sin saltar a una versión mayor que pueda romper la app.
+# Si algún día algo falla tras una actualización, fija aquí la versión exacta que funcionaba (por ejemplo pandas==2.3.3).
+streamlit>=1.50,<2
+pandas>=2.2,<4
+numpy>=1.26,<3
+matplotlib>=3.8,<4
+plotly>=5.20,<8
+requests>=2.31,<3
+openpyxl>=3.1,<4
+xlrd>=2.0,<3
+pillow>=10.3,<14
+jinja2>=3.1,<4
+SQLAlchemy>=2.0,<3
+psycopg2-binary>=2.9,<3
+reportlab>=4.0,<6
