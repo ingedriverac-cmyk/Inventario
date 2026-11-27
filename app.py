@@ -3718,6 +3718,7 @@ elif menu == "Necesidades de Taller":
         pend['Año_Solicitado'] = pend['Año_Solicitado'].fillna("").astype(str).str.strip().replace("", "Sin especificar")
 
         necesidad, inv_nt, es_disp, es_rep = calcular_necesidad_taller(pend, df_inv, canal_nt)
+        _orden_r = {r: i for i, r in enumerate(RANGOS_ANIO_SOLICITADO)}
 
         k_nt1, k_nt2, k_nt3 = st.columns(3)
         with k_nt1:
