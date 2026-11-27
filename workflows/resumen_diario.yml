@@ -1,1 +1,41 @@
+name: Resumen diario por correo
 
+on:
+  schedule:
+    - cron: "0 0 * * *"      # 00:00 UTC = 7:00 p. m. en Cancún (UTC-5). GitHub puede tardar unos minutos en lanzarlo.
+  workflow_dispatch:          # también se puede lanzar a mano desde la pestaña Actions
+    inputs:
+      probar:
+        description: "Solo mostrar el resumen en el registro, sin enviar correos"
+        type: boolean
+        default: true
+
+jobs:
+  resumen:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install pandas SQLAlchemy psycopg2-binary
+
+      - name: Calcular y enviar el resumen
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          EMAIL_DESTINOS: ${{ secrets.EMAIL_DESTINOS }}
+          EMAIL_REMITENTE: ${{ secrets.EMAIL_REMITENTE }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
+          SMTP_SEGURIDAD: ${{ secrets.SMTP_SEGURIDAD }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] && [ "${{ inputs.probar }}" = "true" ]; then
+            python resumen_diario.py --probar
+          else
+            python resumen_diario.py
+          fi
