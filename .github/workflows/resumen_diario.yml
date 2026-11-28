@@ -2,8 +2,8 @@ name: Resumen diario por correo
 
 on:
   schedule:
-    - cron: "0 0 * * *"      # 00:00 UTC = 7:00 p. m. en Cancún (UTC-5). GitHub puede tardar unos minutos en lanzarlo.
-  workflow_dispatch:          # también se puede lanzar a mano desde la pestaña Actions
+    - cron: "0 0 * * *"      # 00:00 UTC = 7:00 p. m. en Cancún (UTC-5)
+  workflow_dispatch:
     inputs:
       probar:
         description: "Solo mostrar el resumen en el registro, sin enviar correos"
